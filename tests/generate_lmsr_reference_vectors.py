@@ -81,8 +81,25 @@ def generate_fixture() -> dict:
 
 
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Emit deterministic LMSR reference vectors")
+    parser.add_argument("--check", action="store_true", help="verify the checked-in fixture matches freshly generated output")
+    args = parser.parse_args()
+
     fixture_path = Path(__file__).parent / "fixtures" / "lmsr_reference_vectors.json"
-    fixture_path.parent.mkdir(parents=True, exist_ok=True)
-    fixture_path.write_text(json.dumps(generate_fixture(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(f"wrote {fixture_path}")
+    generated = json.dumps(generate_fixture(), indent=2, sort_keys=True) + "\n"
+
+    if args.check:
+        if not fixture_path.exists():
+            print(f"missing fixture: {fixture_path}", file=sys.stderr)
+            raise SystemExit(1)
+        if fixture_path.read_text(encoding="utf-8") != generated:
+            print(f"fixture out of date: {fixture_path}", file=sys.stderr)
+            raise SystemExit(1)
+        print(f"fixture up to date: {fixture_path}")
+    else:
+        fixture_path.parent.mkdir(parents=True, exist_ok=True)
+        fixture_path.write_text(generated, encoding="utf-8")
+        print(f"wrote {fixture_path}")
 

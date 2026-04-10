@@ -7,6 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from smart_contracts.lmsr_math import SCALE, lmsr_cost, lmsr_cost_delta, lmsr_liquidity_scale, lmsr_prices, lmsr_sell_return
+from smart_contracts.market_app.contract import SHARE_UNIT
 
 
 def test_prices_sum_precision_10000_random_states() -> None:
@@ -38,9 +39,9 @@ def test_buy_then_sell_round_trip_net_cost_nonnegative() -> None:
     for _ in range(1_000):
         n = rng.randint(2, 16)
         b = rng.randint(100_000, 10_000_000)
-        q = [rng.randint(0, 5_000_000) for _ in range(n)]
+        q = [rng.randint(0, 5) * SHARE_UNIT for _ in range(n)]
         outcome = rng.randrange(n)
-        shares = rng.randint(1, 500_000)
+        shares = rng.randint(1, 500) * SHARE_UNIT
 
         buy_cost = lmsr_cost_delta(q, b, outcome, shares)
         q_after = list(q)
@@ -56,9 +57,9 @@ def test_buy_then_sell_round_trip_no_free_money_5000_random_large_states() -> No
     for _ in range(5_000):
         n = rng.randint(2, 16)
         b = rng.randint(1, 1_000_000_000)
-        q = [rng.randint(0, 1_000_000_000) for _ in range(n)]
+        q = [rng.randint(0, 1_000) * SHARE_UNIT for _ in range(n)]
         outcome = rng.randrange(n)
-        shares = rng.randint(1, 500_000_000)
+        shares = rng.randint(1, 500) * SHARE_UNIT
 
         buy_cost = lmsr_cost_delta(q, b, outcome, shares)
         q_after = list(q)
@@ -134,11 +135,11 @@ def test_multi_leg_round_trip_no_free_money_5000_random_states() -> None:
     for _ in range(5_000):
         n = rng.randint(2, 8)
         b = rng.randint(100_000, 50_000_000)
-        q = [rng.randint(0, 10_000_000) for _ in range(n)]
+        q = [rng.randint(0, 10) * SHARE_UNIT for _ in range(n)]
         first_outcome = rng.randrange(n)
         second_outcome = rng.randrange(n)
-        first_shares = rng.randint(1, 500_000)
-        second_shares = rng.randint(1, 500_000)
+        first_shares = rng.randint(1, 500) * SHARE_UNIT
+        second_shares = rng.randint(1, 500) * SHARE_UNIT
 
         first_cost = lmsr_cost_delta(q, b, first_outcome, first_shares)
         q1 = q.copy()

@@ -179,6 +179,10 @@ debug_traces/
 .algokit/static-analysis/ # Replace with .algokit/static-analysis/tealer/ to enable snapshot checks in CI
 .algokit/sources
 
+# TLA+ model checker artifacts
+tla/states/
+tla/*.bin
+
 # Secrets - never commit
 .env
 .env.*

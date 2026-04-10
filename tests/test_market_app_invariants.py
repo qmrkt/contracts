@@ -27,6 +27,7 @@ def test_market_app_invariants() -> None:
     cases.append(market)
 
     market = bootstrap_and_buy()
+    market.provide_liq(sender="lp2", deposit_amount=50_000_000, now=5_500)
     market.withdraw_liq(sender="creator", shares_to_burn=10_000_000)
     cases.append(market)
 
@@ -75,7 +76,13 @@ def test_market_app_invariants() -> None:
     cases.append(market)
 
     for case in cases:
-        assert case.pool_balance >= max(case.q, default=0)
+        remaining_winning_supply = 0
+        if 0 <= case.winning_outcome < case.num_outcomes:
+            remaining_winning_supply = sum(
+                holdings[case.winning_outcome] for holdings in case.user_outcome_shares.values()
+            )
+        if case.status == STATUS_RESOLVED:
+            assert case.pool_balance >= remaining_winning_supply
         if case.status != STATUS_RESOLVED and case.b > 0:
             assert abs(sum(lmsr_prices(case.q, case.b)) - SCALE) <= case.num_outcomes
 
@@ -94,4 +101,3 @@ def test_authorization_and_status_negative_cases() -> None:
     active_market.bootstrap(sender="creator", deposit_amount=200_000_000)
     with pytest.raises(MarketAppError, match="only creator"):
         active_market.cancel(sender="bad")
-

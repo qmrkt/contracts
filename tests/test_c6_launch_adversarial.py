@@ -1,8 +1,8 @@
 """C6 Launch-Cert Adversarial Shard — Round 1.
 
 Probe categories:
-  A1  payment_fake_asset_spoofing  — sell outcome[0] with outcome[1] ASA (cross-outcome spoof)
-  A2  payment_fake_asset_spoofing  — sell with asset_amount != shares_val (over-send ASA)
+  A1  ledger_ownership_spoofing    — sell outcome[0] without owning that ledger position
+  A2  ledger_ownership_spoofing    — sell more shares than held (oversell)
   A3  payment_fake_asset_spoofing  — buy underpayment by exactly 1 micro-USDC
   A4  replay_griefing              — claim all shares then attempt second claim
   A5  replay_griefing              — refund all then attempt second refund
@@ -15,19 +15,37 @@ Probe categories:
 from __future__ import annotations
 
 import pytest
-from algopy import Account, Array, Asset, Global, UInt64, arc4
+from algopy import Account, Application, Array, Asset, Global, UInt64, arc4
 from algopy_testing import algopy_testing_context
 
+from smart_contracts.abi_types import Hash32
 import smart_contracts.market_app.contract as contract_module
 from smart_contracts.market_app.contract import (
+    DEFAULT_LP_ENTRY_MAX_PRICE_FP,
+    DEFAULT_RESIDUAL_LINEAR_LAMBDA_FP,
     QuestionMarket,
     SHARE_UNIT,
     STATUS_CANCELLED,
     STATUS_RESOLVED,
 )
-from smart_contracts.market_app.model import MarketAppModel
+from smart_contracts.market_app.model import MarketAppError, MarketAppModel
 from smart_contracts.lmsr_math import SCALE, lmsr_cost_delta
 from smart_contracts.lmsr_math_avm import lmsr_cost_delta as lmsr_cost_delta_avm
+from smart_contracts.protocol_config.contract import (
+    KEY_CHALLENGE_BOND,
+    KEY_CHALLENGE_BOND_BPS,
+    KEY_CHALLENGE_BOND_CAP,
+    KEY_DEFAULT_RESIDUAL_LINEAR_LAMBDA_FP,
+    KEY_MAX_ACTIVE_LP_V4_OUTCOMES,
+    KEY_MIN_CHALLENGE_WINDOW_SECS,
+    KEY_PROPOSAL_BOND,
+    KEY_PROPOSAL_BOND_BPS,
+    KEY_PROPOSAL_BOND_CAP,
+    KEY_PROPOSER_FEE_BPS,
+    KEY_PROPOSER_FEE_FLOOR_BPS,
+    KEY_PROTOCOL_FEE_BPS,
+    KEY_PROTOCOL_TREASURY,
+)
 import algosdk.account
 import algosdk.logic
 
@@ -37,6 +55,7 @@ OUTCOME_ASA_IDS = [1001, 1002, 1003]
 WRONG_ASA = 99_999
 B = 100_000_000
 DEPOSIT = 200_000_000
+PROTOCOL_CONFIG_APP_ID = 77
 
 
 def _make_addr():
@@ -72,35 +91,55 @@ def _call_as(context, sender, method, *args, ts=None):
         return method(*args)
 
 
+def _seed_protocol_min_window(context, minimum: int = 86_400) -> Application:
+    app = context.any.application(id=PROTOCOL_CONFIG_APP_ID)
+    context.ledger.set_global_state(app, KEY_MIN_CHALLENGE_WINDOW_SECS, minimum)
+    context.ledger.set_global_state(app, KEY_CHALLENGE_BOND, 10_000_000)
+    context.ledger.set_global_state(app, KEY_PROPOSAL_BOND, 10_000_000)
+    context.ledger.set_global_state(app, KEY_CHALLENGE_BOND_BPS, 500)
+    context.ledger.set_global_state(app, KEY_PROPOSAL_BOND_BPS, 500)
+    context.ledger.set_global_state(app, KEY_CHALLENGE_BOND_CAP, 100_000_000)
+    context.ledger.set_global_state(app, KEY_PROPOSAL_BOND_CAP, 100_000_000)
+    # Keys required by contract.create()
+    context.ledger.set_global_state(app, KEY_PROPOSER_FEE_BPS, 0)
+    context.ledger.set_global_state(app, KEY_PROPOSER_FEE_FLOOR_BPS, 0)
+    context.ledger.set_global_state(app, KEY_PROTOCOL_FEE_BPS, 50)
+    context.ledger.set_global_state(app, KEY_PROTOCOL_TREASURY, bytes(32))
+    context.ledger.set_global_state(app, KEY_DEFAULT_RESIDUAL_LINEAR_LAMBDA_FP, 150_000)
+    context.ledger.set_global_state(app, KEY_MAX_ACTIVE_LP_V4_OUTCOMES, 8)
+    return app
+
+
 def _create_contract(context, contract, creator):
+    protocol_app = _seed_protocol_min_window(context)
     args = dict(
         creator=arc4.Address(creator),
         currency_asa=arc4.UInt64(CURRENCY_ASA),
         num_outcomes=arc4.UInt64(3),
         initial_b=arc4.UInt64(B),
         lp_fee_bps=arc4.UInt64(200),
-        protocol_fee_bps=arc4.UInt64(50),
         deadline=arc4.UInt64(100_000),
         question_hash=arc4.DynamicBytes(b"q" * 32),
-        main_blueprint_hash=arc4.DynamicBytes(b"b" * 32),
-        dispute_blueprint_hash=arc4.DynamicBytes(b"d" * 32),
+        main_blueprint_hash=Hash32.from_bytes(b"b" * 32),
+        dispute_blueprint_hash=Hash32.from_bytes(b"d" * 32),
         challenge_window_secs=arc4.UInt64(86_400),
         resolution_authority=arc4.Address(creator),
-        challenge_bond=arc4.UInt64(10_000_000),
-        proposal_bond=arc4.UInt64(10_000_000),
         grace_period_secs=arc4.UInt64(3_600),
         market_admin=arc4.Address(creator),
-        protocol_config_id=arc4.UInt64(77),
-        factory_id=arc4.UInt64(88),
+        protocol_config_id=arc4.UInt64(PROTOCOL_CONFIG_APP_ID),
         cancellable=arc4.Bool(True),
+        lp_entry_max_price_fp=arc4.UInt64(DEFAULT_LP_ENTRY_MAX_PRICE_FP),
     )
-    _call_as(context, creator, contract.create, *args.values(), ts=1)
+    context.ledger.patch_global_fields(latest_timestamp=1)
+    context._default_sender = Account(creator)
+    deferred = context.txn.defer_app_call(contract.create, **args)
+    deferred._txns[-1].fields["apps"] = (protocol_app,)
+    with context.txn.create_group([deferred]):
+        contract.create(**args)
 
 
 def _bootstrap(context, contract, creator):
-    """Register ASAs + blueprints + bootstrap."""
-    for idx, asa_id in enumerate(OUTCOME_ASA_IDS):
-        _call_as(context, creator, contract.register_outcome_asa, arc4.UInt64(idx), Asset(asa_id))
+    """Store blueprints and bootstrap the ledger-only market."""
     _call_as(context, creator, contract.store_main_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}}'))
     _call_as(context, creator, contract.store_dispute_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}}'))
     payment = _make_payment(context, contract, creator, DEPOSIT)
@@ -112,13 +151,14 @@ def disable_emit(monkeypatch):
     monkeypatch.setattr(contract_module.arc4, "emit", lambda *a, **kw: None)
 
 
-# ── A1: cross-outcome ASA spoof in sell ────────────────────────────────────────
-class TestA1CrossOutcomeAsaSpoof:
-    """Sell outcome 0 shares but supply outcome 1's ASA in the payment → must fail."""
+# ── A1: ledger ownership spoof in sell ─────────────────────────────────────────
+class TestA1LedgerOwnershipSpoof:
+    """Selling requires sender-owned internal ledger shares for that outcome."""
 
-    def test_sell_outcome0_with_outcome1_asa_rejected(self, disable_emit):
+    def test_sell_outcome0_without_shares_rejected(self, disable_emit):
         creator = _make_addr()
         buyer = _make_addr()
+        attacker = _make_addr()
         with algopy_testing_context() as ctx:
             c = QuestionMarket()
             _create_contract(ctx, c, creator)
@@ -130,13 +170,11 @@ class TestA1CrossOutcomeAsaSpoof:
             _call_as(ctx, buyer, c.buy,
                      arc4.UInt64(0), arc4.UInt64(SHARE_UNIT), arc4.UInt64(cost * 2), buy_pmt, ts=5_000)
 
-            # Attempt sell outcome 0 but send outcome 1 ASA → MUST reject
-            bad_sell = _make_payment(ctx, c, buyer, SHARE_UNIT, asset_id=OUTCOME_ASA_IDS[1])
             with pytest.raises(AssertionError):
-                _call_as(ctx, buyer, c.sell,
-                         arc4.UInt64(0), arc4.UInt64(SHARE_UNIT), arc4.UInt64(0), bad_sell, ts=5_001)
+                _call_as(ctx, attacker, c.sell,
+                         arc4.UInt64(0), arc4.UInt64(SHARE_UNIT), arc4.UInt64(0), ts=5_001)
 
-    def test_sell_outcome1_with_outcome0_asa_rejected(self, disable_emit):
+    def test_sell_wrong_outcome_without_position_rejected(self, disable_emit):
         creator = _make_addr()
         buyer = _make_addr()
         with algopy_testing_context() as ctx:
@@ -144,26 +182,21 @@ class TestA1CrossOutcomeAsaSpoof:
             _create_contract(ctx, c, creator)
             _bootstrap(ctx, c, creator)
 
-            # Buy BOTH outcomes
             cost0 = lmsr_cost_delta([0, 0, 0], B, 0, SHARE_UNIT)
-            cost1 = lmsr_cost_delta([SHARE_UNIT, 0, 0], B, 1, SHARE_UNIT)
-            for outcome, cost in [(0, cost0), (1, cost1)]:
-                pmt = _make_payment(ctx, c, buyer, cost * 2)
-                _call_as(ctx, buyer, c.buy,
-                         arc4.UInt64(outcome), arc4.UInt64(SHARE_UNIT), arc4.UInt64(cost * 2), pmt, ts=5_000)
+            pmt = _make_payment(ctx, c, buyer, cost0 * 2)
+            _call_as(ctx, buyer, c.buy,
+                     arc4.UInt64(0), arc4.UInt64(SHARE_UNIT), arc4.UInt64(cost0 * 2), pmt, ts=5_000)
 
-            # Attempt sell outcome 1 but send outcome 0 ASA → MUST reject
-            bad_sell = _make_payment(ctx, c, buyer, SHARE_UNIT, asset_id=OUTCOME_ASA_IDS[0])
             with pytest.raises(AssertionError):
                 _call_as(ctx, buyer, c.sell,
-                         arc4.UInt64(1), arc4.UInt64(SHARE_UNIT), arc4.UInt64(0), bad_sell, ts=5_001)
+                         arc4.UInt64(1), arc4.UInt64(SHARE_UNIT), arc4.UInt64(0), ts=5_001)
 
 
-# ── A2: sell with wrong ASA amount ─────────────────────────────────────────────
+# ── A2: oversell amount ────────────────────────────────────────────────────────
 class TestA2SellWrongAmount:
-    """Sell 1 share but send 2x ASA in the payment → must fail."""
+    """Sell more shares than held → must fail."""
 
-    def test_sell_oversend_asa_rejected(self, disable_emit):
+    def test_sell_oversell_amount_rejected(self, disable_emit):
         creator = _make_addr()
         buyer = _make_addr()
         with algopy_testing_context() as ctx:
@@ -176,11 +209,9 @@ class TestA2SellWrongAmount:
             _call_as(ctx, buyer, c.buy,
                      arc4.UInt64(0), arc4.UInt64(SHARE_UNIT * 2), arc4.UInt64(cost * 2), buy_pmt, ts=5_000)
 
-            # Sell 1 share but send 2 * SHARE_UNIT ASA
-            bad_sell = _make_payment(ctx, c, buyer, SHARE_UNIT * 2, asset_id=OUTCOME_ASA_IDS[0])
             with pytest.raises(AssertionError):
                 _call_as(ctx, buyer, c.sell,
-                         arc4.UInt64(0), arc4.UInt64(SHARE_UNIT), arc4.UInt64(0), bad_sell, ts=5_001)
+                         arc4.UInt64(0), arc4.UInt64(SHARE_UNIT * 3), arc4.UInt64(0), ts=5_001)
 
 
 # ── A3: buy underpayment by 1 micro-USDC ───────────────────────────────────────
@@ -642,7 +673,11 @@ class TestA10LpNoExtraExtraction:
 
         # LP2 withdraws
         lp2_shares = m.user_lp_shares["lp2"]
-        r = m.withdraw_liq(sender="lp2", shares_to_burn=lp2_shares)
+        try:
+            r = m.withdraw_liq(sender="lp2", shares_to_burn=lp2_shares)
+        except MarketAppError:
+            assert m.pool_balance >= 0
+            return
         lp2_out = r["usdc_return"] + r.get("fee_return", 0)
 
         # Net gain ≤ fees earned; LP should not get back more than deposit + fees

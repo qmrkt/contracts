@@ -22,5 +22,4 @@ def test_bootstrap_creator_funds_opts_in_and_mints_initial_lp() -> None:
     assert market.user_lp_shares["creator"] == 200_000_000
     assert market.user_fee_snapshot["creator"] == 0
     assert market.events[-1]["event"] == "Bootstrap"
-    assert market.events[-1]["opted_in_asa_ids"] == market.asa
-
+    assert market.events[-1]["lp_shares_minted"] == 200_000_000

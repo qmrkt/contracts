@@ -69,11 +69,11 @@ class TestGracePeriod:
         m.propose_resolution(
             sender="resolver", outcome_index=0,
             evidence_hash=b"e" * 32, now=m.deadline + 1,
-            bond_paid=PROPOSAL_BOND,
+            bond_paid=0,
         )
         assert m.status == STATUS_RESOLUTION_PROPOSED
         assert m.proposer == "resolver"
-        assert m.proposer_bond_held == PROPOSAL_BOND
+        assert m.proposer_bond_held == 0
 
     def test_authority_proposes_after_grace_period(self) -> None:
         m = make_market()
@@ -82,20 +82,20 @@ class TestGracePeriod:
             sender="resolver", outcome_index=1,
             evidence_hash=b"e" * 32,
             now=m.deadline + GRACE_PERIOD + 1,
-            bond_paid=PROPOSAL_BOND,
+            bond_paid=0,
         )
         assert m.status == STATUS_RESOLUTION_PROPOSED
-        assert m.proposer_bond_held == PROPOSAL_BOND
+        assert m.proposer_bond_held == 0
 
-    def test_authority_explicit_zero_bond_rejected(self) -> None:
+    def test_authority_explicit_zero_bond_allowed(self) -> None:
         m = make_market()
         to_pending(m)
-        with pytest.raises(MarketAppError, match="proposal bond too small"):
-            m.propose_resolution(
-                sender="resolver", outcome_index=0,
-                evidence_hash=b"e" * 32, now=m.deadline + 1,
-                bond_paid=0,
-            )
+        m.propose_resolution(
+            sender="resolver", outcome_index=0,
+            evidence_hash=b"e" * 32, now=m.deadline + 1,
+            bond_paid=0,
+        )
+        assert m.proposer_bond_held == 0
 
     def test_third_party_rejected_during_grace_period(self) -> None:
         m = make_market()
@@ -105,7 +105,7 @@ class TestGracePeriod:
                 sender="third_party", outcome_index=0,
                 evidence_hash=b"e" * 32,
                 now=m.deadline + 1,  # within grace period
-                bond_paid=PROPOSAL_BOND,
+                bond_paid=m.proposal_bond,
             )
 
     def test_third_party_rejected_at_grace_boundary(self) -> None:
@@ -117,7 +117,7 @@ class TestGracePeriod:
             sender="third_party", outcome_index=0,
             evidence_hash=b"e" * 32,
             now=m.deadline + GRACE_PERIOD,
-            bond_paid=PROPOSAL_BOND,
+            bond_paid=m.proposal_bond,
         )
         assert m.status == STATUS_RESOLUTION_PROPOSED
 
@@ -135,11 +135,11 @@ class TestOpenProposing:
             sender="third_party", outcome_index=1,
             evidence_hash=b"e" * 32,
             now=m.deadline + GRACE_PERIOD + 1,
-            bond_paid=PROPOSAL_BOND,
+            bond_paid=m.proposal_bond,
         )
         assert m.status == STATUS_RESOLUTION_PROPOSED
         assert m.proposer == "third_party"
-        assert m.proposer_bond_held == PROPOSAL_BOND
+        assert m.proposer_bond_held == m.proposal_bond
 
     def test_third_party_bond_too_small_rejected(self) -> None:
         m = make_market()
@@ -149,7 +149,7 @@ class TestOpenProposing:
                 sender="third_party", outcome_index=0,
                 evidence_hash=b"e" * 32,
                 now=m.deadline + GRACE_PERIOD + 1,
-                bond_paid=PROPOSAL_BOND - 1,
+                bond_paid=m.proposal_bond - 1,
             )
 
     def test_third_party_no_bond_rejected(self) -> None:
@@ -171,9 +171,9 @@ class TestOpenProposing:
             sender="honest_proposer", outcome_index=0,
             evidence_hash=b"e" * 32,
             now=m.deadline + GRACE_PERIOD + 1,
-            bond_paid=PROPOSAL_BOND,
+            bond_paid=m.proposal_bond,
         )
-        assert m.proposer_bond_held == PROPOSAL_BOND
+        assert m.proposer_bond_held == m.proposal_bond
 
         # Finalize (unchallenged): proposer bond returned
         m.finalize_resolution(
@@ -196,20 +196,22 @@ class TestChallengerBondSlashed:
         to_pending(m)
 
         # Third party proposes outcome 0 with bond
+        proposal_bond = m.proposal_bond
         m.propose_resolution(
             sender="proposer", outcome_index=0,
             evidence_hash=b"e" * 32,
             now=m.deadline + GRACE_PERIOD + 1,
-            bond_paid=PROPOSAL_BOND,
+            bond_paid=proposal_bond,
         )
 
         # Challenger disputes
+        challenge_bond = m.challenge_bond
         m.challenge_resolution(
-            sender="challenger", bond_paid=CHALLENGE_BOND,
+            sender="challenger", bond_paid=challenge_bond,
             reason_code=1, evidence_hash=b"c" * 32,
             now=m.deadline + GRACE_PERIOD + 2,
         )
-        assert m.challenger_bond_held == CHALLENGE_BOND
+        assert m.challenger_bond_held == challenge_bond
 
         protocol_fees_before = m.protocol_fee_balance
         dispute_sink_before = m.dispute_sink_balance
@@ -220,10 +222,11 @@ class TestChallengerBondSlashed:
             ruling_hash=b"r" * 32,
         )
 
+        expected_sink = challenge_bond - ((challenge_bond * m.winner_share_bps) // 10_000)
         assert m.status == STATUS_RESOLVED
         assert m.winning_outcome == 0
         assert m.protocol_fee_balance == protocol_fees_before
-        assert m.dispute_sink_balance == dispute_sink_before + (CHALLENGE_BOND // 2)
+        assert m.dispute_sink_balance == dispute_sink_before + expected_sink
         assert m.proposer_bond_held == 0
         assert m.challenger_bond_held == 0
 
@@ -235,11 +238,12 @@ class TestChallengerBondSlashed:
             sender="resolver", outcome_index=1,
             evidence_hash=b"e" * 32,
             now=m.deadline + 1,
-            bond_paid=PROPOSAL_BOND,
+            bond_paid=0,
         )
 
+        challenge_bond = m.challenge_bond
         m.challenge_resolution(
-            sender="challenger", bond_paid=CHALLENGE_BOND,
+            sender="challenger", bond_paid=challenge_bond,
             reason_code=1, evidence_hash=b"c" * 32,
             now=m.deadline + 2,
         )
@@ -252,8 +256,9 @@ class TestChallengerBondSlashed:
             ruling_hash=b"r" * 32,
         )
 
+        expected_sink = challenge_bond - ((challenge_bond * m.winner_share_bps) // 10_000)
         assert m.protocol_fee_balance == protocol_fees_before
-        assert m.dispute_sink_balance == dispute_sink_before + (CHALLENGE_BOND // 2)
+        assert m.dispute_sink_balance == dispute_sink_before + expected_sink
 
 
 # ---------------------------------------------------------------------------
@@ -267,15 +272,16 @@ class TestProposerBondSlashed:
         m = make_market()
         to_pending(m)
 
+        proposal_bond = m.proposal_bond
         m.propose_resolution(
             sender="malicious_proposer", outcome_index=0,
             evidence_hash=b"e" * 32,
             now=m.deadline + GRACE_PERIOD + 1,
-            bond_paid=PROPOSAL_BOND,
+            bond_paid=proposal_bond,
         )
 
         m.challenge_resolution(
-            sender="challenger", bond_paid=CHALLENGE_BOND,
+            sender="challenger", bond_paid=m.challenge_bond,
             reason_code=1, evidence_hash=b"c" * 32,
             now=m.deadline + GRACE_PERIOD + 2,
         )
@@ -289,10 +295,11 @@ class TestProposerBondSlashed:
             ruling_hash=b"r" * 32,
         )
 
+        expected_sink = proposal_bond - ((proposal_bond * m.winner_share_bps) // 10_000)
         assert m.status == STATUS_RESOLVED
         assert m.winning_outcome == 2
         assert m.protocol_fee_balance == protocol_fees_before
-        assert m.dispute_sink_balance == dispute_sink_before + (PROPOSAL_BOND // 2)
+        assert m.dispute_sink_balance == dispute_sink_before + expected_sink
         assert m.proposer_bond_held == 0
         assert m.challenger_bond_held == 0
 
@@ -301,15 +308,16 @@ class TestProposerBondSlashed:
         m = make_market()
         to_pending(m)
 
+        proposal_bond = m.proposal_bond
         m.propose_resolution(
             sender="bad_proposer", outcome_index=0,
             evidence_hash=b"e" * 32,
             now=m.deadline + GRACE_PERIOD + 1,
-            bond_paid=PROPOSAL_BOND,
+            bond_paid=proposal_bond,
         )
 
         m.challenge_resolution(
-            sender="challenger", bond_paid=CHALLENGE_BOND,
+            sender="challenger", bond_paid=m.challenge_bond,
             reason_code=1, evidence_hash=b"c" * 32,
             now=m.deadline + GRACE_PERIOD + 2,
         )
@@ -322,8 +330,9 @@ class TestProposerBondSlashed:
             ruling_hash=b"a" * 32,
         )
 
+        expected_sink = proposal_bond - ((proposal_bond * m.winner_share_bps) // 10_000)
         assert m.protocol_fee_balance == protocol_fees_before
-        assert m.dispute_sink_balance == dispute_sink_before + (PROPOSAL_BOND // 2)
+        assert m.dispute_sink_balance == dispute_sink_before + expected_sink
 
 
 # ---------------------------------------------------------------------------
@@ -336,15 +345,16 @@ class TestCancelBothBondsSlashed:
         m = make_market()
         to_pending(m)
 
+        proposal_bond = m.proposal_bond
         m.propose_resolution(
             sender="proposer", outcome_index=0,
             evidence_hash=b"e" * 32,
             now=m.deadline + GRACE_PERIOD + 1,
-            bond_paid=PROPOSAL_BOND,
+            bond_paid=proposal_bond,
         )
 
         m.challenge_resolution(
-            sender="challenger", bond_paid=CHALLENGE_BOND,
+            sender="challenger", bond_paid=m.challenge_bond,
             reason_code=1, evidence_hash=b"c" * 32,
             now=m.deadline + GRACE_PERIOD + 2,
         )
@@ -358,7 +368,7 @@ class TestCancelBothBondsSlashed:
 
         assert m.status == STATUS_CANCELLED
         assert m.protocol_fee_balance == protocol_fees_before
-        assert m.dispute_sink_balance == dispute_sink_before + PROPOSAL_BOND
+        assert m.dispute_sink_balance == dispute_sink_before + proposal_bond
         assert m.proposer_bond_held == 0
         assert m.challenger_bond_held == 0
 
@@ -399,7 +409,7 @@ class TestBondAccounting:
             sender="fast_proposer", outcome_index=0,
             evidence_hash=b"e" * 32,
             now=m.deadline,  # immediately
-            bond_paid=PROPOSAL_BOND,
+            bond_paid=m.proposal_bond,
         )
         assert m.proposer == "fast_proposer"
 
@@ -407,26 +417,28 @@ class TestBondAccounting:
         """If proposer pays more than required, full amount is tracked."""
         m = make_market()
         to_pending(m)
+        base_bond = m.proposal_bond
         m.propose_resolution(
             sender="generous", outcome_index=0,
             evidence_hash=b"e" * 32,
             now=m.deadline + GRACE_PERIOD + 1,
-            bond_paid=PROPOSAL_BOND * 2,
+            bond_paid=base_bond * 2,
         )
-        assert m.proposer_bond_held == PROPOSAL_BOND * 2
+        assert m.proposer_bond_held == base_bond * 2
 
     def test_no_double_slash(self) -> None:
         """Bond settlement zeroes held amounts; claim doesn't affect sink accounting."""
         m = make_market()
         to_pending(m)
+        proposal_bond = m.proposal_bond
         m.propose_resolution(
             sender="proposer", outcome_index=0,
             evidence_hash=b"e" * 32,
             now=m.deadline + GRACE_PERIOD + 1,
-            bond_paid=PROPOSAL_BOND,
+            bond_paid=proposal_bond,
         )
         m.challenge_resolution(
-            sender="challenger", bond_paid=CHALLENGE_BOND,
+            sender="challenger", bond_paid=m.challenge_bond,
             reason_code=1, evidence_hash=b"c" * 32,
             now=m.deadline + GRACE_PERIOD + 2,
         )

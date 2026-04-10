@@ -9,15 +9,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from smart_contracts.lmsr_math import (
     EXP_TAYLOR_TERMS,
+    LN2_FP,
     MAX_UINT128,
     SCALE,
     exp_fp,
     exponent_inputs_fp,
     ln_fp,
+    lmsr_collateral_required_from_prices,
     log_sum_exp_fp,
     lmsr_cost,
     lmsr_cost_delta,
+    lmsr_gauge_alpha_from_prices,
     lmsr_liquidity_scale,
+    lmsr_normalized_q_from_prices,
     lmsr_prices,
     lmsr_sell_return,
 )
@@ -191,3 +195,35 @@ def test_reference_vectors_n2_n5_n16() -> None:
 
 def test_checked_in_reference_fixture_matches_generator() -> None:
     assert load_fixture() == generate_fixture()
+
+
+def test_normalized_q_from_prices_reconstructs_prices_with_small_error() -> None:
+    q = [850_000, 300_000, 100_000, 950_000, 725_000]
+    b = 800_000
+    prices = lmsr_prices(q, b)
+
+    normalized_q = lmsr_normalized_q_from_prices(prices, b)
+    reconstructed_prices = lmsr_prices(normalized_q, b)
+
+    assert len(normalized_q) == len(q)
+    assert all(value >= 0 for value in normalized_q)
+    assert all(abs(before - after) <= 2 for before, after in zip(prices, reconstructed_prices))
+
+
+def test_gauge_alpha_and_collateral_match_uniform_binary_intuition() -> None:
+    prices = [SCALE // 2, SCALE // 2]
+    alpha = lmsr_gauge_alpha_from_prices(prices)
+    collateral = lmsr_collateral_required_from_prices(100_000_000, prices)
+
+    assert abs(alpha - LN2_FP) <= 2
+    assert abs(collateral - 69_314_700) <= 500
+
+
+def test_collateral_required_grows_as_price_skews() -> None:
+    balanced_prices = [500_000, 500_000]
+    skewed_prices = [950_000, 50_000]
+
+    balanced = lmsr_collateral_required_from_prices(100_000_000, balanced_prices)
+    skewed = lmsr_collateral_required_from_prices(100_000_000, skewed_prices)
+
+    assert skewed > balanced

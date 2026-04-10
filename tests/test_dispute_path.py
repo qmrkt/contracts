@@ -66,7 +66,7 @@ def market_to_disputed() -> MarketAppModel:
     m = market_to_proposed()
     m.challenge_resolution(
         sender="challenger",
-        bond_paid=BOND,
+        bond_paid=m.challenge_bond,
         reason_code=1,
         evidence_hash=b"c" * 32,
         now=m.deadline + 2,
@@ -264,7 +264,7 @@ class TestDisputeStatusGuards:
         if status >= STATUS_RESOLUTION_PROPOSED:
             m.propose_resolution(sender="resolver", outcome_index=0, evidence_hash=b"e" * 32, now=m.deadline + 1)
         if status == STATUS_CANCELLED:
-            m.challenge_resolution(sender="challenger", bond_paid=BOND, reason_code=1, evidence_hash=b"c" * 32, now=m.deadline + 2)
+            m.challenge_resolution(sender="challenger", bond_paid=m.challenge_bond, reason_code=1, evidence_hash=b"c" * 32, now=m.deadline + 2)
             m.cancel_dispute_and_market(sender="resolver", ruling_hash=b"x" * 32)
         elif status == STATUS_RESOLVED:
             m.finalize_resolution(sender="anyone", now=m.deadline + 1 + m.challenge_window_secs)
@@ -311,7 +311,7 @@ class TestFullDisputeLifecycle:
         m.propose_resolution(sender="resolver", outcome_index=0, evidence_hash=b"e" * 32, now=m.deadline + 1)
 
         # Challenge
-        m.challenge_resolution(sender="challenger", bond_paid=BOND, reason_code=2, evidence_hash=b"ch" * 16, now=m.deadline + 2)
+        m.challenge_resolution(sender="challenger", bond_paid=m.challenge_bond, reason_code=2, evidence_hash=b"ch" * 16, now=m.deadline + 2)
         assert m.status == STATUS_DISPUTED
 
         # Register external dispute
@@ -333,7 +333,7 @@ class TestFullDisputeLifecycle:
         m.trigger_resolution(sender="anyone", now=m.deadline)
         m.propose_resolution(sender="resolver", outcome_index=0, evidence_hash=b"e" * 32, now=m.deadline + 1)
 
-        m.challenge_resolution(sender="challenger", bond_paid=BOND, reason_code=1, evidence_hash=b"c" * 32, now=m.deadline + 2)
+        m.challenge_resolution(sender="challenger", bond_paid=m.challenge_bond, reason_code=1, evidence_hash=b"c" * 32, now=m.deadline + 2)
 
         # Admin decides market is irresolvable
         m.cancel_dispute_and_market(sender="resolver", ruling_hash=b"irresolvable" * 2 + b"irre")

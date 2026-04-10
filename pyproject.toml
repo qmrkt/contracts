@@ -2,7 +2,7 @@
 name = "contracts"
 version = "0.1.0"
 description = "Algorand smart contracts"
-authors = ["question.market <dev@question.market>"]
+authors = ["question.market"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
@@ -15,8 +15,9 @@ algorand-python-testing = "^1"
 [tool.poetry.group.dev.dependencies]
 algokit-client-generator = "^2.1.0"
 puyapy = "*"
+hypothesis = "^6.100"
+pytest = "^8.3.0"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
-

@@ -385,8 +385,8 @@ class TestRound2_BondAccounting:
         buy_one(m, sender="buyer", outcome_index=0)
         m.trigger_resolution(sender="anyone", now=m.deadline)
         with pytest.raises(MarketAppError, match="bond"):
-            m.propose_resolution(sender="resolver", outcome_index=0,
-                                 evidence_hash=b"e" * 32, now=m.deadline + 1,
+            m.propose_resolution(sender="open_proposer", outcome_index=0,
+                                 evidence_hash=b"e" * 32, now=m.deadline + m.grace_period_secs + 1,
                                  bond_paid=m.proposal_bond - 1)
 
 
@@ -615,7 +615,9 @@ class TestRound3_ZeroAddressAndEmptyState:
             dispute_blueprint_hash=b"d" * 32, challenge_window_secs=86_400,
             protocol_config_id=77, factory_id=88,
             resolution_authority="resolver", challenge_bond=0,
-            proposal_bond=0, grace_period_secs=3_600, market_admin="admin",
+            proposal_bond=0, challenge_bond_bps=0, proposal_bond_bps=0,
+            challenge_bond_cap=0, proposal_bond_cap=0,
+            grace_period_secs=3_600, market_admin="admin",
         )
         m.bootstrap(sender="creator", deposit_amount=200_000_000)
         m.buy(sender="buyer", outcome_index=0, max_cost=10_000_000, now=5000)
@@ -691,6 +693,8 @@ class TestRound3_OverflowAndEdgeMath:
             resolution_authority="resolver",
             challenge_bond=2**53,  # large but within safe int range
             proposal_bond=2**53,
+            challenge_bond_cap=2**53,
+            proposal_bond_cap=2**53,
             grace_period_secs=3_600, market_admin="admin",
         )
         m.bootstrap(sender="creator", deposit_amount=200_000_000)

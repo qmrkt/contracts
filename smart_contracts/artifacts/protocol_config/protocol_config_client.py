@@ -17,6 +17,12 @@ class ProtocolConfig(algopy.arc4.ARC4Client, typing.Protocol):
         min_bootstrap_deposit: algopy.arc4.UIntN[typing.Literal[64]],
         challenge_bond: algopy.arc4.UIntN[typing.Literal[64]],
         proposal_bond: algopy.arc4.UIntN[typing.Literal[64]],
+        challenge_bond_bps: algopy.arc4.UIntN[typing.Literal[64]],
+        proposal_bond_bps: algopy.arc4.UIntN[typing.Literal[64]],
+        challenge_bond_cap: algopy.arc4.UIntN[typing.Literal[64]],
+        proposal_bond_cap: algopy.arc4.UIntN[typing.Literal[64]],
+        proposer_fee_bps: algopy.arc4.UIntN[typing.Literal[64]],
+        proposer_fee_floor_bps: algopy.arc4.UIntN[typing.Literal[64]],
         default_b: algopy.arc4.UIntN[typing.Literal[64]],
         protocol_fee_ceiling_bps: algopy.arc4.UIntN[typing.Literal[64]],
         protocol_fee_bps: algopy.arc4.UIntN[typing.Literal[64]],
@@ -26,6 +32,8 @@ class ProtocolConfig(algopy.arc4.ARC4Client, typing.Protocol):
         min_challenge_window_secs: algopy.arc4.UIntN[typing.Literal[64]],
         min_grace_period_secs: algopy.arc4.UIntN[typing.Literal[64]],
         max_lp_fee_bps: algopy.arc4.UIntN[typing.Literal[64]],
+        default_residual_linear_lambda_fp: algopy.arc4.UIntN[typing.Literal[64]],
+        max_active_lp_v4_outcomes: algopy.arc4.UIntN[typing.Literal[64]],
     ) -> None: ...
 
     @algopy.arc4.abimethod
@@ -48,6 +56,42 @@ class ProtocolConfig(algopy.arc4.ARC4Client, typing.Protocol):
 
     @algopy.arc4.abimethod
     def update_proposal_bond(
+        self,
+        value: algopy.arc4.UIntN[typing.Literal[64]],
+    ) -> None: ...
+
+    @algopy.arc4.abimethod
+    def update_challenge_bond_bps(
+        self,
+        value: algopy.arc4.UIntN[typing.Literal[64]],
+    ) -> None: ...
+
+    @algopy.arc4.abimethod
+    def update_proposal_bond_bps(
+        self,
+        value: algopy.arc4.UIntN[typing.Literal[64]],
+    ) -> None: ...
+
+    @algopy.arc4.abimethod
+    def update_challenge_bond_cap(
+        self,
+        value: algopy.arc4.UIntN[typing.Literal[64]],
+    ) -> None: ...
+
+    @algopy.arc4.abimethod
+    def update_proposal_bond_cap(
+        self,
+        value: algopy.arc4.UIntN[typing.Literal[64]],
+    ) -> None: ...
+
+    @algopy.arc4.abimethod
+    def update_proposer_fee_bps(
+        self,
+        value: algopy.arc4.UIntN[typing.Literal[64]],
+    ) -> None: ...
+
+    @algopy.arc4.abimethod
+    def update_proposer_fee_floor_bps(
         self,
         value: algopy.arc4.UIntN[typing.Literal[64]],
     ) -> None: ...
@@ -102,6 +146,18 @@ class ProtocolConfig(algopy.arc4.ARC4Client, typing.Protocol):
 
     @algopy.arc4.abimethod
     def update_max_lp_fee_bps(
+        self,
+        value: algopy.arc4.UIntN[typing.Literal[64]],
+    ) -> None: ...
+
+    @algopy.arc4.abimethod
+    def update_default_residual_linear_lambda_fp(
+        self,
+        value: algopy.arc4.UIntN[typing.Literal[64]],
+    ) -> None: ...
+
+    @algopy.arc4.abimethod
+    def update_max_active_lp_v4_outcomes(
         self,
         value: algopy.arc4.UIntN[typing.Literal[64]],
     ) -> None: ...

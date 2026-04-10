@@ -11,6 +11,7 @@ SCALE = 1_000_000
 LN2_FP = 693_147
 EXP_TAYLOR_TERMS = 20
 LN_TAYLOR_TERMS = 32
+BUY_APPROXIMATION_MARGIN = 6
 
 
 @subroutine
@@ -176,6 +177,16 @@ def _validate_state(q: Array[UInt64], b: UInt64) -> None:
 
 
 @subroutine
+def _validate_prices(prices: Array[UInt64]) -> None:
+    _require(prices.length >= UInt64(2))
+    total = UInt64(0)
+    for idx in urange(prices.length):
+        _require(prices[idx] > UInt64(0))
+        total = total + prices[idx]
+    _require(total == UInt64(SCALE))
+
+
+@subroutine
 def _exponent_fp(q_i: UInt64, b: UInt64) -> UInt64:
     return _floor_div(q_i * UInt64(SCALE), b)
 
@@ -199,12 +210,41 @@ def _sum_shifted_exp_fp(q: Array[UInt64], b: UInt64, shared_max_fp: UInt64) -> U
 
 
 @subroutine
+def _log_sum_exp_fp(q: Array[UInt64], b: UInt64) -> UInt64:
+    max_exponent = _max_exponent_fp(q, b)
+    sum_exp = _sum_shifted_exp_fp(q, b, max_exponent)
+    return max_exponent + ln_fp(sum_exp)
+
+
+@subroutine
+def _lmsr_cost_ceil(q: Array[UInt64], b: UInt64) -> UInt64:
+    return _mul_div_ceil(b, _log_sum_exp_fp(q, b), UInt64(SCALE))
+
+
+@subroutine
+def _lmsr_cost_floor(q: Array[UInt64], b: UInt64) -> UInt64:
+    return _mul_div_floor(b, _log_sum_exp_fp(q, b), UInt64(SCALE))
+
+
+@subroutine
 def lmsr_cost_delta(q: Array[UInt64], b: UInt64, outcome: UInt64, shares: UInt64) -> UInt64:
     _validate_state(q, b)
     _require(outcome < q.length)
 
     q_after = q.copy()
     q_after[outcome] = q_after[outcome] + shares
+    cost_before_floor = _lmsr_cost_floor(q, b)
+    cost_after_ceil = _lmsr_cost_ceil(q_after, b)
+    cost_after_floor = _lmsr_cost_floor(q_after, b)
+    direct_quote = UInt64(0)
+    if cost_after_ceil > cost_before_floor:
+        direct_quote = cost_after_ceil - cost_before_floor
+    round_trip_floor = UInt64(0)
+    if cost_after_floor > cost_before_floor:
+        round_trip_floor = cost_after_floor - cost_before_floor
+    padded_direct_quote = direct_quote
+    if shares > UInt64(0):
+        padded_direct_quote = direct_quote + UInt64(BUY_APPROXIMATION_MARGIN)
 
     max_before = _max_exponent_fp(q, b)
     max_after = _max_exponent_fp(q_after, b)
@@ -212,8 +252,14 @@ def lmsr_cost_delta(q: Array[UInt64], b: UInt64, outcome: UInt64, shares: UInt64
 
     sum_before = _sum_shifted_exp_fp(q, b, shared_max)
     sum_after = _sum_shifted_exp_fp(q_after, b, shared_max)
-    ratio_fp = _mul_div_ceil(sum_after, UInt64(SCALE), sum_before)
-    return _ceil_div(b * ln_fp(ratio_fp), UInt64(SCALE))
+    ratio_quote = direct_quote
+    if sum_before > UInt64(0):
+        ratio_fp = _mul_div_ceil(sum_after, UInt64(SCALE), sum_before)
+        ratio_quote = _mul_div_ceil(b, ln_fp(ratio_fp), UInt64(SCALE))
+    ratio_cap = ratio_quote + UInt64(BUY_APPROXIMATION_MARGIN)
+    if padded_direct_quote > ratio_cap:
+        padded_direct_quote = ratio_cap
+    return _max_u64(_max_u64(ratio_quote, padded_direct_quote), round_trip_floor)
 
 
 @subroutine
@@ -232,7 +278,7 @@ def lmsr_sell_return(q: Array[UInt64], b: UInt64, outcome: UInt64, shares: UInt6
     sum_before = _sum_shifted_exp_fp(q, b, shared_max)
     sum_after = _sum_shifted_exp_fp(q_after, b, shared_max)
     ratio_fp = _mul_div_floor(sum_before, UInt64(SCALE), sum_after)
-    return _floor_div(b * ln_fp(ratio_fp), UInt64(SCALE))
+    return _mul_div_floor(b, ln_fp(ratio_fp), UInt64(SCALE))
 
 
 @subroutine
@@ -276,6 +322,39 @@ def lmsr_liquidity_scale_b(q: Array[UInt64], b: UInt64, deposit: UInt64, pool: U
     return _mul_div_floor(b, pool + deposit, pool)
 
 
+@subroutine
+def lmsr_gauge_alpha_from_prices(prices: Array[UInt64]) -> UInt64:
+    _validate_prices(prices)
+    alpha = UInt64(0)
+    for idx in urange(prices.length):
+        inv_price_fp = _mul_div_ceil(UInt64(SCALE), UInt64(SCALE), prices[idx])
+        alpha = _max_u64(alpha, ln_fp(inv_price_fp))
+    return alpha
+
+
+@subroutine
+def lmsr_collateral_required_from_prices(target_delta_b: UInt64, prices: Array[UInt64]) -> UInt64:
+    _require(target_delta_b > UInt64(0))
+    alpha = lmsr_gauge_alpha_from_prices(prices)
+    return _mul_div_ceil(target_delta_b, alpha, UInt64(SCALE))
+
+
+@subroutine
+def lmsr_normalized_q_from_prices(prices: Array[UInt64], b: UInt64) -> Array[UInt64]:
+    _validate_prices(prices)
+    _require(b > UInt64(0))
+    alpha = lmsr_gauge_alpha_from_prices(prices)
+    q = prices.copy()
+    for idx in urange(prices.length):
+        inv_price_fp = _mul_div_ceil(UInt64(SCALE), UInt64(SCALE), prices[idx])
+        ln_inv = ln_fp(inv_price_fp)
+        if alpha >= ln_inv:
+            q[idx] = _mul_div_floor(b, alpha - ln_inv, UInt64(SCALE))
+        else:
+            q[idx] = UInt64(0)
+    return q
+
+
 __all__ = [
     "EXP_TAYLOR_TERMS",
     "LN_TAYLOR_TERMS",
@@ -284,9 +363,12 @@ __all__ = [
     "exp_pos_fp",
     "exp_neg_fp",
     "ln_fp",
+    "lmsr_collateral_required_from_prices",
     "lmsr_cost_delta",
+    "lmsr_gauge_alpha_from_prices",
     "lmsr_liquidity_scale_b",
     "lmsr_liquidity_scale_q",
+    "lmsr_normalized_q_from_prices",
     "lmsr_prices",
     "lmsr_sell_return",
 ]

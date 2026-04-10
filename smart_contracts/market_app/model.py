@@ -30,6 +30,7 @@ DEFAULT_WINNER_SHARE_BPS = 5_000
 DEFAULT_DISPUTE_SINK_SHARE_BPS = 5_000
 MARKET_CONTRACT_VERSION = 3
 MAX_COMMENT_BYTES = 512
+SECONDS_PER_DAY = 86_400
 
 
 class MarketAppError(ValueError):
@@ -56,10 +57,18 @@ class MarketAppModel:
     proposal_bond: int
     grace_period_secs: int
     market_admin: str
+    challenge_bond_bps: int = 500
+    proposal_bond_bps: int = 500
+    challenge_bond_cap: int = 100_000_000
+    proposal_bond_cap: int = 100_000_000
+    proposer_fee_bps: int = 0
+    proposer_fee_floor_bps: int = 0
     cancellable: bool = True
     initial_status: int = STATUS_CREATED
     cumulative_fee_per_share: int = 0
     contract_version: int = field(default=MARKET_CONTRACT_VERSION, init=False)
+    min_challenge_bond: int = field(init=False)
+    min_proposal_bond: int = field(init=False)
     status: int = field(init=False)
     pool_balance: int = field(default=0, init=False)
     lp_shares_total: int = field(default=0, init=False)
@@ -81,11 +90,12 @@ class MarketAppModel:
     pending_responder_role: int = field(default=0, init=False)  # 0=none, 1=creator, 2=admin
     winning_outcome: int = field(default=-1, init=False)
     q: list[int] = field(init=False)
-    asa: list[int] = field(init=False)
     lp_fee_balance: int = field(default=0, init=False)
     protocol_fee_balance: int = field(default=0, init=False)
+    bootstrap_deposit: int = field(default=0, init=False)
     total_outstanding_cost_basis: int = field(default=0, init=False)
     dispute_sink_balance: int = field(default=0, init=False)
+    resolution_budget_balance: int = field(default=0, init=False)
     winner_share_bps: int = field(default=DEFAULT_WINNER_SHARE_BPS, init=False)
     dispute_sink_share_bps: int = field(default=DEFAULT_DISPUTE_SINK_SHARE_BPS, init=False)
     user_lp_shares: dict[str, int] = field(default_factory=dict, init=False)
@@ -93,6 +103,7 @@ class MarketAppModel:
     user_claimable_fees: dict[str, int] = field(default_factory=dict, init=False)
     user_outcome_shares: dict[str, list[int]] = field(default_factory=dict, init=False)
     user_cost_basis: dict[str, list[int]] = field(default_factory=dict, init=False)
+    total_user_shares: list[int] = field(init=False)
     pending_payouts: dict[str, int] = field(default_factory=dict, init=False)
     events: list[dict[str, object]] = field(default_factory=list, init=False)
 
@@ -109,6 +120,18 @@ class MarketAppModel:
             raise MarketAppError("challenge_bond must be non-negative")
         if self.proposal_bond < 0:
             raise MarketAppError("proposal_bond must be non-negative")
+        if self.challenge_bond_bps < 0 or self.challenge_bond_bps > BPS_DENOMINATOR:
+            raise MarketAppError("challenge_bond_bps must be between 0 and 10000")
+        if self.proposal_bond_bps < 0 or self.proposal_bond_bps > BPS_DENOMINATOR:
+            raise MarketAppError("proposal_bond_bps must be between 0 and 10000")
+        if self.challenge_bond_cap < self.challenge_bond:
+            raise MarketAppError("challenge_bond_cap must be at least challenge_bond")
+        if self.proposal_bond_cap < self.proposal_bond:
+            raise MarketAppError("proposal_bond_cap must be at least proposal_bond")
+        if self.proposer_fee_bps < 0 or self.proposer_fee_bps > BPS_DENOMINATOR:
+            raise MarketAppError("proposer_fee_bps must be between 0 and 10000")
+        if self.proposer_fee_floor_bps < 0 or self.proposer_fee_floor_bps > BPS_DENOMINATOR:
+            raise MarketAppError("proposer_fee_floor_bps must be between 0 and 10000")
         if self.grace_period_secs < 0:
             raise MarketAppError("grace_period_secs must be non-negative")
         if self.winner_share_bps < 0 or self.dispute_sink_share_bps < 0:
@@ -123,9 +146,12 @@ class MarketAppModel:
             raise MarketAppError("resolution_authority must not be zero address")
         if self.market_admin == ZERO_ADDRESS:
             raise MarketAppError("market_admin must not be zero address")
+        self.min_challenge_bond = self.challenge_bond
+        self.min_proposal_bond = self.proposal_bond
         self.status = self.initial_status
         self.q = [0] * len(self.outcome_asa_ids)
-        self.asa = list(self.outcome_asa_ids)
+        self.total_user_shares = [0] * len(self.outcome_asa_ids)
+        self._refresh_required_bonds()
 
     @property
     def num_outcomes(self) -> int:
@@ -181,6 +207,41 @@ class MarketAppModel:
     def _calc_fee_up(self, amount: int, bps: int) -> int:
         return self._ceil_div(amount * bps, BPS_DENOMINATOR)
 
+    def _bond_scale_base(self) -> int:
+        return max(self.pool_balance, self.bootstrap_deposit)
+
+    def _required_bond(self, minimum: int, bps: int, cap: int) -> int:
+        proportional = self._ceil_div(self._bond_scale_base() * bps, BPS_DENOMINATOR)
+        return min(cap, max(minimum, proportional))
+
+    def _required_proposal_bond(self) -> int:
+        return self._required_bond(self.min_proposal_bond, self.proposal_bond_bps, self.proposal_bond_cap)
+
+    def _required_challenge_bond(self) -> int:
+        return self._required_bond(self.min_challenge_bond, self.challenge_bond_bps, self.challenge_bond_cap)
+
+    def _proposer_fee_for_bond(self, required_bond: int) -> int:
+        floor_fee = self._calc_fee_up(self.min_proposal_bond, self.proposer_fee_floor_bps)
+        daily_fee = self._calc_fee_up(required_bond, self.proposer_fee_bps)
+        window_fee = self._ceil_div(daily_fee * self.challenge_window_secs, SECONDS_PER_DAY)
+        return max(floor_fee, window_fee)
+
+    def _required_proposer_fee(self) -> int:
+        return self._proposer_fee_for_bond(self._required_proposal_bond())
+
+    def _max_proposer_fee(self) -> int:
+        return self._proposer_fee_for_bond(self.proposal_bond_cap)
+
+    def _consume_proposer_fee(self) -> int:
+        fee = self._required_proposer_fee()
+        self._require(self.resolution_budget_balance >= fee, "resolution budget exhausted")
+        self.resolution_budget_balance -= fee
+        return fee
+
+    def _refresh_required_bonds(self) -> None:
+        self.challenge_bond = self._required_challenge_bond()
+        self.proposal_bond = self._required_proposal_bond()
+
     def _settle_lp_fees(self, sender: str) -> None:
         self._ensure_user(sender)
         shares = self.user_lp_shares[sender]
@@ -202,6 +263,10 @@ class MarketAppModel:
     def _assert_valid_outcome(self, outcome_index: int) -> None:
         self._require(0 <= outcome_index < self.num_outcomes, "outcome_index out of range")
 
+    def _require_share_granularity(self, shares: int) -> None:
+        self._require(shares >= SHARE_UNIT, "shares must be at least one whole share")
+        self._require(shares % SHARE_UNIT == 0, "shares must be whole-share multiples")
+
     def _assert_price_sum(self) -> None:
         if self.status == STATUS_CREATED or self.b == 0:
             return
@@ -215,7 +280,7 @@ class MarketAppModel:
         # bounded. We only enforce the strict solvency invariant after resolution,
         # when the actual payout obligation is known.
         if self.status == STATUS_RESOLVED and 0 <= self.winning_outcome < self.num_outcomes:
-            winning_payout = self.q[self.winning_outcome]
+            winning_payout = self.total_user_shares[self.winning_outcome]
             self._require(self.pool_balance >= winning_payout, "solvency invariant violated")
 
     def _assert_refund_reserve(self) -> None:
@@ -260,12 +325,18 @@ class MarketAppModel:
             "bootstrap deposit below LMSR solvency floor",
         )
 
-    def bootstrap(self, *, sender: str, deposit_amount: int) -> int:
+    def bootstrap(self, *, sender: str, deposit_amount: int, budget_amount: int | None = None) -> int:
         self._require_status(STATUS_CREATED)
         self._require_authorized(sender, self.creator, "only creator can bootstrap")
         self._require(deposit_amount > 0, "bootstrap deposit must be positive")
         self._require_lmsr_bootstrap_floor(deposit_amount)
+        required_budget = self._max_proposer_fee()
+        if budget_amount is None:
+            budget_amount = required_budget
+        self._require(budget_amount >= required_budget, "resolution budget too small")
         self.pool_balance = deposit_amount
+        self.bootstrap_deposit = deposit_amount
+        self.resolution_budget_balance = budget_amount
         self.lp_shares_total = deposit_amount
         self.user_lp_shares[sender] = deposit_amount
         self.user_fee_snapshot[sender] = self.cumulative_fee_per_share
@@ -273,12 +344,12 @@ class MarketAppModel:
         self.user_outcome_shares.setdefault(sender, [0] * self.num_outcomes)
         self.user_cost_basis.setdefault(sender, [0] * self.num_outcomes)
         self.status = STATUS_ACTIVE
+        self._refresh_required_bonds()
         self._emit(
             "Bootstrap",
             sender=sender,
             deposit_amount=deposit_amount,
             lp_shares_minted=deposit_amount,
-            opted_in_asa_ids=list(self.asa),
             status=self.status,
         )
         self._assert_invariants()
@@ -289,6 +360,7 @@ class MarketAppModel:
         self._assert_valid_outcome(outcome_index)
         self._require(max_cost > 0, "max_cost must be positive")
         self._require(shares > 0, "shares must be positive")
+        self._require_share_granularity(shares)
         self._ensure_user(sender)
         cost = lmsr_cost_delta(self.q, self.b, outcome_index, shares)
         lp_fee = self._calc_fee_up(cost, self.lp_fee_bps)
@@ -299,10 +371,12 @@ class MarketAppModel:
         self.q[outcome_index] += shares
         self.user_outcome_shares[sender][outcome_index] += shares
         self.user_cost_basis[sender][outcome_index] += cost
+        self.total_user_shares[outcome_index] += shares
         self.total_outstanding_cost_basis += cost
         self.pool_balance += cost
         self._distribute_lp_fee(lp_fee)
         self.protocol_fee_balance += protocol_fee
+        self._refresh_required_bonds()
         self._emit(
             "Buy",
             outcome_index=outcome_index,
@@ -324,6 +398,7 @@ class MarketAppModel:
         self._assert_valid_outcome(outcome_index)
         self._require(min_return >= 0, "min_return must be non-negative")
         self._require(shares > 0, "shares must be positive")
+        self._require_share_granularity(shares)
         self._ensure_user(sender)
         self._require(self.user_outcome_shares[sender][outcome_index] >= shares, "insufficient outcome shares")
         gross_return = lmsr_sell_return(self.q, self.b, outcome_index, shares)
@@ -336,10 +411,12 @@ class MarketAppModel:
         self.q[outcome_index] -= shares
         self.user_outcome_shares[sender][outcome_index] -= shares
         self.user_cost_basis[sender][outcome_index] -= basis_reduction
+        self.total_user_shares[outcome_index] -= shares
         self.total_outstanding_cost_basis -= basis_reduction
         self.pool_balance -= gross_return
         self._distribute_lp_fee(lp_fee)
         self.protocol_fee_balance += protocol_fee
+        self._refresh_required_bonds()
         self._emit(
             "Sell",
             outcome_index=outcome_index,
@@ -371,6 +448,7 @@ class MarketAppModel:
         self.user_lp_shares[sender] = self.user_lp_shares.get(sender, 0) + shares_minted
         self.user_fee_snapshot[sender] = self.cumulative_fee_per_share
         self.user_outcome_shares.setdefault(sender, [0] * self.num_outcomes)
+        self._refresh_required_bonds()
         new_prices = lmsr_prices(self.q, self.b)
         for before, after in zip(old_prices, new_prices):
             self._require(abs(before - after) <= PRICE_TOLERANCE_BASE, "price invariance violated")
@@ -385,7 +463,7 @@ class MarketAppModel:
         return shares_minted
 
     def withdraw_liq(self, *, sender: str, shares_to_burn: int) -> dict[str, int]:
-        self._require_status(STATUS_ACTIVE, STATUS_CANCELLED)
+        self._require_status(STATUS_ACTIVE, STATUS_CANCELLED, STATUS_RESOLVED)
         self._require(shares_to_burn > 0, "shares_to_burn must be positive")
         self._ensure_user(sender)
         user_shares = self.user_lp_shares[sender]
@@ -398,18 +476,25 @@ class MarketAppModel:
         remaining_total = self.lp_shares_total - shares_to_burn
         if self.status == STATUS_ACTIVE:
             usdc_return = (self.pool_balance * shares_to_burn) // self.lp_shares_total
-            if remaining_total == 0:
-                self.q = [0] * self.num_outcomes
-                self.b = 0
-            else:
-                self.q = [(qi * remaining_total) // self.lp_shares_total for qi in self.q]
-                self.b = (self.b * remaining_total) // self.lp_shares_total
-        else:
+            new_q = [(qi * remaining_total) // self.lp_shares_total for qi in self.q]
+            new_b = (self.b * remaining_total) // self.lp_shares_total
+            self._require(new_b > 0, "lp withdrawal would zero liquidity parameter")
+            for idx, qi in enumerate(new_q):
+                self._require(qi >= self.total_user_shares[idx], "lp withdrawal would strand user shares")
+            self.q = new_q
+            self.b = new_b
+        elif self.status == STATUS_CANCELLED:
             self._require(
                 self.pool_balance >= self.total_outstanding_cost_basis,
                 "refund reserve invariant violated",
             )
             residual_pool = self.pool_balance - self.total_outstanding_cost_basis
+            usdc_return = (residual_pool * shares_to_burn) // self.lp_shares_total
+        else:
+            self._require(0 <= self.winning_outcome < self.num_outcomes, "winning outcome not set")
+            claim_liability = self.total_user_shares[self.winning_outcome]
+            self._require(self.pool_balance >= claim_liability, "solvency invariant violated")
+            residual_pool = self.pool_balance - claim_liability
             usdc_return = (residual_pool * shares_to_burn) // self.lp_shares_total
         self.pool_balance -= usdc_return
         self.lp_fee_balance -= fee_return
@@ -417,6 +502,7 @@ class MarketAppModel:
         self.user_lp_shares[sender] -= shares_to_burn
         self.user_claimable_fees[sender] -= fee_return
         self.user_fee_snapshot[sender] = self.cumulative_fee_per_share
+        self._refresh_required_bonds()
         if self.status == STATUS_ACTIVE and self.b > 0:
             new_prices = lmsr_prices(self.q, self.b)
             for before, after in zip(old_prices, new_prices):
@@ -451,14 +537,14 @@ class MarketAppModel:
         grace_expired = now >= resolution_became_pending + self.grace_period_secs
 
         if bond_paid is None:
-            bond_paid = self.proposal_bond if sender == self.resolution_authority else 0
+            bond_paid = 0 if sender == self.resolution_authority else self._required_proposal_bond()
 
         if sender == self.resolution_authority:
-            self._require(bond_paid >= self.proposal_bond, "proposal bond too small")
+            self._require(bond_paid >= 0, "proposal bond too small")
             self.proposer = sender
             self.proposer_bond_held = bond_paid
         elif grace_expired:
-            self._require(bond_paid >= self.proposal_bond, "proposal bond too small")
+            self._require(bond_paid >= self._required_proposal_bond(), "proposal bond too small")
             self.proposer = sender
             self.proposer_bond_held = bond_paid
         else:
@@ -492,9 +578,9 @@ class MarketAppModel:
         self._require_authorized(sender, self.resolution_authority, "only resolution authority may early propose")
 
         if bond_paid is None:
-            bond_paid = self.proposal_bond
+            bond_paid = 0
 
-        self._require(bond_paid >= self.proposal_bond, "proposal bond too small")
+        self._require(bond_paid >= 0, "proposal bond too small")
         self.proposer = sender
         self.proposer_bond_held = bond_paid
         self.proposed_outcome = outcome_index
@@ -514,7 +600,7 @@ class MarketAppModel:
     def challenge_resolution(self, *, sender: str, bond_paid: int, reason_code: int, evidence_hash: bytes, now: int) -> None:
         self._require_status(STATUS_RESOLUTION_PROPOSED)
         self._require(now < self.proposal_timestamp + self.challenge_window_secs, "challenge window closed")
-        self._require(bond_paid >= self.challenge_bond, "challenge bond too small")
+        self._require(bond_paid >= self._required_challenge_bond(), "challenge bond too small")
         self.challenger = sender
         self.challenger_bond_held = bond_paid
         self.challenge_reason_code = reason_code
@@ -537,14 +623,16 @@ class MarketAppModel:
     def _settle_confirmed_dispute(self) -> dict[str, int]:
         losing_bond = self.challenger_bond_held
         winner_bonus = self._winner_bonus_from_bond(losing_bond)
+        proposer_fee = self._consume_proposer_fee()
         dispute_sink_capture = losing_bond - winner_bonus
-        proposer_payout = self.proposer_bond_held + winner_bonus
+        proposer_payout = self.proposer_bond_held + winner_bonus + proposer_fee
         proposer_refund = self.proposer_bond_held
         self.dispute_sink_balance += dispute_sink_capture
         self.proposer_bond_held = 0
         self.challenger_bond_held = 0
         return {
             "proposer_refund": proposer_refund,
+            "proposer_fee": proposer_fee,
             "proposer_reward": winner_bonus,
             "proposer_payout": proposer_payout,
             "challenger_refund": 0,
@@ -563,6 +651,7 @@ class MarketAppModel:
         self.challenger_bond_held = 0
         return {
             "proposer_refund": 0,
+            "proposer_fee": 0,
             "proposer_reward": 0,
             "challenger_refund": challenger_refund,
             "challenger_reward": winner_bonus,
@@ -723,10 +812,10 @@ class MarketAppModel:
         self._require_status(STATUS_RESOLUTION_PROPOSED)
         self._require(now >= self.proposal_timestamp + self.challenge_window_secs, "challenge window not elapsed")
         self._require(self.challenger == ZERO_ADDRESS, "market was challenged")
-        # Proposal accepted unchallenged: return proposer bond
+        proposer_fee = self._consume_proposer_fee()
         proposer_refund = self.proposer_bond_held
         self.proposer_bond_held = 0
-        self._credit_pending_payout(self.proposer, proposer_refund)
+        self._credit_pending_payout(self.proposer, proposer_refund + proposer_fee)
         self.status = STATUS_RESOLVED
         self.winning_outcome = self.proposed_outcome
         self._emit(
@@ -734,6 +823,7 @@ class MarketAppModel:
             sender=sender,
             winning_outcome=self.winning_outcome,
             proposer_refund=proposer_refund,
+            proposer_fee=proposer_fee,
             status=self.status,
         )
         self._assert_invariants()
@@ -745,16 +835,18 @@ class MarketAppModel:
         self._require(outcome_index == self.winning_outcome, "only winning outcome may be claimed")
         self._ensure_user(sender)
         self._require(shares > 0, "shares must be positive")
+        self._require_share_granularity(shares)
         self._require(self.user_outcome_shares[sender][outcome_index] >= shares, "insufficient winning shares")
-        outstanding = self.q[outcome_index]
-        self._require(outstanding > 0, "no winning supply remaining")
-        payout = (self.pool_balance * shares) // outstanding
+        payout = shares
+        self._require(self.pool_balance >= payout, "insufficient pool balance for claim")
         basis_reduction = self._basis_reduction(sender, outcome_index, shares)
         self.user_outcome_shares[sender][outcome_index] -= shares
         self.user_cost_basis[sender][outcome_index] -= basis_reduction
+        self.total_user_shares[outcome_index] -= shares
         self.total_outstanding_cost_basis -= basis_reduction
         self.q[outcome_index] -= shares
         self.pool_balance -= payout
+        self._refresh_required_bonds()
         self._emit(
             "Claim",
             outcome_index=outcome_index,
@@ -777,14 +869,17 @@ class MarketAppModel:
         self._assert_valid_outcome(outcome_index)
         self._ensure_user(sender)
         self._require(shares > 0, "shares must be positive")
+        self._require_share_granularity(shares)
         self._require(self.user_outcome_shares[sender][outcome_index] >= shares, "insufficient shares for refund")
         basis_reduction = self._basis_reduction(sender, outcome_index, shares)
         refund_amount = basis_reduction
         self.user_outcome_shares[sender][outcome_index] -= shares
         self.user_cost_basis[sender][outcome_index] -= basis_reduction
+        self.total_user_shares[outcome_index] -= shares
         self.total_outstanding_cost_basis -= basis_reduction
         self.q[outcome_index] -= shares
         self.pool_balance -= refund_amount
+        self._refresh_required_bonds()
         self._emit(
             "Refund",
             outcome_index=outcome_index,
@@ -800,6 +895,20 @@ class MarketAppModel:
         self.pending_payouts[sender] = 0
         self._emit(
             "WithdrawPendingPayouts",
+            sender=sender,
+            amount=amount,
+            status=self.status,
+        )
+        return amount
+
+    def reclaim_resolution_budget(self, *, sender: str) -> int:
+        self._require_status(STATUS_RESOLVED, STATUS_CANCELLED)
+        self._require_authorized(sender, self.creator, "only creator may reclaim resolution budget")
+        amount = self.resolution_budget_balance
+        self._require(amount > 0, "no resolution budget")
+        self.resolution_budget_balance = 0
+        self._emit(
+            "ReclaimResolutionBudget",
             sender=sender,
             amount=amount,
             status=self.status,

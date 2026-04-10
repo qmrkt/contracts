@@ -1,6 +1,13 @@
-from algopy import UInt64
+from algopy import Array, UInt64
 
-from smart_contracts.lmsr_math_avm import _mul_div_ceil, _mul_div_floor
+from smart_contracts.lmsr_math_avm import (
+    _mul_div_ceil,
+    _mul_div_floor,
+    lmsr_collateral_required_from_prices,
+    lmsr_gauge_alpha_from_prices,
+    lmsr_normalized_q_from_prices,
+    lmsr_prices,
+)
 
 
 def test_mul_div_floor_supports_large_uint64_products() -> None:
@@ -22,3 +29,24 @@ def test_mul_div_ceil_supports_large_uint64_products() -> None:
     expected = (18_446_744_073_710 * 1_000_000 + 999_999 - 1) // 999_999
 
     assert int(result) == expected
+
+
+def test_collateral_required_from_prices_matches_binary_uniform_case() -> None:
+    prices = Array[UInt64]((UInt64(500_000), UInt64(500_000)))
+
+    alpha = lmsr_gauge_alpha_from_prices(prices)
+    collateral = lmsr_collateral_required_from_prices(UInt64(100_000_000), prices)
+
+    assert int(alpha) >= 693_147 - 2
+    assert abs(int(collateral) - 69_314_700) <= 500
+
+
+def test_normalized_q_from_prices_round_trips_prices() -> None:
+    prices = Array[UInt64]((UInt64(200_000), UInt64(300_000), UInt64(500_000)))
+
+    q = lmsr_normalized_q_from_prices(prices, UInt64(100_000_000))
+    reconstructed = lmsr_prices(q, UInt64(100_000_000))
+
+    assert reconstructed.length == prices.length
+    for idx in range(int(prices.length)):
+        assert abs(int(reconstructed[UInt64(idx)]) - int(prices[UInt64(idx)])) <= 2

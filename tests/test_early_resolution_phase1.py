@@ -69,7 +69,7 @@ def test_early_proposal_enters_proposed_and_can_finalize_unchallenged() -> None:
 
     assert market.status == STATUS_RESOLUTION_PROPOSED
     assert market.proposer == "resolver"
-    assert market.proposer_bond_held == market.proposal_bond
+    assert market.proposer_bond_held == 0
     assert market.proposed_outcome == 0
     assert market.proposal_timestamp == proposal_time
 
@@ -115,11 +115,11 @@ def test_abort_early_resolution_reopens_active_and_clears_metadata() -> None:
     assert market.resolution_path_used == 0
     assert market.dispute_backend_kind == 0
     assert market.pending_responder_role == 0
-    assert market.dispute_sink_balance == market.proposal_bond // 2
+    assert market.dispute_sink_balance == 0
 
     abort_event = market.events[-1]
     assert abort_event["event"] == "AbortEarlyResolution"
-    assert abort_event["challenger_payout"] == market.challenge_bond + (market.proposal_bond // 2)
+    assert abort_event["challenger_payout"] == market.challenge_bond
     assert abort_event["resumed_status"] == STATUS_ACTIVE
 
     reopened_trade = market.buy(

@@ -15,7 +15,6 @@ def test_market_app_creation_state_and_boxes() -> None:
     assert high.num_outcomes == MAX_OUTCOMES
     assert low.status == STATUS_CREATED
     assert low.q == [0] * MIN_OUTCOMES
-    assert low.asa == [1000 + i for i in range(MIN_OUTCOMES)]
     assert low.pool_balance == 0
     assert low.lp_shares_total == 0
     assert low.cumulative_fee_per_share == 0
@@ -25,9 +24,9 @@ def test_market_app_creation_state_and_boxes() -> None:
 
     contract_source = source_text(CONTRACT_SOURCE)
     assert 'BOX_KEY_Q = b"q"' in contract_source
-    assert 'BOX_KEY_ASA = b"asa"' in contract_source
     assert 'outcome_quantities_box' in contract_source
-    assert 'outcome_asa_ids_box' in contract_source
+    assert 'BOX_KEY_USER_SHARES = b"us:"' in contract_source
+    assert 'BOX_KEY_USER_COST_BASIS = b"uc:"' in contract_source
 
     required_fields = [
         "creator:",
@@ -42,14 +41,16 @@ def test_market_app_creation_state_and_boxes() -> None:
         "status:",
         "deadline:",
         "question_hash:",
-        "blueprint_hash:",
+        "main_blueprint_hash:",
+        "dispute_blueprint_hash:",
         "proposed_outcome:",
         "proposal_timestamp:",
         "proposal_evidence_hash:",
         "challenge_window_secs:",
         "challenger:",
         "protocol_config_id:",
-        "factory_id:",
+        "protocol_treasury:",
+        "residual_linear_lambda_fp:",
         "lp_shares:",
         "fee_snapshot:",
     ]
@@ -60,4 +61,3 @@ def test_market_app_creation_state_and_boxes() -> None:
         make_market(num_outcomes=MIN_OUTCOMES - 1)
     with pytest.raises(MarketAppError, match="num_outcomes"):
         make_market(num_outcomes=MAX_OUTCOMES + 1)
-

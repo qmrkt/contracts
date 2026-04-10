@@ -9,11 +9,14 @@ from __future__ import annotations
 import algosdk.account
 import algosdk.logic
 import pytest
-from algopy import Account, Asset, Bytes, UInt64, arc4
+from algopy import Account, Application, Asset, Bytes, UInt64, arc4
 from algopy_testing import algopy_testing_context
 
+from smart_contracts.abi_types import Hash32
 import smart_contracts.market_app.contract as contract_module
 from smart_contracts.market_app.contract import (
+    DEFAULT_LP_ENTRY_MAX_PRICE_FP,
+    DEFAULT_RESIDUAL_LINEAR_LAMBDA_FP,
     MAX_BLUEPRINT_SIZE,
     QuestionMarket,
     SHARE_UNIT,
@@ -24,11 +27,27 @@ from smart_contracts.market_app.contract import (
     STATUS_RESOLVED,
 )
 from smart_contracts.market_app.model import MarketAppError, MarketAppModel
+from smart_contracts.protocol_config.contract import (
+    KEY_CHALLENGE_BOND,
+    KEY_CHALLENGE_BOND_BPS,
+    KEY_CHALLENGE_BOND_CAP,
+    KEY_MIN_CHALLENGE_WINDOW_SECS,
+    KEY_PROPOSAL_BOND,
+    KEY_PROPOSAL_BOND_BPS,
+    KEY_PROPOSAL_BOND_CAP,
+    KEY_DEFAULT_RESIDUAL_LINEAR_LAMBDA_FP,
+    KEY_MAX_ACTIVE_LP_V4_OUTCOMES,
+    KEY_PROPOSER_FEE_BPS,
+    KEY_PROPOSER_FEE_FLOOR_BPS,
+    KEY_PROTOCOL_FEE_BPS,
+    KEY_PROTOCOL_TREASURY,
+)
 
 CURRENCY_ASA = 31_566_704
 OUTCOME_ASA_IDS = [1000, 1001, 1002]
 DEPOSIT = 200_000_000
 MAX_COST = 50_000_000
+PROTOCOL_CONFIG_APP_ID = 77
 
 
 def make_address() -> str:
@@ -57,32 +76,51 @@ def call_as(context, sender, method, *args, latest_timestamp=None):
         return method(*args)
 
 
+def _seed_protocol_min_window(context, minimum: int = 86_400) -> Application:
+    app = context.any.application(id=PROTOCOL_CONFIG_APP_ID)
+    context.ledger.set_global_state(app, KEY_MIN_CHALLENGE_WINDOW_SECS, minimum)
+    context.ledger.set_global_state(app, KEY_CHALLENGE_BOND, 10_000_000)
+    context.ledger.set_global_state(app, KEY_PROPOSAL_BOND, 10_000_000)
+    context.ledger.set_global_state(app, KEY_CHALLENGE_BOND_BPS, 500)
+    context.ledger.set_global_state(app, KEY_PROPOSAL_BOND_BPS, 500)
+    context.ledger.set_global_state(app, KEY_CHALLENGE_BOND_CAP, 100_000_000)
+    context.ledger.set_global_state(app, KEY_PROPOSAL_BOND_CAP, 100_000_000)
+    context.ledger.set_global_state(app, KEY_PROPOSER_FEE_BPS, 0)
+    context.ledger.set_global_state(app, KEY_PROPOSER_FEE_FLOOR_BPS, 0)
+    # Keys required by contract.create() since protocol_fee_bps/treasury/lambda moved to config
+    context.ledger.set_global_state(app, KEY_PROTOCOL_FEE_BPS, 50)
+    context.ledger.set_global_state(app, KEY_PROTOCOL_TREASURY, bytes(32))
+    context.ledger.set_global_state(app, KEY_DEFAULT_RESIDUAL_LINEAR_LAMBDA_FP, 150_000)
+    context.ledger.set_global_state(app, KEY_MAX_ACTIVE_LP_V4_OUTCOMES, 8)
+    return app
+
+
 def create_contract(context, contract: QuestionMarket, creator: str) -> None:
-    call_as(
-        context,
-        creator,
-        contract.create,
-        arc4.Address(creator),
-        arc4.UInt64(CURRENCY_ASA),
-        arc4.UInt64(3),
-        arc4.UInt64(100_000_000),
-        arc4.UInt64(200),
-        arc4.UInt64(50),
-        arc4.UInt64(100_000),
-        arc4.DynamicBytes(b"q" * 32),
-        arc4.DynamicBytes(b"b" * 32),
-        arc4.DynamicBytes(b"d" * 32),
-        arc4.UInt64(86_400),
-        arc4.Address(creator),
-        arc4.UInt64(10_000_000),
-        arc4.UInt64(10_000_000),
-        arc4.UInt64(3_600),
-        arc4.Address(creator),
-        arc4.UInt64(77),
-        arc4.UInt64(88),
-        arc4.Bool(True),
-        latest_timestamp=1,
+    protocol_app = _seed_protocol_min_window(context)
+    args = dict(
+        creator=arc4.Address(creator),
+        currency_asa=arc4.UInt64(CURRENCY_ASA),
+        num_outcomes=arc4.UInt64(3),
+        initial_b=arc4.UInt64(100_000_000),
+        lp_fee_bps=arc4.UInt64(200),
+        deadline=arc4.UInt64(100_000),
+        question_hash=arc4.DynamicBytes(b"q" * 32),
+        main_blueprint_hash=Hash32.from_bytes(b"b" * 32),
+        dispute_blueprint_hash=Hash32.from_bytes(b"d" * 32),
+        challenge_window_secs=arc4.UInt64(86_400),
+        resolution_authority=arc4.Address(creator),
+        grace_period_secs=arc4.UInt64(3_600),
+        market_admin=arc4.Address(creator),
+        protocol_config_id=arc4.UInt64(PROTOCOL_CONFIG_APP_ID),
+        cancellable=arc4.Bool(True),
+        lp_entry_max_price_fp=arc4.UInt64(DEFAULT_LP_ENTRY_MAX_PRICE_FP),
     )
+    context.ledger.patch_global_fields(latest_timestamp=1)
+    context._default_sender = Account(creator)
+    deferred = context.txn.defer_app_call(contract.create, **args)
+    deferred._txns[-1].fields["apps"] = (protocol_app,)
+    with context.txn.create_group([deferred]):
+        contract.create(**args)
 
 
 @pytest.fixture()
@@ -173,8 +211,6 @@ class TestDoubleOperations:
         with algopy_testing_context() as context:
             contract = QuestionMarket()
             create_contract(context, contract, creator)
-            for idx, asa_id in enumerate(OUTCOME_ASA_IDS):
-                call_as(context, creator, contract.register_outcome_asa, arc4.UInt64(idx), Asset(asa_id))
             call_as(context, creator, contract.store_main_blueprint, arc4.DynamicBytes(b'{}'))
             call_as(context, creator, contract.store_dispute_blueprint, arc4.DynamicBytes(b'{}'))
 

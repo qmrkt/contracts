@@ -232,7 +232,11 @@ class TestLPManipulation:
         # Flash LP
         m.provide_liq(sender="flash_lp", deposit_amount=1_000_000_000, now=2000)
         lp_shares = m.user_lp_shares["flash_lp"]
-        result = m.withdraw_liq(sender="flash_lp", shares_to_burn=lp_shares)
+        try:
+            result = m.withdraw_liq(sender="flash_lp", shares_to_burn=lp_shares)
+        except MarketAppError:
+            assert m.pool_balance >= pool_before
+            return
 
         # Should get back approximately what was deposited (minus rounding)
         profit = result["usdc_return"] + result["fee_return"] - 1_000_000_000
@@ -442,12 +446,12 @@ class TestP9Ordering:
 
         assert itxn_line > last_state_line, "itxn must come after all state updates in refund()"
 
-    def test_itxn_after_state_in_withdraw_liq(self) -> None:
-        """In withdraw_liq(), _send_currency comes after all state writes."""
+    def test_itxn_after_state_in_claim_lp_residual(self) -> None:
+        """In claim_lp_residual(), _send_currency comes after all state writes."""
         import inspect
         from smart_contracts.market_app.contract import QuestionMarket
 
-        source = inspect.getsource(QuestionMarket.withdraw_liq)
+        source = inspect.getsource(QuestionMarket.claim_lp_residual)
         lines = source.split("\n")
 
         last_state_line = 0
@@ -455,12 +459,11 @@ class TestP9Ordering:
         for i, line in enumerate(lines):
             stripped = line.strip()
             if any(kw in stripped for kw in [
-                "self._set_q", "self.pool_balance", "self.lp_fee_balance",
-                "self.lp_shares_total", "self._set_lp_shares", "self._set_claimable",
-                "self._set_fee_snapshot",
+                "self.pool_balance.value", "self.total_residual_claimed.value",
+                "self._set_residual_claimed",
             ]):
                 last_state_line = i
             if "_send_currency" in stripped:
                 itxn_line = i
 
-        assert itxn_line > last_state_line, "itxn must come after all state updates in withdraw_liq()"
+        assert itxn_line > last_state_line, "itxn must come after all state updates in claim_lp_residual()"

@@ -3,118 +3,65 @@
 
 // algopy.arc4.ARC4Contract.approval_program() -> uint64:
 main:
-    intcblock 8 0 2 32
-    bytecblock "pcid" "ra"
-    // smart_contracts/market_factory/contract.py:20
+    intcblock 8 1 32 0
+    // smart_contracts/market_factory/contract.py:10
     // class MarketFactory(ARC4Contract):
     txn NumAppArgs
-    bz main_bare_noop@12
-    txn OnCompletion
-    !
-    assert
-    txn ApplicationID
-    bz main_create_NoOp@8
-    pushbytes 0xfaf246d4 // method "create_market(address,uint64,byte[],uint64,uint64,uint64,byte[],byte[],uint64,uint64,address,uint64,uint64,bool,uint64)void"
+    bz main_create@5
+    pushbytes 0x29579a03 // method "create_market(uint64,byte[],uint64,uint64,uint64,byte[32],byte[32],uint64,uint64,address,uint64,bool,uint64,pay)void"
     txna ApplicationArgs 0
-    match create_market
+    match main_create_market_route@3
     err
 
-main_create_NoOp@8:
-    // smart_contracts/market_factory/contract.py:20
-    // class MarketFactory(ARC4Contract):
-    pushbytes 0x905c1c26 // method "create(uint64,address)void"
-    txna ApplicationArgs 0
-    match create
-    err
-
-main_bare_noop@12:
-    // smart_contracts/market_factory/contract.py:32
-    // @arc4.baremethod()
+main_create_market_route@3:
+    // smart_contracts/market_factory/contract.py:17
+    // @arc4.abimethod()
     txn OnCompletion
     !
     txn ApplicationID
     &&
-    return
-
-
-// smart_contracts.market_factory.contract.MarketFactory.create[routing]() -> void:
-create:
-    // smart_contracts/market_factory/contract.py:83
-    // @arc4.abimethod(create="require")
-    txna ApplicationArgs 1
-    dup
-    len
-    intc_0 // 8
-    ==
-    assert // invalid number of bytes for arc4.uint64
-    txna ApplicationArgs 2
-    dup
-    len
-    intc_3 // 32
-    ==
-    assert // invalid number of bytes for arc4.static_array<arc4.uint8, 32>
-    // smart_contracts/market_factory/contract.py:89
-    // self._require(protocol_config_id.as_uint64() > UInt64(0))
-    swap
-    btoi
-    // smart_contracts/market_factory/contract.py:30
-    // assert condition
-    dup
     assert
-    // smart_contracts/market_factory/contract.py:90
-    // self._require(bool(resolution_authority))
-    dig 1
-    global ZeroAddress
-    !=
-    // smart_contracts/market_factory/contract.py:30
-    // assert condition
-    assert
-    // smart_contracts/market_factory/contract.py:92
-    // self.protocol_config_id.value = protocol_config_id.as_uint64()
-    bytec_0 // "pcid"
-    swap
-    app_global_put
-    // smart_contracts/market_factory/contract.py:93
-    // self.resolution_authority.value = resolution_authority.bytes
-    bytec_1 // "ra"
-    swap
-    app_global_put
-    // smart_contracts/market_factory/contract.py:83
-    // @arc4.abimethod(create="require")
-    pushint 1
+    b create_market
+
+main_create@5:
+    // smart_contracts/market_factory/contract.py:13
+    // @arc4.baremethod(create="require")
+    txn OnCompletion
+    !
+    txn ApplicationID
+    !
+    &&
     return
 
 
 // smart_contracts.market_factory.contract.MarketFactory.create_market[routing]() -> void:
 create_market:
-    pushbytes ""
-    dupn 3
-    // smart_contracts/market_factory/contract.py:95
+    // smart_contracts/market_factory/contract.py:17
     // @arc4.abimethod()
     txna ApplicationArgs 1
-    dup
-    len
-    intc_3 // 32
-    ==
-    assert // invalid number of bytes for arc4.static_array<arc4.uint8, 32>
-    txna ApplicationArgs 2
     dup
     len
     intc_0 // 8
     ==
     assert // invalid number of bytes for arc4.uint64
-    txna ApplicationArgs 3
-    dupn 2
-    intc_1 // 0
+    txna ApplicationArgs 2
+    dup
+    intc_3 // 0
     extract_uint16 // on error: invalid array length header
-    intc_2 // 2
+    pushint 2
     +
-    swap
+    dig 1
     len
     ==
     assert // invalid number of bytes for arc4.dynamic_array<arc4.uint8>
+    txna ApplicationArgs 3
+    dup
+    len
+    intc_0 // 8
+    ==
+    assert // invalid number of bytes for arc4.uint64
     txna ApplicationArgs 4
-    dupn 2
+    dup
     len
     intc_0 // 8
     ==
@@ -127,455 +74,223 @@ create_market:
     assert // invalid number of bytes for arc4.uint64
     txna ApplicationArgs 6
     dup
-    cover 3
+    len
+    intc_2 // 32
+    ==
+    assert // invalid number of bytes for arc4.static_array<arc4.uint8, 32>
+    txna ApplicationArgs 7
+    dup
+    len
+    intc_2 // 32
+    ==
+    assert // invalid number of bytes for arc4.static_array<arc4.uint8, 32>
+    txna ApplicationArgs 8
     dup
     len
     intc_0 // 8
     ==
     assert // invalid number of bytes for arc4.uint64
-    txna ApplicationArgs 7
-    dup
-    cover 4
-    dup
-    intc_1 // 0
-    extract_uint16 // on error: invalid array length header
-    intc_2 // 2
-    +
-    swap
-    len
-    ==
-    assert // invalid number of bytes for arc4.dynamic_array<arc4.uint8>
-    txna ApplicationArgs 8
-    dup
-    cover 4
-    dup
-    intc_1 // 0
-    extract_uint16 // on error: invalid array length header
-    intc_2 // 2
-    +
-    swap
-    len
-    ==
-    assert // invalid number of bytes for arc4.dynamic_array<arc4.uint8>
     txna ApplicationArgs 9
     dup
-    cover 4
     len
     intc_0 // 8
     ==
     assert // invalid number of bytes for arc4.uint64
     txna ApplicationArgs 10
     dup
-    cover 4
-    dup
     len
-    intc_0 // 8
-    ==
-    assert // invalid number of bytes for arc4.uint64
-    txna ApplicationArgs 11
-    dup
-    cover 5
-    len
-    intc_3 // 32
+    intc_2 // 32
     ==
     assert // invalid number of bytes for arc4.static_array<arc4.uint8, 32>
+    txna ApplicationArgs 11
+    dup
+    len
+    intc_0 // 8
+    ==
+    assert // invalid number of bytes for arc4.uint64
     txna ApplicationArgs 12
     dup
-    cover 5
     len
-    intc_0 // 8
-    ==
-    assert // invalid number of bytes for arc4.uint64
-    txna ApplicationArgs 13
-    dup
-    cover 5
-    len
-    intc_0 // 8
-    ==
-    assert // invalid number of bytes for arc4.uint64
-    txna ApplicationArgs 14
-    dup
-    cover 5
-    len
-    pushint 1
+    intc_1 // 1
     ==
     assert // invalid number of bytes for arc4.bool
-    txna ApplicationArgs 15
+    txna ApplicationArgs 13
     dup
     len
     intc_0 // 8
     ==
     assert // invalid number of bytes for arc4.uint64
-    // smart_contracts/market_factory/contract.py:114
-    // min_grace_period_secs = self._protocol_config_uint64(Bytes(KEY_MIN_GRACE_PERIOD_SECS))
-    pushbytes 0x6d696e5f67726163655f706572696f645f73656373
-    callsub _protocol_config_uint64
-    cover 5
-    // smart_contracts/market_factory/contract.py:115
-    // num_outcomes_val = num_outcomes.as_uint64()
-    uncover 4
-    btoi
+    txn GroupIndex
+    intc_1 // 1
+    -
     dup
-    cover 5
-    // smart_contracts/market_factory/contract.py:116
-    // bootstrap_amount = bootstrap_deposit.as_uint64()
-    swap
-    btoi
+    gtxns TypeEnum
+    intc_1 // pay
+    ==
+    assert // transaction type is pay
+    // smart_contracts/market_factory/contract.py:35
+    // assert funding.sender == Txn.sender
     dup
-    cover 2
-    cover 5
-    // smart_contracts/market_factory/contract.py:118
-    // self._require(num_outcomes_val >= UInt64(MIN_OUTCOMES))
+    gtxns Sender
+    txn Sender
+    ==
+    assert
+    // smart_contracts/market_factory/contract.py:36
+    // assert funding.receiver == Global.current_application_address
     dup
-    intc_2 // 2
+    gtxns Receiver
+    global CurrentApplicationAddress
+    ==
+    assert
+    // smart_contracts/market_factory/contract.py:37
+    // assert funding.amount >= CREATE_MARKET_MIN_FUNDING
+    dup
+    gtxns Amount
+    pushint 1716400
     >=
-    // smart_contracts/market_factory/contract.py:30
-    // assert condition
     assert
-    // smart_contracts/market_factory/contract.py:119
-    // self._require(num_outcomes_val <= self._protocol_config_uint64(Bytes(KEY_MAX_OUTCOMES)))
-    pushbytes 0x6d61785f6f7574636f6d6573
-    callsub _protocol_config_uint64
+    // smart_contracts/market_factory/contract.py:38
+    // assert funding.rekey_to == Global.zero_address
+    dup
+    gtxns RekeyTo
+    global ZeroAddress
+    ==
+    assert
+    // smart_contracts/market_factory/contract.py:39
+    // assert funding.close_remainder_to == Global.zero_address
+    gtxns CloseRemainderTo
+    global ZeroAddress
+    ==
+    assert
+    // smart_contracts/market_factory/contract.py:41
+    // assert num_outcomes.as_uint64() <= MAX_ACTIVE_LP_OUTCOMES
+    dig 10
+    btoi
+    intc_0 // 8
     <=
-    // smart_contracts/market_factory/contract.py:30
-    // assert condition
     assert
-    // smart_contracts/market_factory/contract.py:120
-    // self._require(lp_fee_bps.as_uint64() <= self._protocol_config_uint64(Bytes(KEY_MAX_LP_FEE_BPS)))
-    uncover 2
-    btoi
-    pushbytes 0x6d61785f6c705f6665655f627073
-    callsub _protocol_config_uint64
-    <=
-    // smart_contracts/market_factory/contract.py:30
-    // assert condition
-    assert
-    // smart_contracts/market_factory/contract.py:122
-    // challenge_window_secs.as_uint64()
-    swap
-    btoi
-    // smart_contracts/market_factory/contract.py:123
-    // >= self._protocol_config_uint64(Bytes(KEY_MIN_CHALLENGE_WINDOW_SECS))
-    pushbytes 0x6d696e5f6368616c6c656e67655f77696e646f775f73656373
-    callsub _protocol_config_uint64
-    // smart_contracts/market_factory/contract.py:122-123
-    // challenge_window_secs.as_uint64()
-    // >= self._protocol_config_uint64(Bytes(KEY_MIN_CHALLENGE_WINDOW_SECS))
-    >=
-    // smart_contracts/market_factory/contract.py:30
-    // assert condition
-    assert
-    // smart_contracts/market_factory/contract.py:125
-    // self._require(bootstrap_amount >= self._protocol_config_uint64(Bytes(KEY_MIN_BOOTSTRAP_DEPOSIT)))
-    pushbytes 0x6d696e5f626f6f7473747261705f6465706f736974
-    callsub _protocol_config_uint64
-    >=
-    // smart_contracts/market_factory/contract.py:30
-    // assert condition
-    assert
-    // smart_contracts/market_factory/contract.py:127
-    // initial_b = initial_liquidity_b.as_uint64()
-    btoi
+    // smart_contracts/market_factory/contract.py:42
+    // protocol_config_id = Txn.applications(1).id
+    txna Applications 1
+    // smart_contracts/market_factory/contract.py:43
+    // linked_factory_id, linked_factory_exists = op.AppGlobal.get_ex_uint64(Application(protocol_config_id), b"mfi")
     dup
-    // smart_contracts/market_factory/contract.py:128
-    // if initial_b == UInt64(0):
-    bnz create_market_after_if_else@10
-    // smart_contracts/market_factory/contract.py:129
-    // default_b = self._protocol_config_uint64(Bytes(KEY_DEFAULT_B))
-    pushbytes 0x64656661756c745f62
-    callsub _protocol_config_uint64
-    bury 21
-    // smart_contracts/market_factory/contract.py:131
-    // if num_outcomes_val > UInt64(2):
-    dig 2
-    intc_2 // 2
-    >
-    bnz create_market_if_body@3
-    dig 1
-    bury 18
-
-create_market_after_if_else@4:
-    // smart_contracts/market_factory/contract.py:133
-    // if num_outcomes_val > UInt64(7):
-    dig 2
-    pushint 7
-    >
-    bz create_market_after_if_else@6
-    // smart_contracts/market_factory/contract.py:134
-    // safe_default_b = bootstrap_amount // UInt64(3)
-    dig 1
-    pushint 3
-    /
-    bury 18
-
-create_market_after_if_else@6:
-    // smart_contracts/market_factory/contract.py:135
-    // if default_b <= safe_default_b:
-    dig 20
-    dig 18
-    <=
-    bz create_market_else_body@8
-    dig 20
-    bury 1
-
-create_market_after_if_else@10:
-    // smart_contracts/market_factory/contract.py:139
-    // resolved_proposal_bond = proposal_bond.as_uint64()
-    dig 6
-    btoi
-    dup
-    bury 20
-    // smart_contracts/market_factory/contract.py:140
-    // if resolved_proposal_bond == UInt64(0):
-    bnz create_market_after_if_else@12
-    // smart_contracts/market_factory/contract.py:141
-    // resolved_proposal_bond = self._protocol_config_uint64(Bytes(KEY_PROPOSAL_BOND))
-    pushbytes 0x70726f706f73616c5f626f6e64
-    callsub _protocol_config_uint64
-    bury 19
-
-create_market_after_if_else@12:
-    // smart_contracts/market_factory/contract.py:142
-    // resolved_grace_period_secs = grace_period_secs.as_uint64()
-    dig 5
-    btoi
-    dup
-    bury 21
-    // smart_contracts/market_factory/contract.py:143
-    // if resolved_grace_period_secs == UInt64(0):
-    bnz create_market_after_if_else@14
-    dig 3
-    bury 20
-
-create_market_after_if_else@14:
-    // smart_contracts/market_factory/contract.py:30
-    // assert condition
-    dupn 2
+    pushbytes 0x6d6669
+    app_global_get_ex
+    pop
+    // smart_contracts/market_factory/contract.py:44
+    // assert linked_factory_id == Global.current_application_id.id
+    global CurrentApplicationID
+    ==
     assert
-    // smart_contracts/market_factory/contract.py:146
-    // self._require(initial_b <= bootstrap_amount)
-    dup
-    dig 3
-    <=
-    // smart_contracts/market_factory/contract.py:30
-    // assert condition
-    assert
-    // smart_contracts/market_factory/contract.py:147
-    // self._require(resolved_grace_period_secs >= min_grace_period_secs)
-    dig 20
-    dup
-    cover 2
-    dig 6
-    >=
-    // smart_contracts/market_factory/contract.py:30
-    // assert condition
-    assert
-    // smart_contracts/market_factory/contract.py:153
-    // arc4.UInt64(initial_b),
-    itob
-    // smart_contracts/market_factory/contract.py:161
-    // arc4.UInt64(resolved_proposal_bond),
-    dig 20
-    itob
-    // smart_contracts/market_factory/contract.py:162
-    // arc4.UInt64(resolved_grace_period_secs),
-    uncover 2
-    itob
-    // smart_contracts/market_factory/contract.py:59-80
-    // created_market = arc4.arc4_create(
+    // smart_contracts/market_factory/contract.py:46-64
+    // arc4.arc4_create(
     //     QuestionMarket.create,
-    //     creator,
+    //     arc4.Address(Txn.sender),
     //     currency_asa,
     //     num_outcomes,
-    //     initial_b,
+    //     initial_liquidity_b,
     //     lp_fee_bps,
-    //     arc4.UInt64(self._protocol_config_uint64(Bytes(KEY_PROTOCOL_FEE_BPS))),
     //     deadline,
     //     question_hash,
     //     main_blueprint_hash,
     //     dispute_blueprint_hash,
     //     challenge_window_secs,
-    //     arc4.Address(self.resolution_authority.value),
-    //     arc4.UInt64(self._protocol_config_uint64(Bytes(KEY_CHALLENGE_BOND))),
-    //     proposal_bond,
+    //     arc4.Address(Global.creator_address),
     //     grace_period_secs,
     //     market_admin,
-    //     arc4.UInt64(self.protocol_config_id.value),
-    //     arc4.UInt64(Global.current_application_id.id),
+    //     arc4.UInt64(protocol_config_id),
     //     cancellable,
+    //     lp_entry_max_price_fp,
     // )
     itxn_begin
-    // smart_contracts/market_factory/contract.py:66
-    // arc4.UInt64(self._protocol_config_uint64(Bytes(KEY_PROTOCOL_FEE_BPS))),
-    pushbytes 0x70726f746f636f6c5f6665655f627073
-    callsub _protocol_config_uint64
-    itob
-    // smart_contracts/market_factory/contract.py:72
-    // arc4.Address(self.resolution_authority.value),
-    intc_1 // 0
-    bytec_1 // "ra"
-    app_global_get_ex
-    assert // check self.resolution_authority exists
-    dup
-    len
-    intc_3 // 32
-    ==
-    assert // Address length is 32 bytes
-    // smart_contracts/market_factory/contract.py:73
-    // arc4.UInt64(self._protocol_config_uint64(Bytes(KEY_CHALLENGE_BOND))),
-    pushbytes 0x6368616c6c656e67655f626f6e64
-    callsub _protocol_config_uint64
-    itob
-    // smart_contracts/market_factory/contract.py:77
-    // arc4.UInt64(self.protocol_config_id.value),
-    intc_1 // 0
-    bytec_0 // "pcid"
-    app_global_get_ex
-    assert // check self.protocol_config_id exists
-    itob
-    // smart_contracts/market_factory/contract.py:78
-    // arc4.UInt64(Global.current_application_id.id),
-    global CurrentApplicationID
-    itob
-    // smart_contracts/market_factory/contract.py:75-79
-    // grace_period_secs,
-    // market_admin,
-    // arc4.UInt64(self.protocol_config_id.value),
-    // arc4.UInt64(Global.current_application_id.id),
-    // cancellable,
-    uncover 5
-    dig 15
-    concat
+    // smart_contracts/market_factory/contract.py:48
+    // arc4.Address(Txn.sender),
+    txn Sender
+    // smart_contracts/market_factory/contract.py:58
+    // arc4.Address(Global.creator_address),
+    global CreatorAddress
+    // smart_contracts/market_factory/contract.py:61
+    // arc4.UInt64(protocol_config_id),
     uncover 2
+    itob
+    // smart_contracts/market_factory/contract.py:62-63
+    // cancellable,
+    // lp_entry_max_price_fp,
+    uncover 4
+    uncover 4
     concat
-    swap
-    concat
-    dig 10
-    concat
-    // smart_contracts/market_factory/contract.py:59-80
-    // created_market = arc4.arc4_create(
+    // smart_contracts/market_factory/contract.py:46-64
+    // arc4.arc4_create(
     //     QuestionMarket.create,
-    //     creator,
+    //     arc4.Address(Txn.sender),
     //     currency_asa,
     //     num_outcomes,
-    //     initial_b,
+    //     initial_liquidity_b,
     //     lp_fee_bps,
-    //     arc4.UInt64(self._protocol_config_uint64(Bytes(KEY_PROTOCOL_FEE_BPS))),
     //     deadline,
     //     question_hash,
     //     main_blueprint_hash,
     //     dispute_blueprint_hash,
     //     challenge_window_secs,
-    //     arc4.Address(self.resolution_authority.value),
-    //     arc4.UInt64(self._protocol_config_uint64(Bytes(KEY_CHALLENGE_BOND))),
-    //     proposal_bond,
+    //     arc4.Address(Global.creator_address),
     //     grace_period_secs,
     //     market_admin,
-    //     arc4.UInt64(self.protocol_config_id.value),
-    //     arc4.UInt64(Global.current_application_id.id),
+    //     arc4.UInt64(protocol_config_id),
     //     cancellable,
+    //     lp_entry_max_price_fp,
     // )
-    intc_2 // 2
+    pushint 5
     itxn_field LocalNumUint
-    pushint 35
+    pushint 47
     itxn_field GlobalNumUint
-    pushint 12
+    pushint 13
     itxn_field GlobalNumByteSlice
     pushint 3
     itxn_field ExtraProgramPages
     pushbytes base64(C4EBQw==)
     itxn_field ClearStateProgramPages
-    pushbytes base64(CyAGAAEIAsCEPZBOJjoGc3RhdHVzDHBvb2xfYmFsYW5jZQABYhx0b3RhbF9vdXRzdGFuZGluZ19jb3N0X2Jhc2lzEnByb3Bvc2VyX2JvbmRfaGVsZAxudW1fb3V0Y29tZXMgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHY3JlYXRvcg9scF9zaGFyZXNfdG90YWwQcHJvcG9zZWRfb3V0Y29tZQ93aW5uaW5nX291dGNvbWUUY2hhbGxlbmdlcl9ib25kX2hlbGQYY3VtdWxhdGl2ZV9mZWVfcGVyX3NoYXJlA3B0cwpjaGFsbGVuZ2VyFHJlc29sdXRpb25fYXV0aG9yaXR5FHByb3RvY29sX2ZlZV9iYWxhbmNlFGRpc3B1dGVfc2lua19iYWxhbmNlCWxwX3NoYXJlcwhkZWFkbGluZQtydWxpbmdfaGFzaANycHUDcHJyCHByb3Bvc2VyDGZlZV9zbmFwc2hvdAIACg5scF9mZWVfYmFsYW5jZQNhc2EMY3VycmVuY3lfYXNhA3BlaBB3aW5uZXJfc2hhcmVfYnBzCmxwX2ZlZV9icHMQcHJvdG9jb2xfZmVlX2JwcxVjaGFsbGVuZ2Vfd2luZG93X3NlY3MNcHJvcG9zYWxfYm9uZAtjYW5jZWxsYWJsZQNjcmMDY2VoA2RyaANkb2EDZGRsA2Riaw5tYWluX2JsdWVwcmludBFkaXNwdXRlX2JsdWVwcmludAFxEHBlbmRpbmdfcGF5b3V0czoTbWFpbl9ibHVlcHJpbnRfaGFzaBZkaXNwdXRlX2JsdWVwcmludF9oYXNoEnByb3RvY29sX2NvbmZpZ19pZA5jaGFsbGVuZ2VfYm9uZBFncmFjZV9wZXJpb2Rfc2VjcwxtYXJrZXRfYWRtaW4WZGlzcHV0ZV9zaW5rX3NoYXJlX2JwcwIAEgp1c2VyX2ZlZXM6DHVzZXJfc2hhcmVzOhB1c2VyX2Nvc3RfYmFzaXM6MRtBANwxGRREMRhBAMWCGwTDuEHuBEK7p8wE/ZilLQTSqBa7BLApBc4E/SyTzQS0kJThBA0PfkIEMGngxASngqUOBCPQ3E0E7bhlqgTCBavYBI6seKsEd8NjEQSEl9tmBFHDqo8EK/XE8QRJEjniBEqkypkElLjA/wSjHoWJBINM8DEEMfJqmwQAs0lvBFCO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)
+    pushbytes base64(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)
     itxn_field ApprovalProgramPages
-    pushbytes base64(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)
+    pushbytes base64(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)
     itxn_field ApprovalProgramPages
-    pushbytes 0xed4e2603 // method "create(address,uint64,uint64,uint64,uint64,uint64,uint64,byte[],byte[],byte[],uint64,address,uint64,uint64,uint64,address,uint64,uint64,bool)void"
-    itxn_field ApplicationArgs
-    dig 22
-    dup
-    cover 2
-    itxn_field ApplicationArgs
-    dig 22
-    itxn_field ApplicationArgs
-    dig 20
-    itxn_field ApplicationArgs
-    uncover 6
-    itxn_field ApplicationArgs
-    dig 18
-    itxn_field ApplicationArgs
-    uncover 4
-    itxn_field ApplicationArgs
-    dig 14
-    itxn_field ApplicationArgs
-    dig 19
-    itxn_field ApplicationArgs
-    dig 16
-    itxn_field ApplicationArgs
-    dig 15
-    itxn_field ApplicationArgs
-    dig 13
+    pushbytes 0xca47e83a // method "create(address,uint64,uint64,uint64,uint64,uint64,byte[],byte[32],byte[32],uint64,address,uint64,address,uint64,bool,uint64)void"
     itxn_field ApplicationArgs
     uncover 3
     itxn_field ApplicationArgs
+    uncover 13
+    itxn_field ApplicationArgs
+    uncover 11
+    itxn_field ApplicationArgs
+    uncover 10
+    itxn_field ApplicationArgs
+    uncover 9
+    itxn_field ApplicationArgs
+    uncover 6
+    itxn_field ApplicationArgs
+    uncover 8
+    itxn_field ApplicationArgs
+    uncover 7
+    itxn_field ApplicationArgs
+    uncover 6
+    itxn_field ApplicationArgs
+    uncover 5
+    itxn_field ApplicationArgs
     uncover 2
     itxn_field ApplicationArgs
     uncover 2
+    itxn_field ApplicationArgs
+    uncover 2
+    itxn_field ApplicationArgs
+    swap
     itxn_field ApplicationArgs
     itxn_field ApplicationArgs
     pushint 6 // appl
     itxn_field TypeEnum
-    intc_1 // 0
+    intc_3 // 0
     itxn_field Fee
     itxn_submit
-    itxn CreatedApplicationID
-    // smart_contracts/market_factory/contract.py:165
-    // self.market_registry[created_app_id] = creator.bytes
-    itob
-    pushbytes 0x6d
-    swap
-    concat
-    dup
-    box_del
-    pop
-    swap
-    box_put
-    // smart_contracts/market_factory/contract.py:95
+    // smart_contracts/market_factory/contract.py:17
     // @arc4.abimethod()
-    pushint 1
+    intc_1 // 1
     return
-
-create_market_else_body@8:
-    dig 17
-    bury 1
-    b create_market_after_if_else@10
-
-create_market_if_body@3:
-    // smart_contracts/market_factory/contract.py:132
-    // safe_default_b = bootstrap_amount // UInt64(2)
-    dig 1
-    intc_2 // 2
-    /
-    bury 18
-    b create_market_after_if_else@4
-
-
-// smart_contracts.market_factory.contract.MarketFactory._protocol_config_uint64(key: bytes) -> uint64:
-_protocol_config_uint64:
-    // smart_contracts/market_factory/contract.py:36-37
-    // @subroutine(inline=False)
-    // def _protocol_config_uint64(self, key: Bytes) -> UInt64:
-    proto 1 1
-    // smart_contracts/market_factory/contract.py:38
-    // value, exists = op.AppGlobal.get_ex_uint64(self.protocol_config_id.value, key)
-    intc_1 // 0
-    bytec_0 // "pcid"
-    app_global_get_ex
-    assert // check self.protocol_config_id exists
-    frame_dig -1
-    app_global_get_ex
-    // smart_contracts/market_factory/contract.py:30
-    // assert condition
-    assert
-    // smart_contracts/market_factory/contract.py:40
-    // return value
-    retsub

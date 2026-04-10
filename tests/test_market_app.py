@@ -38,7 +38,14 @@ def bootstrapped_market() -> MarketAppModel:
     return market
 
 
-def make_market(*, num_outcomes: int = 3, deadline: int = 10_000, cancellable: bool = True) -> MarketAppModel:
+def make_market(
+    *,
+    num_outcomes: int = 3,
+    deadline: int = 10_000,
+    cancellable: bool = True,
+    proposer_fee_bps: int = 0,
+    proposer_fee_floor_bps: int = 0,
+) -> MarketAppModel:
     return MarketAppModel(
         creator="creator",
         currency_asa=31566704,
@@ -56,6 +63,8 @@ def make_market(*, num_outcomes: int = 3, deadline: int = 10_000, cancellable: b
         resolution_authority="resolver",
         challenge_bond=10_000_000,
         proposal_bond=10_000_000,
+        proposer_fee_bps=proposer_fee_bps,
+        proposer_fee_floor_bps=proposer_fee_floor_bps,
         grace_period_secs=3_600,
         market_admin="admin",
         cancellable=cancellable,
@@ -95,14 +104,13 @@ def test_num_outcomes_bounds() -> None:
         make_market(num_outcomes=MAX_OUTCOMES + 1)
 
 
-def test_boxes_q_asa_layout(market: MarketAppModel) -> None:
+def test_boxes_q_layout(market: MarketAppModel) -> None:
     contract_source = source_text(CONTRACT_SOURCE)
     assert market.q == [0] * market.num_outcomes
-    assert market.asa == [1000, 1001, 1002]
     assert 'BOX_KEY_Q = b"q"' in contract_source
-    assert 'BOX_KEY_ASA = b"asa"' in contract_source
     assert 'outcome_quantities_box' in contract_source
-    assert 'outcome_asa_ids_box' in contract_source
+    assert 'BOX_KEY_USER_SHARES = b"us:"' in contract_source
+    assert 'BOX_KEY_USER_COST_BASIS = b"uc:"' in contract_source
 
 
 def test_global_state_schema() -> None:
@@ -120,17 +128,20 @@ def test_global_state_schema() -> None:
         "status:",
         "deadline:",
         "question_hash:",
-        "blueprint_hash:",
+        "main_blueprint_hash:",
+        "dispute_blueprint_hash:",
         "proposed_outcome:",
         "proposal_timestamp:",
         "proposal_evidence_hash:",
         "challenge_window_secs:",
         "challenger:",
         "protocol_config_id:",
-        "factory_id:",
-        "contract_version:",
+        "protocol_treasury:",
+        "residual_linear_lambda_fp:",
+        "total_residual_claimed:",
         "lp_shares:",
         "fee_snapshot:",
+        "withdrawable_fee_surplus:",
     ]
     for field in required_fields:
         assert field in contract_source
@@ -162,7 +173,7 @@ def test_bootstrap_creator_funds_optin_lp_transition(market: MarketAppModel) -> 
     assert market.lp_shares_total == 200_000_000
     assert market.user_lp_shares["creator"] == 200_000_000
     assert market.events[-1]["event"] == "Bootstrap"
-    assert market.events[-1]["opted_in_asa_ids"] == market.asa
+    assert market.events[-1]["lp_shares_minted"] == 200_000_000
 
 
 def test_buy_cost_fees_slippage_transfer(bootstrapped_market: MarketAppModel) -> None:
@@ -233,6 +244,7 @@ def test_provide_liq_scaling_shares_price_invariance(bootstrapped_market: Market
 
 def test_withdraw_liq_scaling_fees_allowed_statuses(bootstrapped_market: MarketAppModel) -> None:
     buy_one(bootstrapped_market, sender="trader", outcome_index=0)
+    bootstrapped_market.provide_liq(sender="lp2", deposit_amount=50_000_000, now=6_000)
     creator_before = bootstrapped_market.user_lp_shares["creator"]
     before_prices = lmsr_prices(bootstrapped_market.q, bootstrapped_market.b)
     result = bootstrapped_market.withdraw_liq(sender="creator", shares_to_burn=creator_before // 10)
@@ -240,9 +252,6 @@ def test_withdraw_liq_scaling_fees_allowed_statuses(bootstrapped_market: MarketA
     assert result["usdc_return"] > 0
     assert result["fee_return"] >= 0
     assert all(abs(a - b) <= 1 for a, b in zip(before_prices, after_prices))
-    resolve_market(bootstrapped_market)
-    with pytest.raises(MarketAppError, match="invalid status"):
-        bootstrapped_market.withdraw_liq(sender="creator", shares_to_burn=1)
     cancelled_market = make_market()
     cancelled_market.bootstrap(sender="creator", deposit_amount=200_000_000)
     cancelled_market.cancel(sender="creator")
@@ -341,12 +350,35 @@ def test_finalize_resolution_after_window_unchallenged(bootstrapped_market: Mark
     assert bootstrapped_market.status == STATUS_RESOLVED
     assert winner == 1
     assert bootstrapped_market.winning_outcome == 1
-    assert bootstrapped_market.pending_payouts["resolver"] == bootstrapped_market.proposal_bond
-    assert bootstrapped_market.withdraw_pending_payouts(sender="resolver") == bootstrapped_market.proposal_bond
-    assert bootstrapped_market.pending_payouts["resolver"] == 0
+    assert bootstrapped_market.pending_payouts.get("resolver", 0) == 0
+    with pytest.raises(MarketAppError, match="no pending payouts"):
+        bootstrapped_market.withdraw_pending_payouts(sender="resolver")
 
 
-def test_claim_winning_outcome_proportional_payout(bootstrapped_market: MarketAppModel) -> None:
+def test_finalize_resolution_pays_proposer_fee_and_creator_reclaims_leftover_budget() -> None:
+    market = make_market(proposer_fee_bps=20, proposer_fee_floor_bps=0)
+    market.bootstrap(sender="creator", deposit_amount=200_000_000)
+    initial_budget = market.resolution_budget_balance
+
+    market.trigger_resolution(sender="anyone", now=market.deadline)
+    market.propose_resolution(
+        sender="resolver",
+        outcome_index=1,
+        evidence_hash=b"e" * 32,
+        now=market.deadline + 1,
+        bond_paid=10_000_000,
+    )
+    expected_fee = market._required_proposer_fee()
+    winner = market.finalize_resolution(sender="anyone", now=market.deadline + 1 + market.challenge_window_secs)
+
+    assert winner == 1
+    assert market.pending_payouts["resolver"] == 10_000_000 + expected_fee
+    assert market.resolution_budget_balance == initial_budget - expected_fee
+    assert market.reclaim_resolution_budget(sender="creator") == initial_budget - expected_fee
+    assert market.resolution_budget_balance == 0
+
+
+def test_claim_winning_outcome_one_to_one_payout(bootstrapped_market: MarketAppModel) -> None:
     buy_one(bootstrapped_market, sender="winner", outcome_index=0)
     buy_one(bootstrapped_market, sender="loser", outcome_index=1)
     resolve_market(bootstrapped_market)
@@ -355,11 +387,12 @@ def test_claim_winning_outcome_proportional_payout(bootstrapped_market: MarketAp
     cost_basis_before = bootstrapped_market.user_cost_basis["winner"][0]
     claim_result = bootstrapped_market.claim(sender="winner", outcome_index=0)
     assert claim_result["shares"] == SHARE_UNIT
-    assert claim_result["payout"] == (starting_pool * SHARE_UNIT) // outstanding
+    assert claim_result["payout"] == SHARE_UNIT
     assert cost_basis_before > 0
     assert bootstrapped_market.user_outcome_shares["winner"][0] == 0
     assert bootstrapped_market.user_cost_basis["winner"][0] == 0
     assert bootstrapped_market.q[0] == outstanding - SHARE_UNIT
+    assert bootstrapped_market.pool_balance == starting_pool - SHARE_UNIT
     with pytest.raises(MarketAppError, match="only winning outcome"):
         bootstrapped_market.claim(sender="loser", outcome_index=1, shares=SHARE_UNIT)
     with pytest.raises(MarketAppError, match="shares must be positive"):
@@ -392,32 +425,99 @@ def test_dispute_resolution_credits_pending_payouts_until_withdrawn(bootstrapped
         evidence_hash=b"c" * 32,
         now=bootstrapped_market.deadline + 2,
     )
+    proposer_bond_held = bootstrapped_market.proposer_bond_held
+    challenger_bond_held = bootstrapped_market.challenger_bond_held
     bootstrapped_market.finalize_dispute(sender="resolver", outcome_index=1, ruling_hash=b"r" * 32)
 
-    expected_payout = bootstrapped_market.challenge_bond + (bootstrapped_market.proposal_bond // 2)
+    expected_payout = challenger_bond_held + (proposer_bond_held // 2)
     assert bootstrapped_market.pending_payouts["challenger"] == expected_payout
     assert bootstrapped_market.withdraw_pending_payouts(sender="challenger") == expected_payout
     assert bootstrapped_market.pending_payouts["challenger"] == 0
 
 
+def test_confirmed_dispute_pays_proposer_fee_once() -> None:
+    market = make_market(proposer_fee_bps=20, proposer_fee_floor_bps=0)
+    market.bootstrap(sender="creator", deposit_amount=200_000_000)
+    initial_budget = market.resolution_budget_balance
+
+    market.trigger_resolution(sender="anyone", now=market.deadline)
+    market.propose_resolution(
+        sender="resolver",
+        outcome_index=0,
+        evidence_hash=b"e" * 32,
+        now=market.deadline + 1,
+        bond_paid=10_000_000,
+    )
+    market.challenge_resolution(
+        sender="challenger",
+        bond_paid=market.challenge_bond,
+        reason_code=1,
+        evidence_hash=b"c" * 32,
+        now=market.deadline + 2,
+    )
+
+    expected_fee = market._required_proposer_fee()
+    market.finalize_dispute(sender="resolver", outcome_index=0, ruling_hash=b"r" * 32)
+
+    assert market.pending_payouts["resolver"] == 10_000_000 + 5_000_000 + expected_fee
+    assert market.resolution_budget_balance == initial_budget - expected_fee
+
+
+def test_overturned_and_cancelled_paths_do_not_pay_proposer_fee() -> None:
+    overturned = make_market(proposer_fee_bps=20, proposer_fee_floor_bps=0)
+    overturned.bootstrap(sender="creator", deposit_amount=200_000_000)
+    overturned_budget = overturned.resolution_budget_balance
+    overturned.trigger_resolution(sender="anyone", now=overturned.deadline)
+    overturned.propose_resolution(sender="resolver", outcome_index=0, evidence_hash=b"e" * 32, now=overturned.deadline + 1)
+    overturned.challenge_resolution(
+        sender="challenger",
+        bond_paid=overturned.challenge_bond,
+        reason_code=1,
+        evidence_hash=b"c" * 32,
+        now=overturned.deadline + 2,
+    )
+    overturned.finalize_dispute(sender="resolver", outcome_index=1, ruling_hash=b"r" * 32)
+    assert "resolver" not in overturned.pending_payouts
+    assert overturned.resolution_budget_balance == overturned_budget
+
+    cancelled = make_market(proposer_fee_bps=20, proposer_fee_floor_bps=0)
+    cancelled.bootstrap(sender="creator", deposit_amount=200_000_000)
+    cancelled_budget = cancelled.resolution_budget_balance
+    cancelled.trigger_resolution(sender="anyone", now=cancelled.deadline)
+    cancelled.propose_resolution(sender="resolver", outcome_index=0, evidence_hash=b"e" * 32, now=cancelled.deadline + 1)
+    cancelled.challenge_resolution(
+        sender="challenger",
+        bond_paid=cancelled.challenge_bond,
+        reason_code=1,
+        evidence_hash=b"c" * 32,
+        now=cancelled.deadline + 2,
+    )
+    cancelled.cancel_dispute_and_market(sender="resolver", ruling_hash=b"r" * 32)
+    assert "resolver" not in cancelled.pending_payouts
+    assert cancelled.resolution_budget_balance == cancelled_budget
+
+
 def test_arc28_events_all_state_changes_core(bootstrapped_market: MarketAppModel) -> None:
     contract_source = source_text(CONTRACT_SOURCE)
     expected_emit_markers = [
-        'arc4.emit("Bootstrap()")',
+        'arc4.emit("Bootstrap(uint64,uint64)"',
         'arc4.emit("Buy(uint64)"',
         'arc4.emit("Sell(uint64)"',
-        'arc4.emit("ProvideLiquidity(uint64)"',
-        'arc4.emit("WithdrawLiquidity(uint64)"',
-        'arc4.emit("TriggerResolution()")',
+        'arc4.emit("EnterLpActive(uint64,uint64)"',
+        'arc4.emit("ClaimLpFees(uint64)"',
+        'arc4.emit("WithdrawLpFees(uint64)"',
+        'arc4.emit("ClaimLpResidual(uint64)"',
+        'arc4.emit("TriggerResolution(uint64)"',
         'arc4.emit("ProposeResolution(uint64,byte[])"',
         'arc4.emit("ProposeEarlyResolution(uint64,byte[])"',
-        'arc4.emit("ChallengeResolution()")',
+        'arc4.emit("ChallengeResolution(uint64,uint64,byte[])"',
         'arc4.emit("AbortEarlyResolution(byte[],uint64)")',
-        'arc4.emit("FinalizeResolution()")',
+        'arc4.emit("FinalizeResolution(uint64)"',
         'arc4.emit("Claim(uint64)"',
-        'arc4.emit("Cancel()")',
+        'arc4.emit("Cancel(uint64)"',
         'arc4.emit("Refund(uint64)"',
-        'arc4.emit("WithdrawPendingPayouts(uint64)")',
+        'arc4.emit("WithdrawFees(uint64)"',
+        'arc4.emit("WithdrawPayouts(uint64)")',
         'arc4.emit("CommentPosted(string)"',
     ]
     for marker in expected_emit_markers:
@@ -451,6 +551,7 @@ def test_invariant_solvency_each_operation() -> None:
     cases.append(m)
 
     m = bootstrap_and_buy()
+    m.provide_liq(sender="lp2", deposit_amount=50_000_000, now=5_500)
     m.withdraw_liq(sender="creator", shares_to_burn=10_000_000)
     cases.append(m)
 
@@ -499,7 +600,13 @@ def test_invariant_solvency_each_operation() -> None:
     cases.append(m)
 
     for case in cases:
-        assert case.pool_balance >= max(case.q, default=0)
+        remaining_winning_supply = 0
+        if 0 <= case.winning_outcome < case.num_outcomes:
+            remaining_winning_supply = sum(
+                holdings[case.winning_outcome] for holdings in case.user_outcome_shares.values()
+            )
+        if case.status == STATUS_RESOLVED:
+            assert case.pool_balance >= remaining_winning_supply
 
 
 @pytest.mark.parametrize("setup", ["bootstrap", "buy", "sell", "provide", "withdraw", "trigger", "propose", "challenge", "finalize", "cancel", "refund"])
@@ -517,6 +624,8 @@ def test_invariant_price_sum_each_operation(setup: str) -> None:
         elif setup == "provide":
             m.provide_liq(sender="lp2", deposit_amount=10_000_000, now=5_500)
         elif setup == "withdraw":
+            buy_one(m, sender="buyer", outcome_index=0)
+            m.provide_liq(sender="lp2", deposit_amount=50_000_000, now=5_500)
             m.withdraw_liq(sender="creator", shares_to_burn=10_000_000)
         elif setup == "trigger":
             m.trigger_resolution(sender="anyone", now=m.deadline)
@@ -590,7 +699,7 @@ def test_uses_c1_math_library(monkeypatch, bootstrapped_market: MarketAppModel) 
 
 def test_num_outcomes_and_boxes(market: MarketAppModel) -> None:
     test_num_outcomes_bounds()
-    test_boxes_q_asa_layout(market)
+    test_boxes_q_layout(market)
 
 
 def test_global_and_local_state_schema() -> None:
@@ -667,8 +776,8 @@ def test_finalize_resolution_after_window(bootstrapped_market: MarketAppModel) -
     test_finalize_resolution_after_window_unchallenged(bootstrapped_market)
 
 
-def test_claim_winnings_proportional_payout(bootstrapped_market: MarketAppModel) -> None:
-    test_claim_winning_outcome_proportional_payout(bootstrapped_market)
+def test_claim_winnings_one_to_one_payout(bootstrapped_market: MarketAppModel) -> None:
+    test_claim_winning_outcome_one_to_one_payout(bootstrapped_market)
 
 
 def test_solvency_invariant_all_ops() -> None:

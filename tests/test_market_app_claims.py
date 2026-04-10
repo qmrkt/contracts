@@ -7,7 +7,7 @@ from smart_contracts.market_app.model import SHARE_UNIT, STATUS_CANCELLED, Marke
 from .market_app_test_utils import buy_one, make_market, resolve_market
 
 
-def test_claim_redeems_only_winning_outcome_for_proportional_usdc_payout() -> None:
+def test_claim_redeems_only_winning_outcome_one_to_one_and_preserves_lp_residual() -> None:
     market = make_market()
     market.bootstrap(sender="creator", deposit_amount=200_000_000)
     buy_one(market, sender="winner", outcome_index=0)
@@ -20,11 +20,12 @@ def test_claim_redeems_only_winning_outcome_for_proportional_usdc_payout() -> No
     claim_result = market.claim(sender="winner", outcome_index=0)
 
     assert claim_result["shares"] == SHARE_UNIT
-    assert claim_result["payout"] == (starting_pool * SHARE_UNIT) // outstanding
+    assert claim_result["payout"] == SHARE_UNIT
     assert cost_basis_before > 0
     assert market.user_outcome_shares["winner"][0] == 0
     assert market.user_cost_basis["winner"][0] == 0
     assert market.q[0] == outstanding - SHARE_UNIT
+    assert market.pool_balance == starting_pool - SHARE_UNIT
 
     with pytest.raises(MarketAppError, match="only winning outcome"):
         market.claim(sender="loser", outcome_index=1, shares=SHARE_UNIT)
@@ -72,9 +73,10 @@ def test_claim_and_refund_multiple_shares_in_single_call() -> None:
     claim_result = claim_market.claim(sender="winner", outcome_index=0, shares=claim_shares)
 
     assert claim_result["shares"] == claim_shares
-    assert claim_result["payout"] == (pool_before_claim * claim_shares) // outstanding_before_claim
+    assert claim_result["payout"] == claim_shares
     assert claim_market.user_outcome_shares["winner"][0] == SHARE_UNIT
-    assert claim_market.q[0] == SHARE_UNIT
+    assert claim_market.q[0] == outstanding_before_claim - claim_shares
+    assert claim_market.pool_balance == pool_before_claim - claim_shares
 
     refund_market = make_market()
     refund_market.bootstrap(sender="creator", deposit_amount=200_000_000)

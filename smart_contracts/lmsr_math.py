@@ -114,6 +114,16 @@ def _validate_state(q: list[int], b: int) -> None:
     _require(b > 0, "b must be positive")
 
 
+def _validate_prices(prices: list[int]) -> None:
+    _require(len(prices) >= 2, "must have at least two outcomes")
+    total = 0
+    for idx, price in enumerate(prices):
+        _check_uint64(price, f"prices[{idx}]")
+        _require(price > 0, "prices must be strictly positive")
+        total += price
+    _require(total == SCALE, "prices must sum to SCALE")
+
+
 # ---------------------------------------------------------------------------
 # Fixed-point exp / ln
 # ---------------------------------------------------------------------------
@@ -295,6 +305,7 @@ def lmsr_cost_delta(q: list[int], b: int, outcome: int, shares: int) -> int:
     numerator_after = _lmsr_cost_numerator(q_after, b)
     direct_delta = numerator_after - numerator_before if numerator_after > numerator_before else 0
     direct_quote = _ceil_div(direct_delta, SCALE) if direct_delta > 0 else 0
+    round_trip_floor = _floor_div(direct_delta, SCALE) if direct_delta > 0 else 0
     padded_direct_quote = direct_quote
     if shares > 0:
         padded_direct_quote = _check_uint64(direct_quote + BUY_APPROXIMATION_MARGIN, "buy padded quote")
@@ -314,8 +325,10 @@ def lmsr_cost_delta(q: list[int], b: int, outcome: int, shares: int) -> int:
         ratio_quote = _ceil_div(delta_numerator, SCALE)
 
     # Keep the buy side contract-favoring even when ln/log-sum-exp quantization
-    # makes the direct cost delta a few microunits too cheap.
-    result = max(ratio_quote, padded_direct_quote)
+    # makes the ratio path a few microunits too cheap, but do not let the
+    # separately rounded direct path overshoot arbitrarily.
+    ratio_cap = _check_uint64(ratio_quote + BUY_APPROXIMATION_MARGIN, "buy ratio cap")
+    result = max(ratio_quote, min(padded_direct_quote, ratio_cap), round_trip_floor)
     return _check_uint64(result, "lmsr_cost_delta")
 
 
@@ -366,6 +379,40 @@ def lmsr_liquidity_scale(q: list[int], b: int, deposit: int, pool: int) -> tuple
     return scaled_q, scaled_b
 
 
+def lmsr_gauge_alpha_from_prices(prices: list[int]) -> int:
+    _validate_prices(prices)
+    alpha_fp = 0
+    for price in prices:
+        inv_price_fp = _mul_div_ceil(SCALE, SCALE, price)
+        alpha_fp = max(alpha_fp, ln_fp(inv_price_fp))
+    return _check_uint64(alpha_fp, "gauge alpha")
+
+
+def lmsr_collateral_required_from_prices(target_delta_b: int, prices: list[int]) -> int:
+    _check_uint64(target_delta_b, "target_delta_b")
+    _require(target_delta_b > 0, "target_delta_b must be positive")
+    alpha_fp = lmsr_gauge_alpha_from_prices(prices)
+    return _check_uint64(_mul_div_ceil(target_delta_b, alpha_fp, SCALE), "collateral required")
+
+
+def lmsr_normalized_q_from_prices(prices: list[int], b: int) -> list[int]:
+    _validate_prices(prices)
+    _check_uint64(b, "b")
+    _require(b > 0, "b must be positive")
+
+    alpha_fp = lmsr_gauge_alpha_from_prices(prices)
+    q: list[int] = []
+    for price in prices:
+        inv_price_fp = _mul_div_ceil(SCALE, SCALE, price)
+        ln_inv_fp = ln_fp(inv_price_fp)
+        if alpha_fp >= ln_inv_fp:
+            q_i = _mul_div_floor(b, alpha_fp - ln_inv_fp, SCALE)
+        else:
+            q_i = 0
+        q.append(_check_uint64(q_i, "normalized q"))
+    return q
+
+
 __all__ = [
     "EXP_TAYLOR_TERMS",
     "LN_TAYLOR_TERMS",
@@ -382,8 +429,11 @@ __all__ = [
     "lmsr_cost",
     "lmsr_cost_delta",
     "lmsr_cost_floor",
+    "lmsr_collateral_required_from_prices",
+    "lmsr_gauge_alpha_from_prices",
     "lmsr_liquidity_scale",
     "lmsr_log_sum_exp_fp",
+    "lmsr_normalized_q_from_prices",
     "lmsr_prices",
     "lmsr_sell_return",
 ]

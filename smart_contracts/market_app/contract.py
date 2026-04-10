@@ -7,11 +7,12 @@ GlobalState, LocalState, and BoxMap storage.
 
 from algopy import (
     Account,
+    Application,
     ARC4Contract,
     Array,
     Asset,
+    Box,
     BoxMap,
-    BoxRef,
     Bytes,
     Global,
     GlobalState,
@@ -26,16 +27,15 @@ from algopy import (
     urange,
 )
 
+from smart_contracts.abi_types import Hash32
 from smart_contracts.lmsr_math_avm import (
     SCALE,
+    lmsr_collateral_required_from_prices,
     lmsr_cost_delta,
-    lmsr_liquidity_scale_b,
-    lmsr_liquidity_scale_q,
+    lmsr_normalized_q_from_prices,
     lmsr_prices,
     lmsr_sell_return,
 )
-from smart_contracts.protocol_config.contract import KEY_PROTOCOL_TREASURY
-
 MIN_OUTCOMES = 2
 MAX_OUTCOMES = 16
 BPS_DENOMINATOR = 10_000
@@ -49,22 +49,23 @@ STATUS_RESOLVED = 5
 STATUS_DISPUTED = 6
 SHARE_UNIT = SCALE
 MAX_BLUEPRINT_SIZE = 8_192
-MARKET_CONTRACT_VERSION = 3
 MAX_COMMENT_BYTES = 512
 ZERO_ADDRESS_BYTES = b"\x00" * 32
 DEFAULT_WINNER_SHARE_BPS = 5_000
 DEFAULT_DISPUTE_SINK_SHARE_BPS = 5_000
-OUTCOME_ASA_TOTAL = 10_000_000_000_000
+DEFAULT_RESIDUAL_LINEAR_LAMBDA_FP = 150_000
+DEFAULT_LP_ENTRY_MAX_PRICE_FP = 800_000
+SECONDS_PER_DAY = 86_400
 
 BOX_KEY_Q = b"q"
-BOX_KEY_ASA = b"asa"
-BOX_KEY_MAIN_BLUEPRINT = b"main_blueprint"
-BOX_KEY_DISPUTE_BLUEPRINT = b"dispute_blueprint"
-BOX_KEY_USER_SHARES = b"user_shares:"
-BOX_KEY_USER_FEES = b"user_fees:"
-BOX_KEY_USER_COST_BASIS = b"user_cost_basis:"
-BOX_KEY_PENDING_PAYOUTS = b"pending_payouts:"
-KEY_PROTOCOL_ADMIN = b"admin"
+BOX_KEY_MAIN_BLUEPRINT = b"mb"
+BOX_KEY_DISPUTE_BLUEPRINT = b"db"
+BOX_KEY_USER_SHARES = b"us:"
+BOX_KEY_USER_FEES = b"uf:"
+BOX_KEY_USER_COST_BASIS = b"uc:"
+BOX_KEY_PENDING_PAYOUTS = b"pp:"
+BOX_KEY_TOTAL_USER_SHARES = b"tus"
+UINT64_BYTES = 8
 
 # State and event schema consumed by the acceptance harness and ARC-56 tooling.
 # creator:
@@ -100,17 +101,22 @@ KEY_PROTOCOL_ADMIN = b"admin"
 # dispute_sink_balance:
 # winner_share_bps:
 # dispute_sink_share_bps:
-# protocol_config_id:
-# factory_id:
-# contract_version:
+# protocol_treasury:
 # lp_shares:
 # fee_snapshot:
+# activation_timestamp:
+# settlement_timestamp:
+# residual_linear_lambda_fp:
+# lp_entry_max_price_fp:
+# total_lp_weighted_entry_sum:
+# total_residual_claimed:
+# withdrawable_fee_surplus:
+# lp_weighted_entry_sum:
+# residual_claimed:
 # ARC-28 events:
 # arc4.emit("Bootstrap()")
 # arc4.emit("Buy(uint64)")
 # arc4.emit("Sell(uint64)")
-# arc4.emit("ProvideLiquidity(uint64)")
-# arc4.emit("WithdrawLiquidity(uint64)")
 # arc4.emit("TriggerResolution()")
 # arc4.emit("ProposeResolution(uint64,byte[])")
 # arc4.emit("ProposeEarlyResolution(uint64,byte[])")
@@ -134,45 +140,54 @@ class QuestionMarket(ARC4Contract):
     def opt_in(self) -> None:
         pass
 
-    @arc4.baremethod()
+    @arc4.baremethod(allow_actions=["NoOp"])
     def bare_noop(self) -> None:
         pass
 
     def __init__(self) -> None:
-        self.creator = GlobalState(Bytes, key="creator")
-        self.currency_asa = GlobalState(UInt64, key="currency_asa")
-        self.num_outcomes = GlobalState(UInt64, key="num_outcomes")
+        self.creator = GlobalState(Bytes, key="cr")
+        self.currency_asa = GlobalState(UInt64, key="ca")
+        self.num_outcomes = GlobalState(UInt64, key="no")
         self.b = GlobalState(UInt64, key="b")
-        self.pool_balance = GlobalState(UInt64, key="pool_balance")
-        self.lp_shares_total = GlobalState(UInt64, key="lp_shares_total")
-        self.lp_fee_bps = GlobalState(UInt64, key="lp_fee_bps")
-        self.protocol_fee_bps = GlobalState(UInt64, key="protocol_fee_bps")
-        self.cumulative_fee_per_share = GlobalState(UInt64, key="cumulative_fee_per_share")
-        self.status = GlobalState(UInt64, key="status")
-        self.deadline = GlobalState(UInt64, key="deadline")
-        self.question_hash = GlobalState(Bytes, key="question_hash")
-        self.main_blueprint_hash = GlobalState(Bytes, key="main_blueprint_hash")
-        self.dispute_blueprint_hash = GlobalState(Bytes, key="dispute_blueprint_hash")
-        self.proposed_outcome = GlobalState(UInt64, key="proposed_outcome")
+        self.pool_balance = GlobalState(UInt64, key="pb")
+        self.bootstrap_deposit = GlobalState(UInt64, key="bd")
+        self.lp_shares_total = GlobalState(UInt64, key="lst")
+        self.lp_fee_bps = GlobalState(UInt64, key="lfb")
+        self.protocol_fee_bps = GlobalState(UInt64, key="pfb")
+        self.cumulative_fee_per_share = GlobalState(UInt64, key="cfs")
+        self.status = GlobalState(UInt64, key="st")
+        self.deadline = GlobalState(UInt64, key="dl")
+        self.question_hash = GlobalState(Bytes, key="qh")
+        self.main_blueprint_hash = GlobalState(Bytes, key="mbh")
+        self.dispute_blueprint_hash = GlobalState(Bytes, key="dbh")
+        self.proposed_outcome = GlobalState(UInt64, key="po")
         self.proposal_timestamp = GlobalState(UInt64, key="pts")
         self.proposal_evidence_hash = GlobalState(Bytes, key="peh")
-        self.challenge_window_secs = GlobalState(UInt64, key="challenge_window_secs")
-        self.challenger = GlobalState(Bytes, key="challenger")
-        self.protocol_config_id = GlobalState(UInt64, key="protocol_config_id")
-        self.factory_id = GlobalState(UInt64, key="factory_id")
-        self.contract_version = GlobalState(UInt64, key="contract_version")
+        self.challenge_window_secs = GlobalState(UInt64, key="cws")
+        self.challenger = GlobalState(Bytes, key="ch")
+        self.protocol_config_id = GlobalState(UInt64, key="pc")
+        self.protocol_treasury = GlobalState(Bytes, key="pt")
+        self.activation_timestamp = GlobalState(UInt64, key="ats")
+        self.settlement_timestamp = GlobalState(UInt64, key="sts")
+        self.residual_linear_lambda_fp = GlobalState(UInt64, key="rlf")
+        self.lp_entry_max_price_fp = GlobalState(UInt64, key="lpm")
+        self.total_lp_weighted_entry_sum = GlobalState(UInt64, key="les")
+        self.total_residual_claimed = GlobalState(UInt64, key="rct")
 
-        self.resolution_authority = GlobalState(Bytes, key="resolution_authority")
-        self.challenge_bond = GlobalState(UInt64, key="challenge_bond")
-        self.market_admin = GlobalState(Bytes, key="market_admin")
-        self.cancellable = GlobalState(UInt64, key="cancellable")
-        self.winning_outcome = GlobalState(UInt64, key="winning_outcome")
-        self.lp_fee_balance = GlobalState(UInt64, key="lp_fee_balance")
-        self.protocol_fee_balance = GlobalState(UInt64, key="protocol_fee_balance")
-        self.total_outstanding_cost_basis = GlobalState(UInt64, key="total_outstanding_cost_basis")
-        self.dispute_sink_balance = GlobalState(UInt64, key="dispute_sink_balance")
-        self.winner_share_bps = GlobalState(UInt64, key="winner_share_bps")
-        self.dispute_sink_share_bps = GlobalState(UInt64, key="dispute_sink_share_bps")
+        self.resolution_authority = GlobalState(Bytes, key="ra")
+        self.resolution_budget_balance = GlobalState(UInt64, key="rbb")
+        self.challenge_bond = GlobalState(UInt64, key="cb")
+        self.challenge_bond_bps = GlobalState(UInt64, key="cbb")
+        self.challenge_bond_cap = GlobalState(UInt64, key="cbc")
+        self.market_admin = GlobalState(Bytes, key="ma")
+        self.cancellable = GlobalState(UInt64, key="cn")
+        self.winning_outcome = GlobalState(UInt64, key="wo")
+        self.lp_fee_balance = GlobalState(UInt64, key="lfbl")
+        self.protocol_fee_balance = GlobalState(UInt64, key="pfbl")
+        self.total_outstanding_cost_basis = GlobalState(UInt64, key="tcb")
+        self.dispute_sink_balance = GlobalState(UInt64, key="dsb")
+        self.winner_share_bps = GlobalState(UInt64, key="wsb")
+        self.dispute_sink_share_bps = GlobalState(UInt64, key="ssb")
 
         # Dispute metadata
         self.challenge_reason_code = GlobalState(UInt64, key="crc")
@@ -180,31 +195,42 @@ class QuestionMarket(ARC4Contract):
         self.dispute_ref_hash = GlobalState(Bytes, key="drh")
         self.dispute_opened_at = GlobalState(UInt64, key="doa")
         self.dispute_deadline = GlobalState(UInt64, key="ddl")
-        self.ruling_hash = GlobalState(Bytes, key="ruling_hash")
+        self.ruling_hash = GlobalState(Bytes, key="rh")
         self.resolution_path_used = GlobalState(UInt64, key="rpu")
         self.dispute_backend_kind = GlobalState(UInt64, key="dbk")
         self.pending_responder_role = GlobalState(UInt64, key="prr")
 
-        self.proposer = GlobalState(Bytes, key="proposer")
-        self.proposer_bond_held = GlobalState(UInt64, key="proposer_bond_held")
-        self.challenger_bond_held = GlobalState(UInt64, key="challenger_bond_held")
-        self.proposal_bond = GlobalState(UInt64, key="proposal_bond")
-        self.grace_period_secs = GlobalState(UInt64, key="grace_period_secs")
+        self.proposer = GlobalState(Bytes, key="pr")
+        self.proposer_bond_held = GlobalState(UInt64, key="pbh")
+        self.challenger_bond_held = GlobalState(UInt64, key="cbh")
+        self.proposal_bond = GlobalState(UInt64, key="prb")
+        self.proposal_bond_bps = GlobalState(UInt64, key="pbb")
+        self.proposal_bond_cap = GlobalState(UInt64, key="pbc")
+        self.proposer_fee_bps = GlobalState(UInt64, key="pfd")
+        self.proposer_fee_floor_bps = GlobalState(UInt64, key="pff")
+        self.grace_period_secs = GlobalState(UInt64, key="gps")
 
-        self.lp_shares = LocalState(UInt64, key="lp_shares")
-        self.fee_snapshot = LocalState(UInt64, key="fee_snapshot")
+        self.lp_shares = LocalState(UInt64, key="ls")
+        self.fee_snapshot = LocalState(UInt64, key="fs")
+        self.withdrawable_fee_surplus = LocalState(UInt64, key="wfs")
+        self.lp_weighted_entry_sum = LocalState(UInt64, key="les")
+        self.residual_claimed = LocalState(UInt64, key="rc")
 
         self.outcome_quantities_box = BoxMap(UInt64, UInt64, key_prefix=BOX_KEY_Q)
-        self.outcome_asa_ids_box = BoxMap(UInt64, UInt64, key_prefix=BOX_KEY_ASA)
         self.user_outcome_shares_box = BoxMap(Bytes, UInt64, key_prefix=BOX_KEY_USER_SHARES)
         self.user_claimable_fees_box = BoxMap(Bytes, UInt64, key_prefix=BOX_KEY_USER_FEES)
         self.user_cost_basis_box = BoxMap(Bytes, UInt64, key_prefix=BOX_KEY_USER_COST_BASIS)
         self.pending_payouts_box = BoxMap(Bytes, UInt64, key_prefix=BOX_KEY_PENDING_PAYOUTS)
-        self.main_blueprint_box = BoxRef(key=BOX_KEY_MAIN_BLUEPRINT)
-        self.dispute_blueprint_box = BoxRef(key=BOX_KEY_DISPUTE_BLUEPRINT)
+        self.total_user_shares_box = Box(Bytes, key=BOX_KEY_TOTAL_USER_SHARES)
+        self.main_blueprint_box = Box(Bytes, key=BOX_KEY_MAIN_BLUEPRINT)
+        self.dispute_blueprint_box = Box(Bytes, key=BOX_KEY_DISPUTE_BLUEPRINT)
 
     def _require(self, condition: bool) -> None:
         assert condition
+
+    def _require_share_granularity(self, shares: UInt64) -> None:
+        self._require(shares >= UInt64(SHARE_UNIT))
+        self._require(shares % UInt64(SHARE_UNIT) == UInt64(0))
 
     def _sender_fee_key(self) -> Bytes:
         return Txn.sender.bytes
@@ -223,6 +249,24 @@ class QuestionMarket(ARC4Contract):
 
     def _set_fee_snapshot(self, value: UInt64) -> None:
         self.fee_snapshot[Txn.sender] = value
+
+    def _get_withdrawable_fee_surplus(self) -> UInt64:
+        return self.withdrawable_fee_surplus.get(Txn.sender, default=UInt64(0))
+
+    def _set_withdrawable_fee_surplus(self, value: UInt64) -> None:
+        self.withdrawable_fee_surplus[Txn.sender] = value
+
+    def _get_lp_weighted_entry_sum(self) -> UInt64:
+        return self.lp_weighted_entry_sum.get(Txn.sender, default=UInt64(0))
+
+    def _set_lp_weighted_entry_sum(self, value: UInt64) -> None:
+        self.lp_weighted_entry_sum[Txn.sender] = value
+
+    def _get_residual_claimed(self) -> UInt64:
+        return self.residual_claimed.get(Txn.sender, default=UInt64(0))
+
+    def _set_residual_claimed(self, value: UInt64) -> None:
+        self.residual_claimed[Txn.sender] = value
 
     def _get_claimable_fees(self) -> UInt64:
         return self.user_claimable_fees_box.get(self._sender_fee_key(), default=UInt64(0))
@@ -248,6 +292,36 @@ class QuestionMarket(ARC4Contract):
     def _set_pending_payout(self, account: Bytes, value: UInt64) -> None:
         self.pending_payouts_box[account] = value
 
+    def _total_user_shares_box_size(self) -> UInt64:
+        return self.num_outcomes.value * UInt64(UINT64_BYTES)
+
+    def _total_user_shares_offset(self, outcome_index: UInt64) -> UInt64:
+        return outcome_index * UInt64(UINT64_BYTES)
+
+    def _initialize_total_user_shares_box(self) -> None:
+        size = self._total_user_shares_box_size()
+        created = self.total_user_shares_box.create(size=size)
+        self._require(created)
+        self.total_user_shares_box.value = op.bzero(size)
+
+    def _get_total_user_shares(self, outcome_index: UInt64) -> UInt64:
+        self._assert_valid_outcome(outcome_index)
+        raw, exists = self.total_user_shares_box.maybe()
+        self._require(exists)
+        return op.extract_uint64(raw, self._total_user_shares_offset(outcome_index))
+
+    def _set_total_user_shares(self, outcome_index: UInt64, value: UInt64) -> None:
+        self._assert_valid_outcome(outcome_index)
+        self.total_user_shares_box.replace(self._total_user_shares_offset(outcome_index), op.itob(value))
+
+    def _increment_total_user_shares(self, outcome_index: UInt64, amount: UInt64) -> None:
+        self._set_total_user_shares(outcome_index, self._get_total_user_shares(outcome_index) + amount)
+
+    def _decrement_total_user_shares(self, outcome_index: UInt64, amount: UInt64) -> None:
+        current = self._get_total_user_shares(outcome_index)
+        self._require(current >= amount)
+        self._set_total_user_shares(outcome_index, current - amount)
+
     def _credit_pending_payout(self, account: Bytes, amount: UInt64) -> None:
         if amount == UInt64(0):
             return
@@ -261,16 +335,6 @@ class QuestionMarket(ARC4Contract):
         else:
             challenger_payout = self._settle_overturned_dispute()
             self._credit_pending_payout(self.challenger.value, challenger_payout)
-
-    def _protocol_admin(self) -> Bytes:
-        value, exists = op.AppGlobal.get_ex_bytes(self.protocol_config_id.value, KEY_PROTOCOL_ADMIN)
-        self._require(exists)
-        return value
-
-    def _protocol_treasury(self) -> Bytes:
-        value, exists = op.AppGlobal.get_ex_bytes(self.protocol_config_id.value, KEY_PROTOCOL_TREASURY)
-        self._require(exists)
-        return value
 
     @subroutine
     def _basis_reduction(self, outcome_index: UInt64, shares: UInt64) -> UInt64:
@@ -350,6 +414,74 @@ class QuestionMarket(ARC4Contract):
         return self._mul_div_ceil(amount, bps, UInt64(BPS_DENOMINATOR))
 
     @subroutine
+    def _config_uint64(self, app: Application, key: Bytes) -> UInt64:
+        value, exists = op.AppGlobal.get_ex_uint64(app, key)
+        self._require(exists)
+        return value
+
+    @subroutine
+    def _config_bytes(self, app: Application, key: Bytes) -> Bytes:
+        value, exists = op.AppGlobal.get_ex_bytes(app, key)
+        self._require(exists)
+        return value
+
+    @subroutine
+    def _bond_scale_base(self) -> UInt64:
+        if self.pool_balance.value >= self.bootstrap_deposit.value:
+            return self.pool_balance.value
+        return self.bootstrap_deposit.value
+
+    @subroutine
+    def _required_bond(self, minimum: UInt64, bps: UInt64, cap: UInt64) -> UInt64:
+        proportional = self._mul_div_ceil(self._bond_scale_base(), bps, UInt64(BPS_DENOMINATOR))
+        bounded = proportional
+        if bounded < minimum:
+            bounded = minimum
+        if bounded > cap:
+            bounded = cap
+        return bounded
+
+    @subroutine
+    def _required_proposal_bond(self) -> UInt64:
+        return self._required_bond(
+            self.proposal_bond.value,
+            self.proposal_bond_bps.value,
+            self.proposal_bond_cap.value,
+        )
+
+    @subroutine
+    def _required_challenge_bond(self) -> UInt64:
+        return self._required_bond(
+            self.challenge_bond.value,
+            self.challenge_bond_bps.value,
+            self.challenge_bond_cap.value,
+        )
+
+    @subroutine
+    def _proposer_fee_for_bond(self, required_bond: UInt64) -> UInt64:
+        floor_fee = self._calc_fee_up(self.proposal_bond.value, self.proposer_fee_floor_bps.value)
+        daily_fee = self._calc_fee_up(required_bond, self.proposer_fee_bps.value)
+        window_fee = self._mul_div_ceil(daily_fee, self.challenge_window_secs.value, UInt64(SECONDS_PER_DAY))
+        if window_fee > floor_fee:
+            return window_fee
+        return floor_fee
+
+    @subroutine
+    def _required_proposer_fee(self) -> UInt64:
+        return self._proposer_fee_for_bond(self._required_proposal_bond())
+
+    @subroutine
+    def _max_proposer_fee(self) -> UInt64:
+        return self._proposer_fee_for_bond(self.proposal_bond_cap.value)
+
+    @subroutine
+    def _consume_proposer_fee(self) -> UInt64:
+        fee = self._required_proposer_fee()
+        self._require(self.resolution_budget_balance.value >= fee)
+        self.resolution_budget_balance.value = self.resolution_budget_balance.value - fee
+        return fee
+
+    @subroutine
     def _lmsr_bootstrap_multiplier(self) -> UInt64:
         if self.num_outcomes.value <= UInt64(2):
             return UInt64(1)
@@ -369,11 +501,13 @@ class QuestionMarket(ARC4Contract):
         self._require(raw.length <= UInt64(MAX_BLUEPRINT_SIZE))
         digest = op.sha256(raw)
         if is_dispute == UInt64(1):
-            self.dispute_blueprint_box.create(size=raw.length)
+            created = self.dispute_blueprint_box.create(size=raw.length)
+            self._require(created)
             self.dispute_blueprint_box.replace(0, raw)
             self.dispute_blueprint_hash.value = digest
         else:
-            self.main_blueprint_box.create(size=raw.length)
+            created = self.main_blueprint_box.create(size=raw.length)
+            self._require(created)
             self.main_blueprint_box.replace(0, raw)
             self.main_blueprint_hash.value = digest
 
@@ -417,6 +551,103 @@ class QuestionMarket(ARC4Contract):
         self._set_fee_snapshot(cumulative)
 
     @subroutine
+    def _current_reserve_requirement(self) -> UInt64:
+        if self.status.value == UInt64(STATUS_RESOLVED) and self.winning_outcome.value < self.num_outcomes.value:
+            return self._get_total_user_shares(self.winning_outcome.value)
+        if self.status.value == UInt64(STATUS_CANCELLED):
+            return self.total_outstanding_cost_basis.value
+        return UInt64(0)
+
+    @subroutine
+    def _releasable_residual_pool(self) -> UInt64:
+        if self.status.value != UInt64(STATUS_RESOLVED) and self.status.value != UInt64(STATUS_CANCELLED):
+            return UInt64(0)
+        free_pool = self.pool_balance.value + self.total_residual_claimed.value
+        reserve = self._current_reserve_requirement()
+        if free_pool <= reserve:
+            return UInt64(0)
+        return free_pool - reserve
+
+    @subroutine
+    def _normalized_residual_window(self) -> UInt64:
+        if self.settlement_timestamp.value <= self.activation_timestamp.value + UInt64(1):
+            return UInt64(0)
+        return self.settlement_timestamp.value - self.activation_timestamp.value - UInt64(1)
+
+    @subroutine
+    def _residual_weight(self) -> UInt64:
+        shares = self._get_lp_shares()
+        if shares == UInt64(0):
+            return UInt64(0)
+        window = self._normalized_residual_window()
+        if window == UInt64(0):
+            return shares
+        elapsed_scaled = self._entry_weighted_sum_checked(shares, self.settlement_timestamp.value - UInt64(1))
+        weighted_sum = self._get_lp_weighted_entry_sum()
+        if elapsed_scaled <= weighted_sum:
+            return shares
+        window_high, window_scaled = op.mulw(window, UInt64(SCALE))
+        self._require(window_high == UInt64(0))
+        premium = self._mul_div_floor(
+            self.residual_linear_lambda_fp.value,
+            elapsed_scaled - weighted_sum,
+            window_scaled,
+        )
+        return shares + premium
+
+    @subroutine
+    def _total_residual_weight(self) -> UInt64:
+        total_shares = self.lp_shares_total.value
+        if total_shares == UInt64(0):
+            return UInt64(0)
+        window = self._normalized_residual_window()
+        if window == UInt64(0):
+            return total_shares
+        elapsed_scaled = self._entry_weighted_sum_checked(total_shares, self.settlement_timestamp.value - UInt64(1))
+        if elapsed_scaled <= self.total_lp_weighted_entry_sum.value:
+            return total_shares
+        window_high, window_scaled = op.mulw(window, UInt64(SCALE))
+        self._require(window_high == UInt64(0))
+        premium = self._mul_div_floor(
+            self.residual_linear_lambda_fp.value,
+            elapsed_scaled - self.total_lp_weighted_entry_sum.value,
+            window_scaled,
+        )
+        return total_shares + premium
+
+    @subroutine
+    def _claimable_residual(self) -> UInt64:
+        if self.status.value != UInt64(STATUS_RESOLVED) and self.status.value != UInt64(STATUS_CANCELLED):
+            return UInt64(0)
+        total_weight = self._total_residual_weight()
+        if total_weight == UInt64(0):
+            return UInt64(0)
+        entitled = self._mul_div_floor(self._releasable_residual_pool(), self._residual_weight(), total_weight)
+        already_claimed = self._get_residual_claimed()
+        if entitled <= already_claimed:
+            return UInt64(0)
+        return entitled - already_claimed
+
+    @subroutine
+    def _entry_weighted_sum_checked(self, shares: UInt64, timestamp: UInt64) -> UInt64:
+        high, low = op.mulw(shares, timestamp)
+        self._require(high == UInt64(0))
+        return low
+
+    @subroutine
+    def _record_settlement_timestamp_now(self) -> None:
+        self.settlement_timestamp.value = self._now()
+
+    @subroutine
+    def _record_settlement_timestamp_dispute(self) -> None:
+        timestamp = self.proposal_timestamp.value
+        if self.dispute_opened_at.value > timestamp:
+            timestamp = self.dispute_opened_at.value
+        if timestamp == UInt64(0):
+            timestamp = UInt64(1)
+        self.settlement_timestamp.value = timestamp
+
+    @subroutine
     def _distribute_lp_fee(self, fee_amount: UInt64) -> None:
         self.lp_fee_balance.value = self.lp_fee_balance.value + fee_amount
         if self.lp_shares_total.value > UInt64(0) and fee_amount > UInt64(0):
@@ -438,8 +669,7 @@ class QuestionMarket(ARC4Contract):
         # bounded. We only enforce the strict solvency invariant after resolution,
         # when the actual payout obligation is known.
         if self.status.value == UInt64(STATUS_RESOLVED) and self.winning_outcome.value < self.num_outcomes.value:
-            q = self._get_q()
-            winning_payout = q[self.winning_outcome.value]
+            winning_payout = self._get_total_user_shares(self.winning_outcome.value)
             self._require(self.pool_balance.value >= winning_payout)
 
     @subroutine
@@ -488,6 +718,40 @@ class QuestionMarket(ARC4Contract):
             fee=0,
         ).submit()
 
+    @arc4.abimethod()
+    def claim_lp_fees(self) -> None:
+        self._settle_lp_fees()
+        claimable = self._get_claimable_fees()
+        self._require(claimable > UInt64(0))
+        self._set_claimable_fees(UInt64(0))
+        self._set_withdrawable_fee_surplus(self._get_withdrawable_fee_surplus() + claimable)
+        arc4.emit("ClaimLpFees(uint64)", arc4.UInt64(claimable))
+
+    @arc4.abimethod()
+    def withdraw_lp_fees(self, amount: arc4.UInt64) -> None:
+        self._settle_lp_fees()
+        withdraw_amount = amount.as_uint64()
+        self._require(withdraw_amount > UInt64(0))
+        self._require(self._get_withdrawable_fee_surplus() >= withdraw_amount)
+        self._require(self.lp_fee_balance.value >= withdraw_amount)
+        self._set_withdrawable_fee_surplus(self._get_withdrawable_fee_surplus() - withdraw_amount)
+        self.lp_fee_balance.value = self.lp_fee_balance.value - withdraw_amount
+        self._send_currency(Txn.sender, withdraw_amount)
+        arc4.emit("WithdrawLpFees(uint64)", amount)
+
+    @arc4.abimethod()
+    def claim_lp_residual(self) -> None:
+        self._require_status_any2(UInt64(STATUS_RESOLVED), UInt64(STATUS_CANCELLED))
+        payout = self._claimable_residual()
+        self._require(payout > UInt64(0))
+        reserve = self._current_reserve_requirement()
+        self._require(self.pool_balance.value >= reserve + payout)
+        self.pool_balance.value = self.pool_balance.value - payout
+        self.total_residual_claimed.value = self.total_residual_claimed.value + payout
+        self._set_residual_claimed(self._get_residual_claimed() + payout)
+        self._send_currency(Txn.sender, payout)
+        arc4.emit("ClaimLpResidual(uint64)", arc4.UInt64(payout))
+
     @subroutine
     def _winner_bonus_from_bond(self, losing_bond: UInt64) -> UInt64:
         return self._mul_div_floor(losing_bond, self.winner_share_bps.value, UInt64(BPS_DENOMINATOR))
@@ -496,8 +760,9 @@ class QuestionMarket(ARC4Contract):
     def _settle_confirmed_dispute(self) -> UInt64:
         losing_bond = self.challenger_bond_held.value
         winner_bonus = self._winner_bonus_from_bond(losing_bond)
+        proposer_fee = self._consume_proposer_fee()
         self.dispute_sink_balance.value = self.dispute_sink_balance.value + (losing_bond - winner_bonus)
-        proposer_payout = self.proposer_bond_held.value + winner_bonus
+        proposer_payout = self.proposer_bond_held.value + winner_bonus + proposer_fee
         self.proposer_bond_held.value = UInt64(0)
         self.challenger_bond_held.value = UInt64(0)
         return proposer_payout
@@ -545,39 +810,49 @@ class QuestionMarket(ARC4Contract):
         num_outcomes: arc4.UInt64,
         initial_b: arc4.UInt64,
         lp_fee_bps: arc4.UInt64,
-        protocol_fee_bps: arc4.UInt64,
         deadline: arc4.UInt64,
         question_hash: arc4.DynamicBytes,
-        main_blueprint_hash: arc4.DynamicBytes,
-        dispute_blueprint_hash: arc4.DynamicBytes,
+        main_blueprint_hash: Hash32,
+        dispute_blueprint_hash: Hash32,
         challenge_window_secs: arc4.UInt64,
         resolution_authority: arc4.Address,
-        challenge_bond: arc4.UInt64,
-        proposal_bond: arc4.UInt64,
         grace_period_secs: arc4.UInt64,
         market_admin: arc4.Address,
         protocol_config_id: arc4.UInt64,
-        factory_id: arc4.UInt64,
         cancellable: arc4.Bool,
+        lp_entry_max_price_fp: arc4.UInt64,
     ) -> None:
         outcome_count = num_outcomes.as_uint64()
+        protocol_config = protocol_config_id.as_uint64()
+        lp_entry_cap = lp_entry_max_price_fp.as_uint64()
+        config_app = Application(protocol_config)
+        min_challenge_window_secs = self._config_uint64(config_app, Bytes(b"mcw"))
+        challenge_bond_min = self._config_uint64(config_app, Bytes(b"cb"))
+        proposal_bond_min = self._config_uint64(config_app, Bytes(b"pb"))
+        challenge_bond_bps_val = self._config_uint64(config_app, Bytes(b"cbb"))
+        proposal_bond_bps_val = self._config_uint64(config_app, Bytes(b"pbb"))
+        challenge_bond_cap_val = self._config_uint64(config_app, Bytes(b"cbc"))
+        proposal_bond_cap_val = self._config_uint64(config_app, Bytes(b"pbc"))
+        proposer_fee_bps_val = self._config_uint64(config_app, Bytes(b"pfd"))
+        proposer_fee_floor_bps_val = self._config_uint64(config_app, Bytes(b"pff"))
+        protocol_fee_bps_val = self._config_uint64(config_app, Bytes(b"pfb"))
+        protocol_treasury_val = self._config_bytes(config_app, Bytes(b"pt"))
+        residual_linear_lambda_fp_val = self._config_uint64(config_app, Bytes(b"rlf"))
         self._require(outcome_count >= UInt64(MIN_OUTCOMES))
         self._require(outcome_count <= UInt64(MAX_OUTCOMES))
         self._require(initial_b.as_uint64() > UInt64(0))
-        self._require(challenge_window_secs.as_uint64() > UInt64(0))
-        self._require(currency_asa.as_uint64() > UInt64(0))
-        self._require(creator.bytes != Bytes(ZERO_ADDRESS_BYTES))
-        self._require(resolution_authority.bytes != Bytes(ZERO_ADDRESS_BYTES))
-        self._require(market_admin.bytes != Bytes(ZERO_ADDRESS_BYTES))
+        self._require(challenge_window_secs.as_uint64() >= min_challenge_window_secs)
+        self._require(lp_entry_cap <= UInt64(SCALE))
 
         self.creator.value = creator.bytes
         self.currency_asa.value = currency_asa.as_uint64()
         self.num_outcomes.value = outcome_count
         self.b.value = initial_b.as_uint64()
         self.pool_balance.value = UInt64(0)
+        self.bootstrap_deposit.value = UInt64(0)
         self.lp_shares_total.value = UInt64(0)
         self.lp_fee_bps.value = lp_fee_bps.as_uint64()
-        self.protocol_fee_bps.value = protocol_fee_bps.as_uint64()
+        self.protocol_fee_bps.value = protocol_fee_bps_val
         self.cumulative_fee_per_share.value = UInt64(0)
         self.status.value = UInt64(STATUS_CREATED)
         self._require(deadline.as_uint64() > self._now())
@@ -590,12 +865,24 @@ class QuestionMarket(ARC4Contract):
         self.proposal_evidence_hash.value = Bytes()
         self.challenge_window_secs.value = challenge_window_secs.as_uint64()
         self.challenger.value = Bytes(ZERO_ADDRESS_BYTES)
-        self.protocol_config_id.value = protocol_config_id.as_uint64()
-        self.factory_id.value = factory_id.as_uint64()
-        self.contract_version.value = UInt64(MARKET_CONTRACT_VERSION)
+        self.protocol_config_id.value = protocol_config
+        self.protocol_treasury.value = protocol_treasury_val
+        self.residual_linear_lambda_fp.value = residual_linear_lambda_fp_val
+        self.lp_entry_max_price_fp.value = lp_entry_cap
+        self.activation_timestamp.value = UInt64(0)
+        self.settlement_timestamp.value = UInt64(0)
+        self.total_lp_weighted_entry_sum.value = UInt64(0)
+        self.total_residual_claimed.value = UInt64(0)
         self.resolution_authority.value = resolution_authority.bytes
-        self.challenge_bond.value = challenge_bond.as_uint64()
-        self.proposal_bond.value = proposal_bond.as_uint64()
+        self.resolution_budget_balance.value = UInt64(0)
+        self.challenge_bond.value = challenge_bond_min
+        self.proposal_bond.value = proposal_bond_min
+        self.challenge_bond_bps.value = challenge_bond_bps_val
+        self.proposal_bond_bps.value = proposal_bond_bps_val
+        self.challenge_bond_cap.value = challenge_bond_cap_val
+        self.proposal_bond_cap.value = proposal_bond_cap_val
+        self.proposer_fee_bps.value = proposer_fee_bps_val
+        self.proposer_fee_floor_bps.value = proposer_fee_floor_bps_val
         self.grace_period_secs.value = grace_period_secs.as_uint64()
         self.market_admin.value = market_admin.bytes
         if cancellable.native:
@@ -637,28 +924,6 @@ class QuestionMarket(ARC4Contract):
         arc4.emit("CommentPosted(string)", message)
 
     @arc4.abimethod()
-    def opt_in_to_asa(self, asset: Asset) -> None:
-        """Opt contract into an ASA. Called by creator before bootstrap for currency_asa
-        and each outcome ASA. SDK calls this N+1 times."""
-        self._require_status(UInt64(STATUS_CREATED))
-        self._require_authorized(self.creator.value)
-        itxn.AssetTransfer(
-            xfer_asset=asset,
-            asset_receiver=Global.current_application_address,
-            asset_amount=0,
-            fee=0,
-        ).submit()
-
-    @arc4.abimethod()
-    def register_outcome_asa(self, outcome_index: arc4.UInt64, asset: Asset) -> None:
-        """Register an outcome ASA ID in box storage. Called by creator before bootstrap."""
-        self._require_status(UInt64(STATUS_CREATED))
-        self._require_authorized(self.creator.value)
-        outcome = outcome_index.as_uint64()
-        self._assert_valid_outcome(outcome)
-        self.outcome_asa_ids_box[outcome] = asset.id
-
-    @arc4.abimethod()
     def store_main_blueprint(self, data: arc4.DynamicBytes) -> None:
         """Store main resolution blueprint on-chain. Creator-only, CREATED status only.
         Must be called before bootstrap. Size capped by MAX_BLUEPRINT_SIZE."""
@@ -680,9 +945,8 @@ class QuestionMarket(ARC4Contract):
     ) -> None:
         """Prepare a CREATED market for bootstrap in a single call.
 
-        This opts the app into the currency ASA and creates outcome ASAs
-        internally. Existing blueprint storage and bootstrap methods can then be
-        grouped after it to activate the market atomically.
+        This opts the app into the currency ASA. Blueprint storage and bootstrap
+        can then be grouped after it to activate the market atomically.
         """
         self._require_status(UInt64(STATUS_CREATED))
         self._require_authorized(self.creator.value)
@@ -693,19 +957,6 @@ class QuestionMarket(ARC4Contract):
             asset_amount=0,
             fee=0,
         ).submit()
-
-        for idx in urange(self.num_outcomes.value):
-            created_asset = itxn.AssetConfig(
-                total=UInt64(OUTCOME_ASA_TOTAL),
-                decimals=UInt64(6),
-                default_frozen=False,
-                unit_name=Bytes(b"QM"),
-                asset_name=Bytes(b"Question Outcome"),
-                manager=Global.current_application_address,
-                reserve=Global.current_application_address,
-                fee=0,
-            ).submit().created_asset
-            self.outcome_asa_ids_box[idx] = created_asset.id
 
         self._assert_invariants()
 
@@ -718,28 +969,42 @@ class QuestionMarket(ARC4Contract):
         self._require_status(UInt64(STATUS_CREATED))
         self._require_authorized(self.creator.value)
         deposit = deposit_amount.as_uint64()
+        budget_required = self._max_proposer_fee()
+        funding_required = deposit + budget_required
         self._require(deposit > UInt64(0))
         self._require_lmsr_bootstrap_floor(deposit)
-        self._verify_payment(payment, deposit)
+        self._verify_payment(payment, funding_required)
 
-        # Verify both blueprints were stored
         self._require(bool(self.main_blueprint_box))
         self._require(bool(self.dispute_blueprint_box))
 
-        # Initialize outcome quantity boxes
         for idx in urange(self.num_outcomes.value):
             self.outcome_quantities_box[idx] = UInt64(0)
-            # Verify outcome ASA was registered
-            self._require(self.outcome_asa_ids_box.get(idx, default=UInt64(0)) > UInt64(0))
+        self._initialize_total_user_shares_box()
+
+        initial_lp_units = self.b.value
+        weighted_entry_sum = self._entry_weighted_sum_checked(initial_lp_units, self._now())
 
         self.pool_balance.value = deposit
-        self.lp_shares_total.value = deposit
-        self._set_lp_shares(deposit)
+        self.bootstrap_deposit.value = deposit
+        self.resolution_budget_balance.value = budget_required
+        self.lp_shares_total.value = initial_lp_units
+        self.activation_timestamp.value = self._now()
+        self.total_lp_weighted_entry_sum.value = weighted_entry_sum
+        self.total_residual_claimed.value = UInt64(0)
+        self.settlement_timestamp.value = UInt64(0)
+        self._set_lp_shares(initial_lp_units)
         self._set_fee_snapshot(self.cumulative_fee_per_share.value)
         self._set_claimable_fees(UInt64(0))
+        self._set_withdrawable_fee_surplus(UInt64(0))
+        self._set_lp_weighted_entry_sum(weighted_entry_sum)
+        self._set_residual_claimed(UInt64(0))
         self.status.value = UInt64(STATUS_ACTIVE)
 
-        arc4.emit("Bootstrap(uint64)", deposit_amount)
+        if payment.asset_amount > funding_required:
+            self._send_currency(Txn.sender, payment.asset_amount - funding_required)
+
+        arc4.emit("Bootstrap(uint64,uint64)", deposit_amount, arc4.UInt64(initial_lp_units))
         self._assert_invariants()
 
     @arc4.abimethod()
@@ -755,6 +1020,7 @@ class QuestionMarket(ARC4Contract):
         self._assert_valid_outcome(outcome)
         shares_val = shares.as_uint64()
         self._require(shares_val > UInt64(0))
+        self._require_share_granularity(shares_val)
         max_total = max_cost.as_uint64()
         self._require(max_total > UInt64(0))
 
@@ -771,19 +1037,12 @@ class QuestionMarket(ARC4Contract):
         self._set_q(q)
         self._set_user_outcome_shares(outcome, self._get_user_outcome_shares(outcome) + shares_val)
         self._set_user_cost_basis(outcome, self._get_user_cost_basis(outcome) + cost)
+        self._increment_total_user_shares(outcome, shares_val)
         self.total_outstanding_cost_basis.value = self.total_outstanding_cost_basis.value + cost
         self.pool_balance.value = self.pool_balance.value + cost
         self._distribute_lp_fee(lp_fee)
         self.protocol_fee_balance.value = self.protocol_fee_balance.value + protocol_fee
 
-        # Transfer outcome ASA to buyer
-        outcome_asa_id = self.outcome_asa_ids_box[outcome]
-        itxn.AssetTransfer(
-            xfer_asset=Asset(outcome_asa_id),
-            asset_receiver=Txn.sender,
-            asset_amount=shares_val,
-            fee=0,
-        ).submit()
         if payment.asset_amount > total_cost:
             self._send_currency(Txn.sender, payment.asset_amount - total_cost)
 
@@ -796,24 +1055,14 @@ class QuestionMarket(ARC4Contract):
         outcome_index: arc4.UInt64,
         shares: arc4.UInt64,
         min_return: arc4.UInt64,
-        asa_payment: gtxn.AssetTransferTransaction,
     ) -> None:
         self._active_before_deadline()
         outcome = outcome_index.as_uint64()
         self._assert_valid_outcome(outcome)
         shares_val = shares.as_uint64()
         self._require(shares_val > UInt64(0))
+        self._require_share_granularity(shares_val)
         self._require(self._get_user_outcome_shares(outcome) >= shares_val)
-
-        # Verify seller sent outcome ASA
-        outcome_asa_id = self.outcome_asa_ids_box[outcome]
-        self._require(asa_payment.sender.bytes == Txn.sender.bytes)
-        self._require(asa_payment.asset_receiver == Global.current_application_address)
-        self._require(asa_payment.xfer_asset.id == outcome_asa_id)
-        self._require(asa_payment.asset_amount == shares_val)
-        self._require(asa_payment.asset_sender.bytes == Global.zero_address.bytes)
-        self._require(asa_payment.rekey_to.bytes == Global.zero_address.bytes)
-        self._require(asa_payment.asset_close_to.bytes == Global.zero_address.bytes)
 
         q = self._get_q()
         gross_return = lmsr_sell_return(q, self.b.value, outcome, shares_val)
@@ -829,6 +1078,7 @@ class QuestionMarket(ARC4Contract):
         self._set_q(q)
         self._set_user_outcome_shares(outcome, self._get_user_outcome_shares(outcome) - shares_val)
         self._set_user_cost_basis(outcome, self._get_user_cost_basis(outcome) - basis_reduction)
+        self._decrement_total_user_shares(outcome, shares_val)
         self.total_outstanding_cost_basis.value = self.total_outstanding_cost_basis.value - basis_reduction
         self.pool_balance.value = self.pool_balance.value - gross_return
         self._distribute_lp_fee(lp_fee)
@@ -841,101 +1091,56 @@ class QuestionMarket(ARC4Contract):
         self._assert_invariants()
 
     @arc4.abimethod()
-    def provide_liq(
+    def enter_lp_active(
         self,
-        deposit_amount: arc4.UInt64,
+        target_delta_b: arc4.UInt64,
+        max_deposit: arc4.UInt64,
+        expected_prices: arc4.DynamicArray[arc4.UInt64],
+        price_tolerance: arc4.UInt64,
         payment: gtxn.AssetTransferTransaction,
     ) -> None:
         self._active_before_deadline()
-        deposit = deposit_amount.as_uint64()
-        self._require(deposit > UInt64(0))
-        self._require(self.pool_balance.value > UInt64(0))
-        self._verify_payment(payment, deposit)
+        delta_b = target_delta_b.as_uint64()
+        max_deposit_val = max_deposit.as_uint64()
+        tolerance = price_tolerance.as_uint64()
+        self._require(delta_b > UInt64(0))
+        self._require(max_deposit_val > UInt64(0))
+        self._require(expected_prices.length == self.num_outcomes.value)
+
+        current_prices = lmsr_prices(self._get_q(), self.b.value)
+        max_price = UInt64(0)
+        for idx in urange(current_prices.length):
+            price = current_prices[idx]
+            self._require(self._abs_diff(price, expected_prices[idx].as_uint64()) <= tolerance)
+            if price > max_price:
+                max_price = price
+        self._require(max_price <= self.lp_entry_max_price_fp.value)
+
+        deposit_required = lmsr_collateral_required_from_prices(delta_b, current_prices)
+        self._require(deposit_required <= max_deposit_val)
+        self._verify_payment(payment, deposit_required)
 
         self._settle_lp_fees()
-        q = self._get_q()
-        old_prices = lmsr_prices(q, self.b.value)
-        scaled_q = lmsr_liquidity_scale_q(q, self.b.value, deposit, self.pool_balance.value)
-        scaled_b = lmsr_liquidity_scale_b(q, self.b.value, deposit, self.pool_balance.value)
-        shares_minted = self._mul_div_floor(self.lp_shares_total.value, deposit, self.pool_balance.value)
-        self._require(shares_minted > UInt64(0))
 
-        self._set_q(scaled_q)
-        self.b.value = scaled_b
-        self.pool_balance.value = self.pool_balance.value + deposit
-        self.lp_shares_total.value = self.lp_shares_total.value + shares_minted
-        self._set_lp_shares(self._get_lp_shares() + shares_minted)
+        next_b = self.b.value + delta_b
+        self._set_q(lmsr_normalized_q_from_prices(current_prices, next_b))
+        self.b.value = next_b
+        self.pool_balance.value = self.pool_balance.value + deposit_required
+        self.lp_shares_total.value = self.lp_shares_total.value + delta_b
+        self.total_lp_weighted_entry_sum.value = (
+            self.total_lp_weighted_entry_sum.value + self._entry_weighted_sum_checked(delta_b, self._now())
+        )
+        self._set_lp_shares(self._get_lp_shares() + delta_b)
+        self._set_lp_weighted_entry_sum(
+            self._get_lp_weighted_entry_sum() + self._entry_weighted_sum_checked(delta_b, self._now())
+        )
         self._set_fee_snapshot(self.cumulative_fee_per_share.value)
 
-        q_after = self._get_q()
-        new_prices = lmsr_prices(q_after, self.b.value)
-        for idx in urange(old_prices.length):
-            self._require(self._abs_diff(old_prices[idx], new_prices[idx]) <= UInt64(PRICE_TOLERANCE_BASE))
+        if payment.asset_amount > deposit_required:
+            self._send_currency(Txn.sender, payment.asset_amount - deposit_required)
 
-        arc4.emit("ProvideLiquidity(uint64)", deposit_amount)
+        arc4.emit("EnterLpActive(uint64,uint64)", target_delta_b, arc4.UInt64(deposit_required))
         self._assert_invariants()
-
-    @arc4.abimethod()
-    def withdraw_liq(self, shares_to_burn: arc4.UInt64) -> None:
-        self._require_status_any2(UInt64(STATUS_ACTIVE), UInt64(STATUS_CANCELLED))
-        burn = shares_to_burn.as_uint64()
-        self._require(burn > UInt64(0))
-
-        current_status = self.status.value
-        user_shares = self._get_lp_shares()
-        total_shares = self.lp_shares_total.value
-        self._require(user_shares >= burn)
-        if current_status == UInt64(STATUS_ACTIVE):
-            self._require(burn < total_shares)
-
-        self._settle_lp_fees()
-        old_prices = Array[UInt64]((UInt64(0),))
-        if current_status == UInt64(STATUS_ACTIVE):
-            q = self._get_q()
-            old_prices = lmsr_prices(q, self.b.value)
-        else:
-            self._require(self.pool_balance.value >= self.total_outstanding_cost_basis.value)
-
-        claimable_fees = self._get_claimable_fees()
-        fee_return = self._mul_div_floor(claimable_fees, burn, user_shares)
-        remaining_total = total_shares - burn
-        usdc_return = UInt64(0)
-
-        if current_status == UInt64(STATUS_ACTIVE):
-            q = self._get_q()
-            usdc_return = self._mul_div_floor(self.pool_balance.value, burn, total_shares)
-            if remaining_total == UInt64(0):
-                for idx in urange(q.length):
-                    q[idx] = UInt64(0)
-                self.b.value = UInt64(0)
-            else:
-                for idx in urange(q.length):
-                    q[idx] = self._mul_div_floor(q[idx], remaining_total, total_shares)
-                self.b.value = self._mul_div_floor(self.b.value, remaining_total, total_shares)
-            self._set_q(q)
-        else:
-            residual_pool = self.pool_balance.value - self.total_outstanding_cost_basis.value
-            usdc_return = self._mul_div_floor(residual_pool, burn, total_shares)
-
-        self.pool_balance.value = self.pool_balance.value - usdc_return
-        self.lp_fee_balance.value = self.lp_fee_balance.value - fee_return
-        self.lp_shares_total.value = remaining_total
-        self._set_lp_shares(user_shares - burn)
-        self._set_claimable_fees(claimable_fees - fee_return)
-        self._set_fee_snapshot(self.cumulative_fee_per_share.value)
-
-        if current_status == UInt64(STATUS_ACTIVE) and self.b.value > UInt64(0):
-            new_prices = lmsr_prices(self._get_q(), self.b.value)
-            for idx in urange(old_prices.length):
-                self._require(self._abs_diff(old_prices[idx], new_prices[idx]) <= UInt64(PRICE_TOLERANCE_BASE))
-        self._assert_invariants()
-
-        # Send USDC + fees to LP
-        total_payout = usdc_return + fee_return
-        if total_payout > UInt64(0):
-            self._send_currency(Txn.sender, total_payout)
-
-        arc4.emit("WithdrawLiquidity(uint64)", shares_to_burn)
 
     @arc4.abimethod()
     def trigger_resolution(self) -> None:
@@ -963,7 +1168,10 @@ class QuestionMarket(ARC4Contract):
             # Open proposing: only after grace period.
             self._require(grace_expired)
 
-        self._verify_payment(payment, self.proposal_bond.value)
+        required_bond = UInt64(0)
+        if not is_authority:
+            required_bond = self._required_proposal_bond()
+        self._verify_payment(payment, required_bond)
 
         # State updates (P9)
         self.proposer.value = Txn.sender.bytes
@@ -986,7 +1194,7 @@ class QuestionMarket(ARC4Contract):
         self._require_authorized(self.resolution_authority.value)
         outcome = outcome_index.as_uint64()
         self._assert_valid_outcome(outcome)
-        self._verify_payment(payment, self.proposal_bond.value)
+        self._verify_payment(payment, UInt64(0))
 
         self.proposer.value = Txn.sender.bytes
         self.proposer_bond_held.value = payment.asset_amount
@@ -1006,7 +1214,7 @@ class QuestionMarket(ARC4Contract):
     ) -> None:
         self._require_status(UInt64(STATUS_RESOLUTION_PROPOSED))
         self._require(self._now() < self.proposal_timestamp.value + self.challenge_window_secs.value)
-        self._verify_payment(payment, self.challenge_bond.value)
+        self._verify_payment(payment, self._required_challenge_bond())
 
         # State updates first (P9). Bond retained by contract until dispute resolves.
         self.challenger.value = Txn.sender.bytes
@@ -1054,6 +1262,7 @@ class QuestionMarket(ARC4Contract):
         self.pending_responder_role.value = UInt64(0)
         self.status.value = UInt64(STATUS_RESOLVED)
         self.winning_outcome.value = outcome
+        self._record_settlement_timestamp_dispute()
         arc4.emit("CreatorResolveDispute(uint64,byte[])", outcome_index, ruling_hash)
         self._assert_invariants()
         self._settle_dispute_and_credit(outcome, original_proposal)
@@ -1077,6 +1286,7 @@ class QuestionMarket(ARC4Contract):
         self.pending_responder_role.value = UInt64(0)
         self.status.value = UInt64(STATUS_RESOLVED)
         self.winning_outcome.value = outcome
+        self._record_settlement_timestamp_dispute()
         arc4.emit("AdminResolveDispute(uint64,byte[])", outcome_index, ruling_hash)
         self._assert_invariants()
         self._settle_dispute_and_credit(outcome, original_proposal)
@@ -1100,6 +1310,7 @@ class QuestionMarket(ARC4Contract):
         self.pending_responder_role.value = UInt64(0)
         self.status.value = UInt64(STATUS_RESOLVED)
         self.winning_outcome.value = outcome
+        self._record_settlement_timestamp_dispute()
         arc4.emit("FinalizeDispute(uint64,byte[])", outcome_index, ruling_hash)
         self._assert_invariants()
         self._settle_dispute_and_credit(outcome, original_proposal)
@@ -1136,6 +1347,7 @@ class QuestionMarket(ARC4Contract):
         self.resolution_path_used.value = UInt64(1)
         self.pending_responder_role.value = UInt64(0)
         self.status.value = UInt64(STATUS_CANCELLED)
+        self._record_settlement_timestamp_dispute()
         arc4.emit("CancelDisputeAndMarket(byte[])", ruling_hash)
         self._assert_invariants()
         self._credit_pending_payout(self.challenger.value, challenger_payout)
@@ -1147,15 +1359,16 @@ class QuestionMarket(ARC4Contract):
         self._require(self.challenger.value == Bytes(ZERO_ADDRESS_BYTES))
 
         # Return proposer bond (unchallenged proposal accepted)
-        proposer_bond = self.proposer_bond_held.value
+        proposer_payout = self.proposer_bond_held.value + self._consume_proposer_fee()
         self.proposer_bond_held.value = UInt64(0)
 
         self.status.value = UInt64(STATUS_RESOLVED)
         self.winning_outcome.value = self.proposed_outcome.value
+        self._record_settlement_timestamp_now()
         arc4.emit("FinalizeResolution(uint64)", arc4.UInt64(self.winning_outcome.value))
         self._assert_invariants()
 
-        self._credit_pending_payout(self.proposer.value, proposer_bond)
+        self._credit_pending_payout(self.proposer.value, proposer_payout)
 
     @arc4.abimethod()
     def claim(self, outcome_index: arc4.UInt64, shares: arc4.UInt64) -> None:
@@ -1165,17 +1378,17 @@ class QuestionMarket(ARC4Contract):
         self._require(outcome == self.winning_outcome.value)
         shares_val = shares.as_uint64()
         self._require(shares_val > UInt64(0))
+        self._require_share_granularity(shares_val)
         self._require(self._get_user_outcome_shares(outcome) >= shares_val)
-
+        self._require(self.pool_balance.value >= shares_val)
         q = self._get_q()
-        outstanding = q[outcome]
-        self._require(outstanding > UInt64(0))
-        payout = self._mul_div_floor(self.pool_balance.value, shares_val, outstanding)
+        payout = shares_val
 
         # State updates first (P9)
         basis_reduction = self._basis_reduction(outcome, shares_val)
         self._set_user_outcome_shares(outcome, self._get_user_outcome_shares(outcome) - shares_val)
         self._set_user_cost_basis(outcome, self._get_user_cost_basis(outcome) - basis_reduction)
+        self._decrement_total_user_shares(outcome, shares_val)
         self.total_outstanding_cost_basis.value = self.total_outstanding_cost_basis.value - basis_reduction
         q[outcome] = q[outcome] - shares_val
         self._set_q(q)
@@ -1193,19 +1406,18 @@ class QuestionMarket(ARC4Contract):
         self._require(self.cancellable.value == UInt64(1))
         self._require_authorized(self.creator.value)
         self.status.value = UInt64(STATUS_CANCELLED)
+        self.settlement_timestamp.value = self.deadline.value
         arc4.emit("Cancel(uint64)", arc4.UInt64(self.status.value))
         self._assert_invariants()
 
     @arc4.abimethod()
     def withdraw_protocol_fees(self) -> None:
-        """Withdraw accumulated protocol fees to the governed protocol treasury. Admin-only."""
-        self._require_authorized(self._protocol_admin())
+        """Withdraw accumulated protocol fees to the configured protocol treasury."""
         amount = self.protocol_fee_balance.value
         self._require(amount > UInt64(0))
-        treasury = self._protocol_treasury()
         self.protocol_fee_balance.value = UInt64(0)
-        self._send_currency(Account(treasury), amount)
-        arc4.emit("WithdrawProtocolFees(uint64)", arc4.UInt64(amount))
+        self._send_currency(Account(self.protocol_treasury.value), amount)
+        arc4.emit("WithdrawFees(uint64)", arc4.UInt64(amount))
 
     @arc4.abimethod()
     def refund(self, outcome_index: arc4.UInt64, shares: arc4.UInt64) -> None:
@@ -1214,6 +1426,7 @@ class QuestionMarket(ARC4Contract):
         self._assert_valid_outcome(outcome)
         shares_val = shares.as_uint64()
         self._require(shares_val > UInt64(0))
+        self._require_share_granularity(shares_val)
         self._require(self._get_user_outcome_shares(outcome) >= shares_val)
 
         q = self._get_q()
@@ -1222,6 +1435,7 @@ class QuestionMarket(ARC4Contract):
         # State updates first (P9)
         self._set_user_outcome_shares(outcome, self._get_user_outcome_shares(outcome) - shares_val)
         self._set_user_cost_basis(outcome, self._get_user_cost_basis(outcome) - basis_reduction)
+        self._decrement_total_user_shares(outcome, shares_val)
         self.total_outstanding_cost_basis.value = self.total_outstanding_cost_basis.value - basis_reduction
         q[outcome] = q[outcome] - shares_val
         self._set_q(q)
@@ -1239,11 +1453,20 @@ class QuestionMarket(ARC4Contract):
         self._require(amount > UInt64(0))
         self._set_pending_payout(Txn.sender.bytes, UInt64(0))
         self._send_currency(Txn.sender, amount)
-        arc4.emit("WithdrawPendingPayouts(uint64)", arc4.UInt64(amount))
+        arc4.emit("WithdrawPayouts(uint64)", arc4.UInt64(amount))
+
+    @arc4.abimethod()
+    def reclaim_resolution_budget(self) -> None:
+        self._require_status_any2(UInt64(STATUS_RESOLVED), UInt64(STATUS_CANCELLED))
+        self._require_authorized(self.creator.value)
+        amount = self.resolution_budget_balance.value
+        self._require(amount > UInt64(0))
+        self.resolution_budget_balance.value = UInt64(0)
+        self._send_currency(Txn.sender, amount)
+        arc4.emit("ReclaimBudget(uint64)", arc4.UInt64(amount))
 
 
 __all__ = [
-    "BOX_KEY_ASA",
     "BOX_KEY_Q",
     "BOX_KEY_DISPUTE_BLUEPRINT",
     "BOX_KEY_MAIN_BLUEPRINT",
@@ -1252,6 +1475,7 @@ __all__ = [
     "BOX_KEY_USER_COST_BASIS",
     "BOX_KEY_USER_FEES",
     "BOX_KEY_USER_SHARES",
+    "DEFAULT_LP_ENTRY_MAX_PRICE_FP",
     "MAX_OUTCOMES",
     "MIN_OUTCOMES",
     "PRICE_TOLERANCE_BASE",

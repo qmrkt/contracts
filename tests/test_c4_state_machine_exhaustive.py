@@ -70,11 +70,11 @@ def market_in_status(status: int) -> MarketAppModel:
         return m
 
     if status == STATUS_DISPUTED:
-        m.challenge_resolution(sender="challenger", bond_paid=10_000_000, reason_code=1, evidence_hash=b"c" * 32, now=m.deadline + 2)
+        m.challenge_resolution(sender="challenger", bond_paid=m.challenge_bond, reason_code=1, evidence_hash=b"c" * 32, now=m.deadline + 2)
         return m
 
     if status == STATUS_CANCELLED:
-        m.challenge_resolution(sender="challenger", bond_paid=10_000_000, reason_code=1, evidence_hash=b"c" * 32, now=m.deadline + 2)
+        m.challenge_resolution(sender="challenger", bond_paid=m.challenge_bond, reason_code=1, evidence_hash=b"c" * 32, now=m.deadline + 2)
         m.cancel_dispute_and_market(sender="resolver", ruling_hash=b"r" * 32)
         return m
 
@@ -94,7 +94,7 @@ OPERATIONS = {
     "withdraw_liq": lambda m: m.withdraw_liq(sender="creator", shares_to_burn=1_000_000),
     "trigger_resolution": lambda m: m.trigger_resolution(sender="anyone", now=m.deadline),
     "propose_resolution": lambda m: m.propose_resolution(sender="resolver", outcome_index=0, evidence_hash=b"e" * 32, now=m.deadline + 1),
-    "challenge_resolution": lambda m: m.challenge_resolution(sender="challenger", bond_paid=10_000_000, reason_code=1, evidence_hash=b"c" * 32, now=m.deadline + 2),
+    "challenge_resolution": lambda m: m.challenge_resolution(sender="challenger", bond_paid=m.challenge_bond, reason_code=1, evidence_hash=b"c" * 32, now=m.deadline + 2),
     "finalize_resolution": lambda m: m.finalize_resolution(sender="anyone", now=m.deadline + 1 + m.challenge_window_secs),
     "claim": lambda m: m.claim(sender="trader", outcome_index=0),
     "cancel": lambda m: m.cancel(sender="creator"),
@@ -114,7 +114,7 @@ VALID_IN_STATUS = {
     STATUS_RESOLUTION_PROPOSED: {"challenge_resolution", "finalize_resolution"},
     STATUS_DISPUTED: {"register_dispute", "creator_resolve_dispute", "admin_resolve_dispute", "finalize_dispute", "cancel_dispute_and_market"},
     STATUS_CANCELLED: {"refund", "withdraw_liq"},
-    STATUS_RESOLVED: {"claim"},
+    STATUS_RESOLVED: {"claim", "withdraw_liq"},
 }
 
 ALL_STATUSES = [

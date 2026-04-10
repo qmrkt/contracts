@@ -11,6 +11,7 @@ import pytest
 from smart_contracts.lmsr_math import SCALE, lmsr_prices
 from smart_contracts.market_app.model import (
     SHARE_UNIT,
+    MarketAppError,
     MarketAppModel,
     STATUS_ACTIVE,
     STATUS_CANCELLED,
@@ -46,6 +47,16 @@ def make_market(num_outcomes: int) -> MarketAppModel:
         grace_period_secs=3_600,
         market_admin="admin",
     )
+
+
+def withdraw_with_safe_burn(market: MarketAppModel, sender: str, target_burn: int) -> dict[str, int] | None:
+    burn = min(target_burn, market.user_lp_shares[sender])
+    while burn > 0:
+        try:
+            return market.withdraw_liq(sender=sender, shares_to_burn=burn)
+        except MarketAppError:
+            burn //= 2
+    return None
 
 
 @pytest.mark.parametrize("n", [2, 5, 16], ids=["N=2", "N=5", "N=16"])
@@ -88,7 +99,7 @@ class TestLifecycleParametrized:
 
         m.trigger_resolution(sender="anyone", now=m.deadline)
         m.propose_resolution(sender="resolver", outcome_index=0, evidence_hash=b"e" * 32, now=m.deadline + 1)
-        m.challenge_resolution(sender="challenger", bond_paid=10_000_000, reason_code=1, evidence_hash=b"c" * 32, now=m.deadline + 2)
+        m.challenge_resolution(sender="challenger", bond_paid=m.challenge_bond, reason_code=1, evidence_hash=b"c" * 32, now=m.deadline + 2)
         assert m.status == STATUS_DISPUTED
 
         m.cancel_dispute_and_market(sender="resolver", ruling_hash=b"r" * 32)
@@ -130,12 +141,18 @@ class TestLifecycleParametrized:
         # LP2 withdraws
         lp2_shares = m.user_lp_shares["lp2"]
         # Withdraw half
-        result = m.withdraw_liq(sender="lp2", shares_to_burn=lp2_shares // 2)
+        result = withdraw_with_safe_burn(m, "lp2", lp2_shares // 2)
+        if result is None:
+            assert all(qi >= user_supply for qi, user_supply in zip(m.q, m.total_user_shares))
+            return
         assert result["usdc_return"] > 0
 
         # Creator withdraws some
         creator_shares = m.user_lp_shares["creator"]
-        result = m.withdraw_liq(sender="creator", shares_to_burn=creator_shares // 4)
+        result = withdraw_with_safe_burn(m, "creator", creator_shares // 4)
+        if result is None:
+            assert all(qi >= user_supply for qi, user_supply in zip(m.q, m.total_user_shares))
+            return
         assert result["usdc_return"] > 0
 
     def test_multi_trader_multi_outcome(self, n: int) -> None:

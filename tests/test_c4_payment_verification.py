@@ -10,19 +10,39 @@ import algosdk.account
 import algosdk.logic
 
 import pytest
-from algopy import Account, Asset, Global, UInt64, arc4
+from algopy import Account, Application, Asset, Global, UInt64, arc4
 from algopy_testing import algopy_testing_context
 
+from smart_contracts.abi_types import Hash32
 import smart_contracts.market_app.contract as contract_module
 from smart_contracts.market_app.contract import (
+    DEFAULT_LP_ENTRY_MAX_PRICE_FP,
+    DEFAULT_RESIDUAL_LINEAR_LAMBDA_FP,
+    PRICE_TOLERANCE_BASE,
     QuestionMarket,
     SHARE_UNIT,
     STATUS_ACTIVE,
 )
+from smart_contracts.lmsr_math import lmsr_prices
+from smart_contracts.protocol_config.contract import (
+    KEY_CHALLENGE_BOND,
+    KEY_CHALLENGE_BOND_BPS,
+    KEY_CHALLENGE_BOND_CAP,
+    KEY_DEFAULT_RESIDUAL_LINEAR_LAMBDA_FP,
+    KEY_MAX_ACTIVE_LP_V4_OUTCOMES,
+    KEY_MIN_CHALLENGE_WINDOW_SECS,
+    KEY_PROPOSAL_BOND,
+    KEY_PROPOSAL_BOND_BPS,
+    KEY_PROPOSAL_BOND_CAP,
+    KEY_PROPOSER_FEE_BPS,
+    KEY_PROPOSER_FEE_FLOOR_BPS,
+    KEY_PROTOCOL_FEE_BPS,
+    KEY_PROTOCOL_TREASURY,
+)
 
 CURRENCY_ASA = 31_566_704
 WRONG_ASA = 99_999
-OUTCOME_ASA_IDS = [1000, 1001, 1002]
+PROTOCOL_CONFIG_APP_ID = 77
 
 
 def make_address() -> str:
@@ -68,29 +88,55 @@ def call_as(context, sender, method, *args, latest_timestamp=None):
         return method(*args)
 
 
+def _seed_protocol_min_window(context, minimum: int = 86_400) -> Application:
+    app = context.any.application(id=PROTOCOL_CONFIG_APP_ID)
+    context.ledger.set_global_state(app, KEY_MIN_CHALLENGE_WINDOW_SECS, minimum)
+    context.ledger.set_global_state(app, KEY_CHALLENGE_BOND, 10_000_000)
+    context.ledger.set_global_state(app, KEY_PROPOSAL_BOND, 10_000_000)
+    context.ledger.set_global_state(app, KEY_CHALLENGE_BOND_BPS, 500)
+    context.ledger.set_global_state(app, KEY_PROPOSAL_BOND_BPS, 500)
+    context.ledger.set_global_state(app, KEY_CHALLENGE_BOND_CAP, 100_000_000)
+    context.ledger.set_global_state(app, KEY_PROPOSAL_BOND_CAP, 100_000_000)
+    context.ledger.set_global_state(app, KEY_PROPOSER_FEE_BPS, 0)
+    context.ledger.set_global_state(app, KEY_PROPOSER_FEE_FLOOR_BPS, 0)
+    # Keys required by contract.create() — read from protocol config app
+    context.ledger.set_global_state(app, KEY_PROTOCOL_FEE_BPS, 50)
+    context.ledger.set_global_state(app, KEY_PROTOCOL_TREASURY, bytes(32))  # zero address bytes
+    context.ledger.set_global_state(app, KEY_DEFAULT_RESIDUAL_LINEAR_LAMBDA_FP, 150_000)
+    context.ledger.set_global_state(app, KEY_MAX_ACTIVE_LP_V4_OUTCOMES, 8)
+    return app
+
+
 def create_contract(context, contract: QuestionMarket, creator: str, resolver: str | None = None) -> None:
+    protocol_app = _seed_protocol_min_window(context)
     args = dict(
         creator=arc4.Address(creator),
         currency_asa=arc4.UInt64(CURRENCY_ASA),
         num_outcomes=arc4.UInt64(3),
         initial_b=arc4.UInt64(100_000_000),
         lp_fee_bps=arc4.UInt64(200),
-        protocol_fee_bps=arc4.UInt64(50),
         deadline=arc4.UInt64(100_000),
         question_hash=arc4.DynamicBytes(b"q" * 32),
-        main_blueprint_hash=arc4.DynamicBytes(b"b" * 32),
-        dispute_blueprint_hash=arc4.DynamicBytes(b"d" * 32),
+        main_blueprint_hash=Hash32.from_bytes(b"b" * 32),
+        dispute_blueprint_hash=Hash32.from_bytes(b"d" * 32),
         challenge_window_secs=arc4.UInt64(86_400),
         resolution_authority=arc4.Address(resolver or creator),
-        challenge_bond=arc4.UInt64(10_000_000),
-        proposal_bond=arc4.UInt64(10_000_000),
         grace_period_secs=arc4.UInt64(3_600),
         market_admin=arc4.Address(creator),
-        protocol_config_id=arc4.UInt64(77),
-        factory_id=arc4.UInt64(88),
+        protocol_config_id=arc4.UInt64(PROTOCOL_CONFIG_APP_ID),
         cancellable=arc4.Bool(True),
+        lp_entry_max_price_fp=arc4.UInt64(DEFAULT_LP_ENTRY_MAX_PRICE_FP),
     )
-    call_as(context, creator, contract.create, *args.values(), latest_timestamp=1)
+    context.ledger.patch_global_fields(latest_timestamp=1)
+    context._default_sender = Account(creator)
+    deferred = context.txn.defer_app_call(contract.create, **args)
+    deferred._txns[-1].fields["apps"] = (protocol_app,)
+    with context.txn.create_group([deferred]):
+        contract.create(**args)
+
+
+def _price_array(values: list[int]) -> arc4.DynamicArray[arc4.UInt64]:
+    return arc4.DynamicArray[arc4.UInt64](*(arc4.UInt64(value) for value in values))
 
 
 @pytest.fixture()
@@ -102,8 +148,6 @@ def setup_bootstrapped_contract(context, creator, disable_arc4_emit_fixture=None
     """Create and bootstrap a QuestionMarket contract, returning it."""
     contract = QuestionMarket()
     create_contract(context, contract, creator)
-    for idx, asa_id in enumerate(OUTCOME_ASA_IDS):
-        call_as(context, creator, contract.register_outcome_asa, arc4.UInt64(idx), Asset(asa_id))
     call_as(context, creator, contract.store_main_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}'))
     call_as(context, creator, contract.store_dispute_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}'))
 
@@ -123,8 +167,6 @@ class TestP11PaymentVerification:
         with algopy_testing_context() as context:
             contract = QuestionMarket()
             create_contract(context, contract, creator)
-            for idx, asa_id in enumerate(OUTCOME_ASA_IDS):
-                call_as(context, creator, contract.register_outcome_asa, arc4.UInt64(idx), Asset(asa_id))
             call_as(context, creator, contract.store_main_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}'))
             call_as(context, creator, contract.store_dispute_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}'))
 
@@ -138,8 +180,6 @@ class TestP11PaymentVerification:
         with algopy_testing_context() as context:
             contract = QuestionMarket()
             create_contract(context, contract, creator)
-            for idx, asa_id in enumerate(OUTCOME_ASA_IDS):
-                call_as(context, creator, contract.register_outcome_asa, arc4.UInt64(idx), Asset(asa_id))
             call_as(context, creator, contract.store_main_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}'))
             call_as(context, creator, contract.store_dispute_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}'))
 
@@ -154,8 +194,6 @@ class TestP11PaymentVerification:
         with algopy_testing_context() as context:
             contract = QuestionMarket()
             create_contract(context, contract, creator)
-            for idx, asa_id in enumerate(OUTCOME_ASA_IDS):
-                call_as(context, creator, contract.register_outcome_asa, arc4.UInt64(idx), Asset(asa_id))
             call_as(context, creator, contract.store_main_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}'))
             call_as(context, creator, contract.store_dispute_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}'))
 
@@ -227,9 +265,24 @@ class TestP11PaymentVerification:
                 (arc4.UInt64(0), arc4.UInt64(50_000_000), arc4.UInt64(1_000_000_000)),
                 "buyer",
             ),
-            ({"rekey_to": make_address()}, "provide_liq", (arc4.UInt64(50_000_000),), "lp"),
-            ({"asset_close_to": make_address()}, "provide_liq", (arc4.UInt64(50_000_000),), "lp"),
-            ({"asset_sender": make_address()}, "provide_liq", (arc4.UInt64(50_000_000),), "lp"),
+            (
+                {"rekey_to": make_address()},
+                "enter_lp_active",
+                (arc4.UInt64(50_000_000), arc4.UInt64(100_000_000), _price_array(lmsr_prices([0, 0, 0], 100_000_000)), arc4.UInt64(PRICE_TOLERANCE_BASE)),
+                "lp",
+            ),
+            (
+                {"asset_close_to": make_address()},
+                "enter_lp_active",
+                (arc4.UInt64(50_000_000), arc4.UInt64(100_000_000), _price_array(lmsr_prices([0, 0, 0], 100_000_000)), arc4.UInt64(PRICE_TOLERANCE_BASE)),
+                "lp",
+            ),
+            (
+                {"asset_sender": make_address()},
+                "enter_lp_active",
+                (arc4.UInt64(50_000_000), arc4.UInt64(100_000_000), _price_array(lmsr_prices([0, 0, 0], 100_000_000)), arc4.UInt64(PRICE_TOLERANCE_BASE)),
+                "lp",
+            ),
         ],
     )
     def test_rejects_payment_with_privileged_or_redirect_fields(
@@ -247,8 +300,6 @@ class TestP11PaymentVerification:
             if method_name == "bootstrap":
                 contract = QuestionMarket()
                 create_contract(context, contract, creator)
-                for idx, asa_id in enumerate(OUTCOME_ASA_IDS):
-                    call_as(context, creator, contract.register_outcome_asa, arc4.UInt64(idx), Asset(asa_id))
                 call_as(context, creator, contract.store_main_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}'))
                 call_as(context, creator, contract.store_dispute_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}'))
                 sender = creator
@@ -263,7 +314,7 @@ class TestP11PaymentVerification:
             with pytest.raises(AssertionError):
                 call_as(context, sender, method, *method_args, payment, latest_timestamp=5000 if method_name != "bootstrap" else 1)
 
-    def test_sell_rejects_payment_with_sender_mismatch_or_redirect_fields(self, disable_arc4_emit) -> None:
+    def test_sell_rejects_sender_without_internal_shares(self, disable_arc4_emit) -> None:
         creator = make_address()
         seller = make_address()
         attacker = make_address()
@@ -281,27 +332,18 @@ class TestP11PaymentVerification:
                 latest_timestamp=5_000,
             )
 
-            bad_payments = [
-                make_payment(context, contract, attacker, SHARE_UNIT, asset_id=OUTCOME_ASA_IDS[0]),
-                make_payment(context, contract, seller, SHARE_UNIT, asset_id=OUTCOME_ASA_IDS[0], rekey_to=attacker),
-                make_payment(context, contract, seller, SHARE_UNIT, asset_id=OUTCOME_ASA_IDS[0], asset_close_to=attacker),
-                make_payment(context, contract, seller, SHARE_UNIT, asset_id=OUTCOME_ASA_IDS[0], asset_sender=attacker),
-            ]
+            with pytest.raises(AssertionError):
+                call_as(
+                    context,
+                    attacker,
+                    contract.sell,
+                    arc4.UInt64(0),
+                    arc4.UInt64(SHARE_UNIT),
+                    arc4.UInt64(0),
+                    latest_timestamp=5_001,
+                )
 
-            for payment in bad_payments:
-                with pytest.raises(AssertionError):
-                    call_as(
-                        context,
-                        seller,
-                        contract.sell,
-                        arc4.UInt64(0),
-                        arc4.UInt64(SHARE_UNIT),
-                        arc4.UInt64(0),
-                        payment,
-                        latest_timestamp=5_001,
-                    )
-
-    def test_provide_liq_rejects_underpayment(self, disable_arc4_emit) -> None:
+    def test_enter_lp_active_rejects_underpayment(self, disable_arc4_emit) -> None:
         creator = make_address()
         lp = make_address()
         with algopy_testing_context() as context:
@@ -309,7 +351,17 @@ class TestP11PaymentVerification:
 
             payment = make_payment(context, contract, lp, 1)
             with pytest.raises(AssertionError):
-                call_as(context, lp, contract.provide_liq, arc4.UInt64(50_000_000), payment, latest_timestamp=5000)
+                call_as(
+                    context,
+                    lp,
+                    contract.enter_lp_active,
+                    arc4.UInt64(50_000_000),
+                    arc4.UInt64(100_000_000),
+                    _price_array(lmsr_prices([0, 0, 0], 100_000_000)),
+                    arc4.UInt64(PRICE_TOLERANCE_BASE),
+                    payment,
+                    latest_timestamp=5000,
+                )
 
     def test_propose_resolution_rejects_underpayment_and_wrong_asset(self, disable_arc4_emit) -> None:
         creator = make_address()
@@ -449,23 +501,18 @@ class TestP11PaymentVerification:
 
 
 # ---------------------------------------------------------------------------
-# P13: ASA lifecycle — outcome ASA registration
+# P13: Ledger-only lifecycle
 # ---------------------------------------------------------------------------
 
 
-class TestP13ASALifecycle:
-    def test_bootstrap_rejects_missing_outcome_asa(self, disable_arc4_emit) -> None:
-        """Bootstrap fails if not all outcome ASAs have been registered."""
+class TestP13LedgerOnlyLifecycle:
+    def test_bootstrap_rejects_missing_dispute_blueprint(self, disable_arc4_emit) -> None:
+        """Bootstrap still fails until both launch blueprints are stored."""
         creator = make_address()
         with algopy_testing_context() as context:
             contract = QuestionMarket()
             create_contract(context, contract, creator)
-            # Only register 2 out of 3 outcome ASAs
-            call_as(context, creator, contract.register_outcome_asa, arc4.UInt64(0), Asset(1000))
-            call_as(context, creator, contract.register_outcome_asa, arc4.UInt64(1), Asset(1001))
-            # Intentionally skip outcome 2
             call_as(context, creator, contract.store_main_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}'))
-            call_as(context, creator, contract.store_dispute_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}'))
 
             payment = make_payment(context, contract, creator, 200_000_000)
             with pytest.raises(AssertionError):
@@ -477,28 +524,17 @@ class TestP13ASALifecycle:
         with algopy_testing_context() as context:
             contract = QuestionMarket()
             create_contract(context, contract, creator)
-            for idx, asa_id in enumerate(OUTCOME_ASA_IDS):
-                call_as(context, creator, contract.register_outcome_asa, arc4.UInt64(idx), Asset(asa_id))
             # Intentionally skip store_main_blueprint and store_dispute_blueprint
 
             payment = make_payment(context, contract, creator, 200_000_000)
             with pytest.raises(AssertionError):
                 call_as(context, creator, contract.bootstrap, arc4.UInt64(200_000_000), payment, latest_timestamp=1)
 
-    def test_register_outcome_asa_only_in_created_status(self, disable_arc4_emit) -> None:
-        """register_outcome_asa rejects after bootstrap."""
+    def test_contract_exposes_no_outcome_registration_surface(self, disable_arc4_emit) -> None:
+        """Ledger-only markets remove mutable outcome-ASA registration entirely."""
         creator = make_address()
-        with algopy_testing_context() as context:
-            contract = setup_bootstrapped_contract(context, creator)
-            with pytest.raises(AssertionError):
-                call_as(context, creator, contract.register_outcome_asa, arc4.UInt64(0), Asset(9999))
-
-    def test_register_outcome_asa_only_by_creator(self, disable_arc4_emit) -> None:
-        """register_outcome_asa rejects non-creator."""
-        creator = make_address()
-        attacker = make_address()
         with algopy_testing_context() as context:
             contract = QuestionMarket()
             create_contract(context, contract, creator)
-            with pytest.raises(AssertionError):
-                call_as(context, attacker, contract.register_outcome_asa, arc4.UInt64(0), Asset(1000))
+            assert not hasattr(contract, "register_outcome_asa")
+            assert not hasattr(contract, "opt_in_to_asa")

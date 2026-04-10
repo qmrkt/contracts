@@ -26,6 +26,8 @@ def make_market(*, num_outcomes: int = 3, deadline: int = 10_000, cancellable: b
         resolution_authority="resolver",
         challenge_bond=10_000_000,
         proposal_bond=10_000_000,
+        proposer_fee_bps=0,
+        proposer_fee_floor_bps=0,
         grace_period_secs=3_600,
         market_admin="admin",
         cancellable=cancellable,
@@ -65,4 +67,3 @@ def bootstrap_and_buy() -> MarketAppModel:
     market.bootstrap(sender="creator", deposit_amount=200_000_000)
     buy_one(market, sender="buyer", outcome_index=0)
     return market
-
