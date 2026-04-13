@@ -18,8 +18,8 @@ from smart_contracts.lmsr_math import (
     SCALE,
     lmsr_collateral_required_from_prices,
     lmsr_cost_delta,
-    lmsr_normalized_q_from_prices,
     lmsr_prices,
+    lmsr_q_from_prices_with_floor,
     lmsr_sell_return,
 )
 from smart_contracts.market_app.model import (
@@ -263,7 +263,7 @@ class ActiveLpMarketAppModel(MarketAppModel):
         self._settle_lp_fees(sender)
         self._ensure_user(sender)
         next_b = self.b + target_delta_b
-        self.q = lmsr_normalized_q_from_prices(current_prices, next_b)
+        self.q = lmsr_q_from_prices_with_floor(current_prices, next_b, self.total_user_shares)
         self.b = next_b
         self.pool_balance += deposit_required
         self.lp_shares_total += target_delta_b

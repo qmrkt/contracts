@@ -62,6 +62,31 @@ def test_v4_lp_entry_preserves_prices_and_disables_active_withdrawal() -> None:
         market.withdraw_liq(sender="creator", shares_to_burn=1)
 
 
+def test_v4_balanced_positions_remain_sellable_after_active_lp_entry() -> None:
+    market = make_active_lp_market(num_outcomes=2)
+    market.bootstrap(sender="creator", deposit_amount=200_000_000, now=0)
+
+    market.buy(sender="trader", outcome_index=0, max_cost=10_000_000, now=5_000, shares=SHARE_UNIT)
+    market.buy(sender="trader", outcome_index=1, max_cost=10_000_000, now=5_001, shares=SHARE_UNIT)
+    before_prices = lmsr_prices(market.q, market.b)
+
+    market.enter_lp_active(
+        sender="lp2",
+        target_delta_b=25_000_000,
+        max_deposit=100_000_000,
+        expected_prices=list(before_prices),
+        now=6_000,
+    )
+
+    assert all(q_i >= outstanding for q_i, outstanding in zip(market.q, market.total_user_shares))
+
+    sold_a = market.sell(sender="trader", outcome_index=0, min_return=0, now=6_001, shares=SHARE_UNIT)
+    sold_b = market.sell(sender="trader", outcome_index=1, min_return=0, now=6_002, shares=SHARE_UNIT)
+
+    assert sold_a["net_return"] > 0
+    assert sold_b["net_return"] > 0
+
+
 def test_v4_rejects_sub_share_granularity() -> None:
     market = make_active_lp_market()
     market.bootstrap(sender="creator", deposit_amount=200_000_000, now=0)

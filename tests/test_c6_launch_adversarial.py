@@ -18,7 +18,6 @@ import pytest
 from algopy import Account, Application, Array, Asset, Global, UInt64, arc4
 from algopy_testing import algopy_testing_context
 
-from smart_contracts.abi_types import Hash32
 import smart_contracts.market_app.contract as contract_module
 from smart_contracts.market_app.contract import (
     DEFAULT_LP_ENTRY_MAX_PRICE_FP,
@@ -120,8 +119,7 @@ def _create_contract(context, contract, creator):
         lp_fee_bps=arc4.UInt64(200),
         deadline=arc4.UInt64(100_000),
         question_hash=arc4.DynamicBytes(b"q" * 32),
-        main_blueprint_hash=Hash32.from_bytes(b"b" * 32),
-        dispute_blueprint_hash=Hash32.from_bytes(b"d" * 32),
+        blueprint_cid=arc4.DynamicBytes(b"ipfs://blueprint-cid"),
         challenge_window_secs=arc4.UInt64(86_400),
         resolution_authority=arc4.Address(creator),
         grace_period_secs=arc4.UInt64(3_600),
@@ -139,9 +137,7 @@ def _create_contract(context, contract, creator):
 
 
 def _bootstrap(context, contract, creator):
-    """Store blueprints and bootstrap the ledger-only market."""
-    _call_as(context, creator, contract.store_main_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}}'))
-    _call_as(context, creator, contract.store_dispute_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}}'))
+    """Bootstrap the market after create-time blueprint configuration."""
     payment = _make_payment(context, contract, creator, DEPOSIT)
     _call_as(context, creator, contract.bootstrap, arc4.UInt64(DEPOSIT), payment, ts=1)
 

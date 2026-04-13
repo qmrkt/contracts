@@ -1,10 +1,9 @@
 import algosdk.account
 import algosdk.logic
 import pytest
-from algopy import Account, Application, Asset, Bytes, UInt64, arc4, op
+from algopy import Account, Application, Asset, Bytes, OnCompleteAction, UInt64, arc4, op
 from algopy_testing import algopy_testing_context
 
-from smart_contracts.abi_types import Hash32
 import smart_contracts.market_app.contract as contract_module
 from smart_contracts.market_app.contract import (
     BOX_KEY_USER_COST_BASIS,
@@ -85,6 +84,7 @@ def create_contract(
     *,
     creator: str,
     resolver: str,
+    blueprint_cid: bytes = b"ipfs://blueprint-cid",
     deadline: int = 10_000,
     num_outcomes: int = 3,
     initial_b: int = 100_000_000,
@@ -124,8 +124,7 @@ def create_contract(
         lp_fee_bps=arc4.UInt64(200),
         deadline=arc4.UInt64(deadline),
         question_hash=arc4.DynamicBytes(b"q" * 32),
-        main_blueprint_hash=Hash32.from_bytes(b"b" * 32),
-        dispute_blueprint_hash=Hash32.from_bytes(b"d" * 32),
+        blueprint_cid=arc4.DynamicBytes(blueprint_cid),
         challenge_window_secs=arc4.UInt64(challenge_window_secs),
         resolution_authority=arc4.Address(resolver),
         grace_period_secs=arc4.UInt64(3_600),
@@ -182,15 +181,24 @@ def register_outcome_asas(context, contract, creator, outcome_asa_ids: list[int]
     _ = (context, contract, creator, outcome_asa_ids)
 
 
-def store_blueprints(context, contract, creator):
-    """Store main and dispute blueprints on a CREATED contract."""
-    call_as(context, creator, contract.store_main_blueprint, arc4.DynamicBytes(SAMPLE_RESOLUTION_LOGIC))
-    call_as(context, creator, contract.store_dispute_blueprint, arc4.DynamicBytes(SAMPLE_RESOLUTION_LOGIC))
+def ensure_blueprint_cid(contract: QuestionMarket) -> None:
+    """Atomic creation configures blueprint metadata at create time."""
+    assert contract.blueprint_cid.value.length > UInt64(0)
 
 
 def initialize_market(context, contract, creator):
     """Initialize a CREATED contract using the atomic market setup helper."""
     call_as(context, creator, contract.initialize)
+
+
+def opt_in_market(context, contract, account: str, latest_timestamp: int | None = None) -> None:
+    if latest_timestamp is not None:
+        context.ledger.patch_global_fields(latest_timestamp=latest_timestamp)
+    context._default_sender = Account(account)
+    deferred = context.txn.defer_app_call(contract.opt_in)
+    deferred._txns[-1].fields["on_completion"] = OnCompleteAction.OptIn
+    with context.txn.create_group([deferred]):
+        contract.opt_in()
 
 
 def seed_protocol_config_state(
@@ -232,7 +240,7 @@ def seed_protocol_config_state(
 
 
 def contract_q(contract: QuestionMarket) -> list[int]:
-    return [int(contract.outcome_quantities_box.get(UInt64(idx), default=UInt64(0))) for idx in range(int(contract.num_outcomes.value))]
+    return [int(contract._get_quantity(UInt64(idx))) for idx in range(int(contract.num_outcomes.value))]
 
 
 def contract_user_shares(contract: QuestionMarket, sender: str, outcome_index: int) -> int:
@@ -336,13 +344,17 @@ def test_contract_create_and_bootstrap_persist_state(disable_arc4_emit) -> None:
         assert contract.creator.value == Account(creator).bytes
         assert contract_q(contract) == [0, 0, 0]
 
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
         payment = make_usdc_payment(context, contract, creator, 200_000_000)
         call_as(context, creator, contract.bootstrap, arc4.UInt64(200_000_000), payment, latest_timestamp=1)
 
         assert int(contract.status.value) == STATUS_ACTIVE
         assert int(contract.pool_balance.value) == 200_000_000
         assert int(contract.lp_shares_total.value) == int(contract.b.value)
+        assert contract.bootstrapper_info.value.length > UInt64(0)
+
+        opt_in_market(context, contract, creator, latest_timestamp=2)
+        assert contract.bootstrapper_info.value.length == UInt64(0)
         assert int(contract.lp_shares[Account(creator)]) == int(contract.b.value)
 
 
@@ -380,12 +392,13 @@ def test_contract_post_comment_emits_for_lp_and_holder(monkeypatch) -> None:
         contract = QuestionMarket()
         create_contract(context, contract, creator=creator, resolver=resolver)
         register_outcome_asas(context, contract, creator)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
 
         payment = make_usdc_payment(context, contract, creator, 200_000_000)
         call_as(context, creator, contract.bootstrap, arc4.UInt64(200_000_000), payment, latest_timestamp=1)
+        opt_in_market(context, contract, creator, latest_timestamp=2)
 
-        call_as(context, creator, contract.post_comment, arc4.String("lp comment"), latest_timestamp=2)
+        call_as(context, creator, contract.post_comment, arc4.String("lp comment"), latest_timestamp=3)
 
         buy_payment = make_usdc_payment(context, contract, holder, 10_000_000)
         call_as(
@@ -407,10 +420,10 @@ def test_contract_post_comment_emits_for_lp_and_holder(monkeypatch) -> None:
         ]
 
 
-def test_contract_bootstrap_rejects_underfunded_sixteen_outcome_market(disable_arc4_emit) -> None:
+def test_contract_bootstrap_rejects_underfunded_max_outcome_market(disable_arc4_emit) -> None:
     creator = make_address()
     resolver = make_address()
-    outcome_asa_ids = [1000 + i for i in range(16)]
+    outcome_asa_ids = [1000 + i for i in range(8)]
 
     with algopy_testing_context() as context:
         contract = QuestionMarket()
@@ -419,11 +432,11 @@ def test_contract_bootstrap_rejects_underfunded_sixteen_outcome_market(disable_a
             contract,
             creator=creator,
             resolver=resolver,
-            num_outcomes=16,
+            num_outcomes=8,
             initial_b=50_000_000,
         )
         register_outcome_asas(context, contract, creator, outcome_asa_ids)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
 
         payment = make_usdc_payment(context, contract, creator, 100_000_000)
         with pytest.raises(AssertionError):
@@ -439,7 +452,7 @@ def test_contract_post_comment_holder_path_skips_lp_local_state(disable_arc4_emi
         contract = QuestionMarket()
         create_contract(context, contract, creator=creator, resolver=resolver)
         register_outcome_asas(context, contract, creator)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
 
         payment = make_usdc_payment(context, contract, creator, 200_000_000)
         call_as(context, creator, contract.bootstrap, arc4.UInt64(200_000_000), payment, latest_timestamp=1)
@@ -473,19 +486,20 @@ def test_contract_post_comment_enforces_participant_and_size_rules(disable_arc4_
         contract = QuestionMarket()
         create_contract(context, contract, creator=creator, resolver=resolver)
         register_outcome_asas(context, contract, creator)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
 
         payment = make_usdc_payment(context, contract, creator, 200_000_000)
         call_as(context, creator, contract.bootstrap, arc4.UInt64(200_000_000), payment, latest_timestamp=1)
+        opt_in_market(context, contract, creator, latest_timestamp=2)
 
         with pytest.raises(AssertionError):
-            call_as(context, outsider, contract.post_comment, arc4.String("hello"), latest_timestamp=2)
+            call_as(context, outsider, contract.post_comment, arc4.String("hello"), latest_timestamp=3)
 
         with pytest.raises(AssertionError):
-            call_as(context, creator, contract.post_comment, arc4.String(""), latest_timestamp=2)
+            call_as(context, creator, contract.post_comment, arc4.String(""), latest_timestamp=3)
 
         exact_limit = "a" * MAX_COMMENT_BYTES
-        call_as(context, creator, contract.post_comment, arc4.String(exact_limit), latest_timestamp=2)
+        call_as(context, creator, contract.post_comment, arc4.String(exact_limit), latest_timestamp=3)
 
         with pytest.raises(AssertionError):
             call_as(
@@ -493,7 +507,7 @@ def test_contract_post_comment_enforces_participant_and_size_rules(disable_arc4_
                 creator,
                 contract.post_comment,
                 arc4.String("a" * (MAX_COMMENT_BYTES + 1)),
-                latest_timestamp=2,
+                latest_timestamp=3,
             )
 
 
@@ -506,11 +520,10 @@ def test_contract_initialize_then_bootstrap_persist_state(disable_arc4_emit) -> 
         create_contract(context, contract, creator=creator, resolver=resolver)
 
         initialize_market(context, contract, creator)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
 
         assert int(contract.status.value) == STATUS_CREATED
-        assert bool(contract.main_blueprint_box)
-        assert bool(contract.dispute_blueprint_box)
+        assert contract.blueprint_cid.value.length > UInt64(0)
 
         payment = make_usdc_payment(context, contract, creator, 200_000_000)
         call_as(context, creator, contract.bootstrap, arc4.UInt64(200_000_000), payment, latest_timestamp=1)
@@ -518,6 +531,9 @@ def test_contract_initialize_then_bootstrap_persist_state(disable_arc4_emit) -> 
         assert int(contract.status.value) == STATUS_ACTIVE
         assert int(contract.pool_balance.value) == 200_000_000
         assert int(contract.lp_shares_total.value) == int(contract.b.value)
+        assert contract.bootstrapper_info.value.length > UInt64(0)
+
+        opt_in_market(context, contract, creator, latest_timestamp=2)
         assert int(contract.lp_shares[Account(creator)]) == int(contract.b.value)
 
 
@@ -544,12 +560,13 @@ def test_contract_trade_and_active_lp_paths_match_greenfield_semantics(disable_a
         contract = QuestionMarket()
         create_contract(context, contract, creator=creator, resolver=resolver)
         register_outcome_asas(context, contract, creator)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
 
         payment = make_usdc_payment(context, contract, creator, 200_000_000)
         call_as(context, creator, contract.bootstrap, arc4.UInt64(200_000_000), payment, latest_timestamp=1)
         assert int(contract.status.value) == STATUS_ACTIVE
         assert int(contract.pool_balance.value) == 200_000_000
+        opt_in_market(context, contract, creator, latest_timestamp=2)
 
         # Buy
         pre_buy_pool = int(contract.pool_balance.value)
@@ -635,7 +652,7 @@ def test_contract_buy_refunds_surplus_payment(disable_arc4_emit) -> None:
     with algopy_testing_context() as context:
         contract = QuestionMarket()
         create_contract(context, contract, creator=creator, resolver=resolver)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
         seed_usdc_balance(context, buyer, 25_000_000)
 
         bootstrap_payment = make_usdc_payment(context, contract, creator, 200_000_000)
@@ -678,7 +695,7 @@ def test_contract_resolved_claim_is_one_to_one_and_lp_can_claim_residual(disable
     with algopy_testing_context() as context:
         contract = QuestionMarket()
         create_contract(context, contract, creator=creator, resolver=resolver)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
 
         bootstrap_payment = make_usdc_payment(context, contract, creator, 200_000_000)
         call_as(context, creator, contract.bootstrap, arc4.UInt64(200_000_000), bootstrap_payment, latest_timestamp=1)
@@ -718,6 +735,7 @@ def test_contract_resolved_claim_is_one_to_one_and_lp_can_claim_residual(disable
             latest_timestamp=10_001,
         )
         call_as(context, creator, contract.finalize_resolution, latest_timestamp=96_402)
+        opt_in_market(context, contract, creator, latest_timestamp=96_402)
 
         reserve_before = int(contract._get_total_user_shares(UInt64(0)))
         pool_before_residual = int(contract.pool_balance.value)
@@ -753,7 +771,7 @@ def test_contract_multi_share_buy_and_sell_single_call_paths(disable_arc4_emit) 
     with algopy_testing_context() as context:
         contract = QuestionMarket()
         create_contract(context, contract, creator=creator, resolver=resolver)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
 
         bootstrap_payment = make_usdc_payment(context, contract, creator, 200_000_000)
         call_as(context, creator, contract.bootstrap, arc4.UInt64(200_000_000), bootstrap_payment, latest_timestamp=1)
@@ -800,7 +818,7 @@ def test_contract_sell_rejects_oversell_amount(disable_arc4_emit) -> None:
     with algopy_testing_context() as context:
         contract = QuestionMarket()
         create_contract(context, contract, creator=creator, resolver=resolver)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
 
         bootstrap_payment = make_usdc_payment(context, contract, creator, 200_000_000)
         call_as(context, creator, contract.bootstrap, arc4.UInt64(200_000_000), bootstrap_payment, latest_timestamp=1)
@@ -841,7 +859,7 @@ def test_contract_finalize_resolution_credits_pending_payout_even_without_receiv
     with algopy_testing_context() as context:
         contract = QuestionMarket()
         create_contract(context, contract, creator=creator, resolver=resolver)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
         seed_usdc_balance(context, resolver, 20_000_000)
 
         payment = make_usdc_payment(context, contract, creator, 200_000_000)
@@ -882,7 +900,7 @@ def test_contract_finalize_resolution_pays_configured_proposer_fee_and_reclaims_
             proposer_fee_bps=20,
             proposer_fee_floor_bps=0,
         )
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
         seed_usdc_balance(context, resolver, 20_000_000)
 
         bootstrap_budget = required_proposer_fee(contract, max_budget=True)
@@ -917,7 +935,7 @@ def test_contract_resolution_authority_can_propose_with_zero_bond(disable_arc4_e
     with algopy_testing_context() as context:
         contract = QuestionMarket()
         create_contract(context, contract, creator=creator, resolver=resolver)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
         seed_usdc_balance(context, resolver, 0)
 
         payment = make_usdc_payment(context, contract, creator, 200_000_000)
@@ -947,7 +965,7 @@ def test_contract_open_proposer_underbonded_after_grace_period_fails(disable_arc
     with algopy_testing_context() as context:
         contract = QuestionMarket()
         create_contract(context, contract, creator=creator, resolver=resolver)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
         seed_usdc_balance(context, open_proposer, 20_000_000)
 
         payment = make_usdc_payment(context, contract, creator, 200_000_000)
@@ -986,7 +1004,7 @@ def test_contract_challenge_bond_cap_is_enforced(disable_arc4_emit) -> None:
             challenge_bond_cap=20_000_000,
             proposal_bond_cap=20_000_000,
         )
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
         seed_usdc_balance(context, resolver, 0)
         seed_usdc_balance(context, challenger, 25_000_000)
 
@@ -1040,7 +1058,7 @@ def test_contract_finalize_dispute_credits_pending_payout_even_without_receiver_
         contract = QuestionMarket()
         create_contract(context, contract, creator=creator, resolver=resolver)
         register_outcome_asas(context, contract, creator)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
         seed_usdc_balance(context, resolver, 20_000_000)
         seed_usdc_balance(context, challenger, 20_000_000)
 
@@ -1091,7 +1109,7 @@ def test_contract_confirmed_dispute_pays_proposer_fee_once(disable_arc4_emit) ->
             proposer_fee_bps=20,
             proposer_fee_floor_bps=0,
         )
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
         seed_usdc_balance(context, resolver, 20_000_000)
         seed_usdc_balance(context, challenger, 20_000_000)
 
@@ -1135,7 +1153,7 @@ def test_contract_overturned_dispute_keeps_resolution_budget_for_creator_reclaim
             proposer_fee_bps=20,
             proposer_fee_floor_bps=0,
         )
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
         seed_usdc_balance(context, resolver, 20_000_000)
         seed_usdc_balance(context, challenger, 20_000_000)
 
@@ -1183,7 +1201,7 @@ def test_contract_cancelled_market_keeps_resolution_budget_for_creator_reclaim(d
             proposer_fee_bps=20,
             proposer_fee_floor_bps=0,
         )
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
         seed_usdc_balance(context, resolver, 20_000_000)
         seed_usdc_balance(context, challenger, 20_000_000)
 
@@ -1228,7 +1246,7 @@ def test_contract_resolution_claim_and_refund_paths_match_model(disable_arc4_emi
         contract = QuestionMarket()
         create_contract(context, contract, creator=creator, resolver=resolver)
         register_outcome_asas(context, contract, creator)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
 
         payment = make_usdc_payment(context, contract, creator, 200_000_000)
         call_as(context, creator, contract.bootstrap, arc4.UInt64(200_000_000), payment, latest_timestamp=1)
@@ -1274,7 +1292,7 @@ def test_contract_resolution_claim_and_refund_paths_match_model(disable_arc4_emi
         contract = QuestionMarket()
         create_contract(context, contract, creator=creator, resolver=resolver)
         register_outcome_asas(context, contract, creator)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
 
         payment = make_usdc_payment(context, contract, creator, 200_000_000)
         call_as(context, creator, contract.bootstrap, arc4.UInt64(200_000_000), payment, latest_timestamp=1)
@@ -1339,7 +1357,7 @@ def test_contract_multi_share_claim_and_refund_single_call_paths(disable_arc4_em
         contract = QuestionMarket()
         create_contract(context, contract, creator=creator, resolver=resolver)
         register_outcome_asas(context, contract, creator)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
 
         bootstrap_payment = make_usdc_payment(context, contract, creator, 200_000_000)
         call_as(context, creator, contract.bootstrap, arc4.UInt64(200_000_000), bootstrap_payment, latest_timestamp=1)
@@ -1404,7 +1422,7 @@ def test_contract_multi_share_claim_and_refund_single_call_paths(disable_arc4_em
         contract = QuestionMarket()
         create_contract(context, contract, creator=creator, resolver=resolver)
         register_outcome_asas(context, contract, creator)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
 
         bootstrap_payment = make_usdc_payment(context, contract, creator, 200_000_000)
         call_as(context, creator, contract.bootstrap, arc4.UInt64(200_000_000), bootstrap_payment, latest_timestamp=1)
@@ -1450,7 +1468,7 @@ def test_contract_dispute_confirmation_routes_half_losing_bond_to_sink(disable_a
         contract = QuestionMarket()
         create_contract(context, contract, creator=creator, resolver=resolver)
         register_outcome_asas(context, contract, creator)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
 
         payment = make_usdc_payment(context, contract, creator, 200_000_000)
         call_as(context, creator, contract.bootstrap, arc4.UInt64(200_000_000), payment, latest_timestamp=1)
@@ -1484,7 +1502,7 @@ def test_contract_dispute_overturn_routes_half_losing_bond_to_sink(disable_arc4_
         contract = QuestionMarket()
         create_contract(context, contract, creator=creator, resolver=resolver)
         register_outcome_asas(context, contract, creator)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
 
         payment = make_usdc_payment(context, contract, creator, 200_000_000)
         call_as(context, creator, contract.bootstrap, arc4.UInt64(200_000_000), payment, latest_timestamp=1)
@@ -1518,7 +1536,7 @@ def test_contract_dispute_cancel_refunds_challenger_and_slashes_proposer_to_sink
         contract = QuestionMarket()
         create_contract(context, contract, creator=creator, resolver=resolver)
         register_outcome_asas(context, contract, creator)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
 
         payment = make_usdc_payment(context, contract, creator, 200_000_000)
         call_as(context, creator, contract.bootstrap, arc4.UInt64(200_000_000), payment, latest_timestamp=1)
@@ -1553,7 +1571,7 @@ def test_contract_abort_early_resolution_reopens_active_before_deadline(disable_
         contract = QuestionMarket()
         create_contract(context, contract, creator=creator, resolver=resolver)
         register_outcome_asas(context, contract, creator)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
 
         payment = make_usdc_payment(context, contract, creator, 200_000_000)
         call_as(context, creator, contract.bootstrap, arc4.UInt64(200_000_000), payment, latest_timestamp=1)
@@ -1634,7 +1652,7 @@ def test_contract_abort_early_resolution_after_deadline_returns_pending(disable_
         contract = QuestionMarket()
         create_contract(context, contract, creator=creator, resolver=resolver)
         register_outcome_asas(context, contract, creator)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
 
         payment = make_usdc_payment(context, contract, creator, 200_000_000)
         call_as(context, creator, contract.bootstrap, arc4.UInt64(200_000_000), payment, latest_timestamp=1)
@@ -1697,7 +1715,7 @@ def test_contract_cancelled_lp_residual_claim_preserves_refund_reserve(disable_a
         contract = QuestionMarket()
         create_contract(context, contract, creator=creator, resolver=resolver)
         register_outcome_asas(context, contract, creator)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
 
         payment = make_usdc_payment(context, contract, creator, 200_000_000)
         call_as(context, creator, contract.bootstrap, arc4.UInt64(200_000_000), payment, latest_timestamp=1)
@@ -1718,8 +1736,9 @@ def test_contract_cancelled_lp_residual_claim_preserves_refund_reserve(disable_a
 
         call_as(context, creator, contract.cancel, latest_timestamp=5_001)
         assert int(contract.status.value) == STATUS_CANCELLED
+        opt_in_market(context, contract, creator, latest_timestamp=5_002)
 
-        call_as(context, creator, contract.claim_lp_residual, latest_timestamp=5_002)
+        call_as(context, creator, contract.claim_lp_residual, latest_timestamp=5_003)
         assert int(contract.pool_balance.value) < pool_before_cancel_claim
         assert int(contract.pool_balance.value) == trader_basis
         assert int(contract.total_outstanding_cost_basis.value) == trader_basis
@@ -1748,7 +1767,7 @@ def test_contract_enter_lp_active_handles_large_amounts_without_overflow(disable
         contract = QuestionMarket()
         create_contract(context, contract, creator=creator, resolver=resolver)
         register_outcome_asas(context, contract, creator)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
 
         bootstrap_payment = make_usdc_payment(context, contract, creator, 1_000_000_000)
         call_as(context, creator, contract.bootstrap, arc4.UInt64(1_000_000_000), bootstrap_payment, latest_timestamp=1)
@@ -1796,7 +1815,7 @@ def test_contract_claim_lp_residual_handles_large_resolved_pool_without_overflow
         contract = QuestionMarket()
         create_contract(context, contract, creator=creator, resolver=resolver)
         register_outcome_asas(context, contract, creator)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
 
         bootstrap_payment = make_usdc_payment(context, contract, creator, LARGE_ACTIVE_POOL)
         call_as(context, creator, contract.bootstrap, arc4.UInt64(LARGE_ACTIVE_POOL), bootstrap_payment, latest_timestamp=1)
@@ -1824,10 +1843,11 @@ def test_contract_claim_lp_residual_handles_large_resolved_pool_without_overflow
             latest_timestamp=10_001,
         )
         call_as(context, creator, contract.finalize_resolution, latest_timestamp=96_401)
+        opt_in_market(context, contract, creator, latest_timestamp=96_402)
 
         reserve_before = int(contract._get_total_user_shares(UInt64(0)))
         pool_before = int(contract.pool_balance.value)
-        call_as(context, creator, contract.claim_lp_residual, latest_timestamp=96_402)
+        call_as(context, creator, contract.claim_lp_residual, latest_timestamp=96_403)
 
         assert int(contract.total_residual_claimed.value) > 0
         assert int(contract.pool_balance.value) < pool_before
@@ -1843,7 +1863,7 @@ def test_contract_claim_lp_residual_handles_large_cancelled_pool_without_overflo
         contract = QuestionMarket()
         create_contract(context, contract, creator=creator, resolver=resolver)
         register_outcome_asas(context, contract, creator)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
 
         bootstrap_payment = make_usdc_payment(context, contract, creator, LARGE_ACTIVE_POOL)
         call_as(context, creator, contract.bootstrap, arc4.UInt64(LARGE_ACTIVE_POOL), bootstrap_payment, latest_timestamp=1)
@@ -1862,7 +1882,8 @@ def test_contract_claim_lp_residual_handles_large_cancelled_pool_without_overflo
         trader_basis = contract_user_cost_basis(contract, trader, 0)
 
         call_as(context, creator, contract.cancel, latest_timestamp=5_001)
-        call_as(context, creator, contract.claim_lp_residual, latest_timestamp=5_002)
+        opt_in_market(context, contract, creator, latest_timestamp=5_002)
+        call_as(context, creator, contract.claim_lp_residual, latest_timestamp=5_003)
 
         assert int(contract.pool_balance.value) == trader_basis
         assert int(contract.total_outstanding_cost_basis.value) == trader_basis
@@ -1878,7 +1899,7 @@ def test_contract_claim_handles_large_pool_without_overflow(disable_arc4_emit) -
         contract = QuestionMarket()
         create_contract(context, contract, creator=creator, resolver=resolver)
         register_outcome_asas(context, contract, creator)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
 
         bootstrap_payment = make_usdc_payment(context, contract, creator, LARGE_CLAIM_POOL)
         call_as(context, creator, contract.bootstrap, arc4.UInt64(LARGE_CLAIM_POOL), bootstrap_payment, latest_timestamp=1)
@@ -1935,7 +1956,7 @@ def test_withdraw_protocol_fees_sends_to_stored_treasury(disable_arc4_emit) -> N
         contract = QuestionMarket()
         create_contract(context, contract, creator=creator, resolver=resolver, protocol_treasury=treasury)
         register_outcome_asas(context, contract, creator)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
         seed_usdc_balance(context, treasury, 0)
 
         payment = make_usdc_payment(context, contract, creator, 200_000_000)

@@ -5,7 +5,6 @@ import algosdk.logic
 from algopy import Account, Application, Asset, UInt64, arc4
 from algopy_testing import algopy_testing_context
 
-from smart_contracts.abi_types import Hash32
 import smart_contracts.market_factory.contract as factory_module
 import smart_contracts.market_app.contract as market_app_module
 from smart_contracts.lmsr_math import lmsr_prices as reference_lmsr_prices
@@ -19,6 +18,7 @@ from smart_contracts.market_app.contract import (
 )
 from smart_contracts.market_factory.contract import MarketFactory
 from tests.contracts.test_protocol_config_factory import (
+    BLUEPRINT_CID,
     PROTOCOL_CONFIG_APP_ID,
     call_as,
     call_create_market,
@@ -50,6 +50,10 @@ def make_usdc_payment(context, contract: QuestionMarket, sender: str, amount: in
     )
 
 
+def read_quantities(contract: QuestionMarket) -> list[int]:
+    return [int(contract._get_quantity(UInt64(i))) for i in range(int(contract.num_outcomes.value))]
+
+
 def test_factory_created_market_passes_c2_lifecycle(disable_arc4_emit, monkeypatch) -> None:
     admin = make_address()
     creator = make_address()
@@ -76,14 +80,12 @@ def test_factory_created_market_passes_c2_lifecycle(disable_arc4_emit, monkeypat
             context,
             creator,
             factory,
-            arc4.Address(creator),
             arc4.UInt64(CURRENCY_ASA),
             arc4.DynamicBytes(b"q" * 32),
             arc4.UInt64(3),
             arc4.UInt64(25_000_000),
             arc4.UInt64(200),
-            Hash32.from_bytes(b"b" * 32),
-            Hash32.from_bytes(b"d" * 32),
+            arc4.DynamicBytes(BLUEPRINT_CID),
             arc4.UInt64(10_000),
             arc4.UInt64(86_400),
             arc4.Address(admin),
@@ -93,8 +95,8 @@ def test_factory_created_market_passes_c2_lifecycle(disable_arc4_emit, monkeypat
             latest_timestamp=1,
         )
 
-        assert created_app_id is None
-        assert captured["method"] is QuestionMarket.create
+        assert int(created_app_id.as_uint64()) == 9_999
+        assert captured["method"] is factory_module.MarketStub.create
 
         # Create market from captured factory args
         market = QuestionMarket()
@@ -114,10 +116,6 @@ def test_factory_created_market_passes_c2_lifecycle(disable_arc4_emit, monkeypat
         assert int(market.challenge_bond_bps.value) == 500
         assert int(market.challenge_bond_cap.value) == 100_000_000
         assert int(market.protocol_fee_bps.value) == 50
-
-        # Store blueprints and bootstrap with payment
-        call_as(context, creator, market.store_main_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}'))
-        call_as(context, creator, market.store_dispute_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}'))
 
         payment = make_usdc_payment(context, market, creator, 200_000_000)
         call_as(context, creator, market.bootstrap, arc4.UInt64(200_000_000), payment, latest_timestamp=2)
@@ -188,14 +186,12 @@ def test_factory_created_market_bootstraps_and_enters_active_lp(disable_arc4_emi
             context,
             creator,
             factory,
-            arc4.Address(creator),
             arc4.UInt64(CURRENCY_ASA),
             arc4.DynamicBytes(b"q" * 32),
             arc4.UInt64(3),
             arc4.UInt64(25_000_000),
             arc4.UInt64(200),
-            Hash32.from_bytes(b"b" * 32),
-            Hash32.from_bytes(b"d" * 32),
+            arc4.DynamicBytes(BLUEPRINT_CID),
             arc4.UInt64(10_000),
             arc4.UInt64(86_400),
             arc4.Address(admin),
@@ -205,12 +201,12 @@ def test_factory_created_market_bootstraps_and_enters_active_lp(disable_arc4_emi
             latest_timestamp=1,
         )
 
-        assert created_app_id is None
-        assert captured["create_method"] is QuestionMarket.create
-        assert captured["create_args"][10].bytes == Account(resolver).bytes
-        assert int(captured["create_args"][13].as_uint64()) == PROTOCOL_CONFIG_APP_ID
-        assert bool(captured["create_args"][14].native) is True
-        assert int(captured["create_args"][15].as_uint64()) == DEFAULT_LP_ENTRY_MAX_PRICE_FP
+        assert int(created_app_id.as_uint64()) == 10_001
+        assert captured["create_method"] is factory_module.MarketStub.create
+        assert captured["create_args"][9].bytes == Account(resolver).bytes
+        assert int(captured["create_args"][12].as_uint64()) == PROTOCOL_CONFIG_APP_ID
+        assert bool(captured["create_args"][13].native) is True
+        assert int(captured["create_args"][14].as_uint64()) == DEFAULT_LP_ENTRY_MAX_PRICE_FP
 
         market = QuestionMarket()
         call_as(
@@ -224,9 +220,6 @@ def test_factory_created_market_bootstraps_and_enters_active_lp(disable_arc4_emi
 
         assert int(market.residual_linear_lambda_fp.value) == DEFAULT_RESIDUAL_LINEAR_LAMBDA_FP
         assert int(market.lp_entry_max_price_fp.value) == DEFAULT_LP_ENTRY_MAX_PRICE_FP
-
-        call_as(context, creator, market.store_main_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}'))
-        call_as(context, creator, market.store_dispute_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}'))
 
         payment = make_usdc_payment(context, market, creator, 200_000_000)
         call_as(context, creator, market.bootstrap, arc4.UInt64(200_000_000), payment, latest_timestamp=2)
@@ -246,7 +239,7 @@ def test_factory_created_market_bootstraps_and_enters_active_lp(disable_arc4_emi
         )
 
         prices_before = reference_lmsr_prices(
-            [int(market.outcome_quantities_box.get(UInt64(i), default=UInt64(0))) for i in range(3)],
+            read_quantities(market),
             int(market.b.value),
         )
         lp_payment = make_usdc_payment(context, market, lp2, 200_000_000)
@@ -263,7 +256,7 @@ def test_factory_created_market_bootstraps_and_enters_active_lp(disable_arc4_emi
         )
 
         prices_after = reference_lmsr_prices(
-            [int(market.outcome_quantities_box.get(UInt64(i), default=UInt64(0))) for i in range(3)],
+            read_quantities(market),
             int(market.b.value),
         )
         assert max(abs(before - after) for before, after in zip(prices_before, prices_after)) <= 2

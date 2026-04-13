@@ -33,8 +33,7 @@ class QuestionMarket(algopy.arc4.ARC4Client, typing.Protocol):
         lp_fee_bps: algopy.arc4.UIntN[typing.Literal[64]],
         deadline: algopy.arc4.UIntN[typing.Literal[64]],
         question_hash: algopy.arc4.DynamicBytes,
-        main_blueprint_hash: algopy.arc4.StaticArray[algopy.arc4.Byte, typing.Literal[32]],
-        dispute_blueprint_hash: algopy.arc4.StaticArray[algopy.arc4.Byte, typing.Literal[32]],
+        blueprint_cid: algopy.arc4.DynamicBytes,
         challenge_window_secs: algopy.arc4.UIntN[typing.Literal[64]],
         resolution_authority: algopy.arc4.Address,
         grace_period_secs: algopy.arc4.UIntN[typing.Literal[64]],
@@ -45,39 +44,18 @@ class QuestionMarket(algopy.arc4.ARC4Client, typing.Protocol):
     ) -> None: ...
 
     @algopy.arc4.abimethod
-    def post_comment(
-        self,
-        message: algopy.arc4.String,
-    ) -> None: ...
-
-    @algopy.arc4.abimethod
-    def store_main_blueprint(
-        self,
-        data: algopy.arc4.DynamicBytes,
-    ) -> None:
-        """
-        Store main resolution blueprint on-chain. Creator-only, CREATED status only.
-        Must be called before bootstrap. Size capped by MAX_BLUEPRINT_SIZE.
-        """
-
-    @algopy.arc4.abimethod
-    def store_dispute_blueprint(
-        self,
-        data: algopy.arc4.DynamicBytes,
-    ) -> None:
-        """
-        Store dispute resolution blueprint on-chain. Creator-only, CREATED status only.
-        Must be called before bootstrap. Size capped by MAX_BLUEPRINT_SIZE.
-        """
-
-    @algopy.arc4.abimethod
     def initialize(
         self,
     ) -> None:
         """
-        Prepare a CREATED market for bootstrap in a single call.
-        This opts the app into the currency ASA. Blueprint storage and bootstrap can then be grouped after it to activate the market atomically.
+        Opt the app into the currency ASA. Called by the factory after funding.
         """
+
+    @algopy.arc4.abimethod
+    def post_comment(
+        self,
+        message: algopy.arc4.String,
+    ) -> None: ...
 
     @algopy.arc4.abimethod
     def bootstrap(

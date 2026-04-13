@@ -13,7 +13,6 @@ import pytest
 from algopy import Account, Application, Asset, Global, UInt64, arc4
 from algopy_testing import algopy_testing_context
 
-from smart_contracts.abi_types import Hash32
 import smart_contracts.market_app.contract as contract_module
 from smart_contracts.market_app.contract import (
     DEFAULT_LP_ENTRY_MAX_PRICE_FP,
@@ -107,7 +106,14 @@ def _seed_protocol_min_window(context, minimum: int = 86_400) -> Application:
     return app
 
 
-def create_contract(context, contract: QuestionMarket, creator: str, resolver: str | None = None) -> None:
+def create_contract(
+    context,
+    contract: QuestionMarket,
+    creator: str,
+    resolver: str | None = None,
+    *,
+    blueprint_cid: bytes = b"ipfs://blueprint-cid",
+) -> None:
     protocol_app = _seed_protocol_min_window(context)
     args = dict(
         creator=arc4.Address(creator),
@@ -117,8 +123,7 @@ def create_contract(context, contract: QuestionMarket, creator: str, resolver: s
         lp_fee_bps=arc4.UInt64(200),
         deadline=arc4.UInt64(100_000),
         question_hash=arc4.DynamicBytes(b"q" * 32),
-        main_blueprint_hash=Hash32.from_bytes(b"b" * 32),
-        dispute_blueprint_hash=Hash32.from_bytes(b"d" * 32),
+        blueprint_cid=arc4.DynamicBytes(blueprint_cid),
         challenge_window_secs=arc4.UInt64(86_400),
         resolution_authority=arc4.Address(resolver or creator),
         grace_period_secs=arc4.UInt64(3_600),
@@ -148,9 +153,6 @@ def setup_bootstrapped_contract(context, creator, disable_arc4_emit_fixture=None
     """Create and bootstrap a QuestionMarket contract, returning it."""
     contract = QuestionMarket()
     create_contract(context, contract, creator)
-    call_as(context, creator, contract.store_main_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}'))
-    call_as(context, creator, contract.store_dispute_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}'))
-
     payment = make_payment(context, contract, creator, 200_000_000)
     call_as(context, creator, contract.bootstrap, arc4.UInt64(200_000_000), payment, latest_timestamp=1)
     return contract
@@ -167,8 +169,6 @@ class TestP11PaymentVerification:
         with algopy_testing_context() as context:
             contract = QuestionMarket()
             create_contract(context, contract, creator)
-            call_as(context, creator, contract.store_main_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}'))
-            call_as(context, creator, contract.store_dispute_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}'))
 
             # Underpay: send 100 but claim 200_000_000
             payment = make_payment(context, contract, creator, 100)
@@ -180,8 +180,6 @@ class TestP11PaymentVerification:
         with algopy_testing_context() as context:
             contract = QuestionMarket()
             create_contract(context, contract, creator)
-            call_as(context, creator, contract.store_main_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}'))
-            call_as(context, creator, contract.store_dispute_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}'))
 
             # Wrong ASA
             payment = make_payment(context, contract, creator, 200_000_000, asset_id=WRONG_ASA)
@@ -194,8 +192,6 @@ class TestP11PaymentVerification:
         with algopy_testing_context() as context:
             contract = QuestionMarket()
             create_contract(context, contract, creator)
-            call_as(context, creator, contract.store_main_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}'))
-            call_as(context, creator, contract.store_dispute_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}'))
 
             # Wrong receiver
             payment = make_payment(context, contract, creator, 200_000_000, receiver=wrong_receiver)
@@ -300,8 +296,6 @@ class TestP11PaymentVerification:
             if method_name == "bootstrap":
                 contract = QuestionMarket()
                 create_contract(context, contract, creator)
-                call_as(context, creator, contract.store_main_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}'))
-                call_as(context, creator, contract.store_dispute_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}'))
                 sender = creator
                 amount = 200_000_000
             else:
@@ -506,29 +500,25 @@ class TestP11PaymentVerification:
 
 
 class TestP13LedgerOnlyLifecycle:
-    def test_bootstrap_rejects_missing_dispute_blueprint(self, disable_arc4_emit) -> None:
-        """Bootstrap still fails until both launch blueprints are stored."""
+    def test_bootstrap_rejects_missing_blueprint_cid(self, disable_arc4_emit) -> None:
+        """Bootstrap requires create-time blueprint metadata in the new flow."""
         creator = make_address()
         with algopy_testing_context() as context:
             contract = QuestionMarket()
-            create_contract(context, contract, creator)
-            call_as(context, creator, contract.store_main_blueprint, arc4.DynamicBytes(b'{"nodes":[],"edges":[]}'))
+            create_contract(context, contract, creator, blueprint_cid=b"")
 
             payment = make_payment(context, contract, creator, 200_000_000)
             with pytest.raises(AssertionError):
                 call_as(context, creator, contract.bootstrap, arc4.UInt64(200_000_000), payment, latest_timestamp=1)
 
-    def test_bootstrap_rejects_missing_resolution_logic(self, disable_arc4_emit) -> None:
-        """Bootstrap fails if resolution logic has not been stored."""
+    def test_contract_exposes_no_legacy_blueprint_storage_surface(self, disable_arc4_emit) -> None:
+        """Atomic markets no longer expose runtime blueprint upload methods."""
         creator = make_address()
         with algopy_testing_context() as context:
             contract = QuestionMarket()
             create_contract(context, contract, creator)
-            # Intentionally skip store_main_blueprint and store_dispute_blueprint
-
-            payment = make_payment(context, contract, creator, 200_000_000)
-            with pytest.raises(AssertionError):
-                call_as(context, creator, contract.bootstrap, arc4.UInt64(200_000_000), payment, latest_timestamp=1)
+            assert not hasattr(contract, "store_main_blueprint")
+            assert not hasattr(contract, "store_dispute_blueprint")
 
     def test_contract_exposes_no_outcome_registration_surface(self, disable_arc4_emit) -> None:
         """Ledger-only markets remove mutable outcome-ASA registration entirely."""

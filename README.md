@@ -42,10 +42,10 @@ smart_contracts/
   protocol_config/   # ProtocolConfig contract
   lmsr_math.py       # Pure Python LMSR math
   lmsr_math_avm.py   # AVM-compatible LMSR (fixed-point)
+  abi_types.py       # Shared ABI type definitions
   artifacts/         # Compiled TEAL, ARC-56 JSON, typed clients
 tests/               # 30+ test files: lifecycle, adversarial, LMSR, disputes
-simulation/          # Parameter tuning and protocol defaults
-scripts/             # LMSR reference vector generation
+tla/                 # TLA+ formal specifications and model checker configs
 ```
 
 ## LMSR pricing

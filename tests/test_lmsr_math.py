@@ -23,6 +23,7 @@ from smart_contracts.lmsr_math import (
     lmsr_liquidity_scale,
     lmsr_normalized_q_from_prices,
     lmsr_prices,
+    lmsr_q_from_prices_with_floor,
     lmsr_sell_return,
 )
 from tests.generate_lmsr_reference_vectors import generate_fixture
@@ -131,6 +132,16 @@ def test_lmsr_liquidity_scale_preserves_prices(case: dict) -> None:
     before_prices = lmsr_prices(case["q"], case["b"])
     after_prices = lmsr_prices(scaled_q, scaled_b)
     assert all(abs(a - b) <= 1 for a, b in zip(before_prices, after_prices))
+
+
+def test_q_from_prices_with_floor_preserves_prices_and_claim_coverage() -> None:
+    prices = [500_000, 500_000]
+    floor_q = [SCALE, SCALE]
+
+    q = lmsr_q_from_prices_with_floor(prices, 100_000_001, floor_q)
+
+    assert q == floor_q
+    assert lmsr_prices(q, 100_000_001) == prices
 
 
 def test_uint128_intermediates_handle_max_realistic_values() -> None:

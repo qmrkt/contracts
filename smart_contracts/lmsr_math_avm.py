@@ -355,6 +355,26 @@ def lmsr_normalized_q_from_prices(prices: Array[UInt64], b: UInt64) -> Array[UIn
     return q
 
 
+@subroutine
+def lmsr_q_from_prices_with_floor(prices: Array[UInt64], b: UInt64, floor_q: Array[UInt64]) -> Array[UInt64]:
+    _validate_prices(prices)
+    _require(floor_q.length == prices.length)
+
+    q = lmsr_normalized_q_from_prices(prices, b)
+    common_shift = UInt64(0)
+    for idx in urange(q.length):
+        if floor_q[idx] > q[idx]:
+            gap = floor_q[idx] - q[idx]
+            if gap > common_shift:
+                common_shift = gap
+
+    if common_shift > UInt64(0):
+        for idx in urange(q.length):
+            q[idx] = q[idx] + common_shift
+
+    return q
+
+
 __all__ = [
     "EXP_TAYLOR_TERMS",
     "LN_TAYLOR_TERMS",
@@ -369,6 +389,7 @@ __all__ = [
     "lmsr_liquidity_scale_b",
     "lmsr_liquidity_scale_q",
     "lmsr_normalized_q_from_prices",
+    "lmsr_q_from_prices_with_floor",
     "lmsr_prices",
     "lmsr_sell_return",
 ]

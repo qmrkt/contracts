@@ -274,6 +274,10 @@ class MarketAppModel:
         tolerance = self.num_outcomes
         self._require(abs(sum(prices) - SCALE) <= tolerance, "price sum invariant violated")
 
+    def _assert_claim_inventory_coverage(self) -> None:
+        for idx, (q_i, outstanding) in enumerate(zip(self.q, self.total_user_shares)):
+            self._require(q_i >= outstanding, f"claim inventory coverage violated at outcome {idx}")
+
     def _assert_solvency(self) -> None:
         # During active trading, LMSR's bounded-loss property means pool_balance
         # can be less than max(q) by up to b*ln(N). This is expected and provably
@@ -295,6 +299,7 @@ class MarketAppModel:
             self._require(self.winner_share_bps + self.dispute_sink_share_bps <= BPS_DENOMINATOR, "dispute split invariant violated")
             self._assert_solvency()
             self._assert_refund_reserve()
+            self._assert_claim_inventory_coverage()
             if self.status != STATUS_RESOLVED:
                 self._assert_price_sum()
 

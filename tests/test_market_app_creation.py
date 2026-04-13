@@ -23,8 +23,8 @@ def test_market_app_creation_state_and_boxes() -> None:
     assert low.proposal_evidence_hash == b""
 
     contract_source = source_text(CONTRACT_SOURCE)
-    assert 'BOX_KEY_Q = b"q"' in contract_source
-    assert 'outcome_quantities_box' in contract_source
+    assert "quantities_packed" in contract_source
+    assert "total_shares_packed" in contract_source
     assert 'BOX_KEY_USER_SHARES = b"us:"' in contract_source
     assert 'BOX_KEY_USER_COST_BASIS = b"uc:"' in contract_source
 
@@ -41,8 +41,7 @@ def test_market_app_creation_state_and_boxes() -> None:
         "status:",
         "deadline:",
         "question_hash:",
-        "main_blueprint_hash:",
-        "dispute_blueprint_hash:",
+        "blueprint_cid:",
         "proposed_outcome:",
         "proposal_timestamp:",
         "proposal_evidence_hash:",

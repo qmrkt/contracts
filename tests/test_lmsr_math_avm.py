@@ -7,6 +7,7 @@ from smart_contracts.lmsr_math_avm import (
     lmsr_gauge_alpha_from_prices,
     lmsr_normalized_q_from_prices,
     lmsr_prices,
+    lmsr_q_from_prices_with_floor,
 )
 
 
@@ -50,3 +51,16 @@ def test_normalized_q_from_prices_round_trips_prices() -> None:
     assert reconstructed.length == prices.length
     for idx in range(int(prices.length)):
         assert abs(int(reconstructed[UInt64(idx)]) - int(prices[UInt64(idx)])) <= 2
+
+
+def test_q_from_prices_with_floor_preserves_prices_and_claim_coverage() -> None:
+    prices = Array[UInt64]((UInt64(500_000), UInt64(500_000)))
+    floor_q = Array[UInt64]((UInt64(1_000_000), UInt64(1_000_000)))
+
+    q = lmsr_q_from_prices_with_floor(prices, UInt64(100_000_001), floor_q)
+    reconstructed = lmsr_prices(q, UInt64(100_000_001))
+
+    assert int(q[UInt64(0)]) == 1_000_000
+    assert int(q[UInt64(1)]) == 1_000_000
+    assert int(reconstructed[UInt64(0)]) == 500_000
+    assert int(reconstructed[UInt64(1)]) == 500_000

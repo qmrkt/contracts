@@ -12,12 +12,10 @@ import pytest
 from algopy import Account, Application, Asset, Bytes, UInt64, arc4
 from algopy_testing import algopy_testing_context
 
-from smart_contracts.abi_types import Hash32
 import smart_contracts.market_app.contract as contract_module
 from smart_contracts.market_app.contract import (
     DEFAULT_LP_ENTRY_MAX_PRICE_FP,
     DEFAULT_RESIDUAL_LINEAR_LAMBDA_FP,
-    MAX_BLUEPRINT_SIZE,
     QuestionMarket,
     SHARE_UNIT,
     STATUS_ACTIVE,
@@ -105,8 +103,7 @@ def create_contract(context, contract: QuestionMarket, creator: str) -> None:
         lp_fee_bps=arc4.UInt64(200),
         deadline=arc4.UInt64(100_000),
         question_hash=arc4.DynamicBytes(b"q" * 32),
-        main_blueprint_hash=Hash32.from_bytes(b"b" * 32),
-        dispute_blueprint_hash=Hash32.from_bytes(b"d" * 32),
+        blueprint_cid=arc4.DynamicBytes(b"ipfs://blueprint-cid"),
         challenge_window_secs=arc4.UInt64(86_400),
         resolution_authority=arc4.Address(creator),
         grace_period_secs=arc4.UInt64(3_600),
@@ -211,8 +208,6 @@ class TestDoubleOperations:
         with algopy_testing_context() as context:
             contract = QuestionMarket()
             create_contract(context, contract, creator)
-            call_as(context, creator, contract.store_main_blueprint, arc4.DynamicBytes(b'{}'))
-            call_as(context, creator, contract.store_dispute_blueprint, arc4.DynamicBytes(b'{}'))
 
             payment = make_usdc_payment(context, contract, creator, DEPOSIT)
             call_as(context, creator, contract.bootstrap, arc4.UInt64(DEPOSIT), payment, latest_timestamp=1)
@@ -259,47 +254,47 @@ class TestDoubleOperations:
 
 
 class TestMaliciousResolutionLogic:
-    def test_empty_blueprint_rejected(self, disable_arc4_emit) -> None:
-        """store_main_blueprint and store_dispute_blueprint reject empty data."""
+    def test_missing_blueprint_cid_rejected_at_bootstrap(self, disable_arc4_emit) -> None:
+        """Bootstrap fails when create-time blueprint metadata is missing."""
+        creator = make_address()
+        with algopy_testing_context() as context:
+            contract = QuestionMarket()
+            protocol_app = _seed_protocol_min_window(context)
+            args = dict(
+                creator=arc4.Address(creator),
+                currency_asa=arc4.UInt64(CURRENCY_ASA),
+                num_outcomes=arc4.UInt64(3),
+                initial_b=arc4.UInt64(100_000_000),
+                lp_fee_bps=arc4.UInt64(200),
+                deadline=arc4.UInt64(100_000),
+                question_hash=arc4.DynamicBytes(b"q" * 32),
+                blueprint_cid=arc4.DynamicBytes(b""),
+                challenge_window_secs=arc4.UInt64(86_400),
+                resolution_authority=arc4.Address(creator),
+                grace_period_secs=arc4.UInt64(3_600),
+                market_admin=arc4.Address(creator),
+                protocol_config_id=arc4.UInt64(PROTOCOL_CONFIG_APP_ID),
+                cancellable=arc4.Bool(True),
+                lp_entry_max_price_fp=arc4.UInt64(DEFAULT_LP_ENTRY_MAX_PRICE_FP),
+            )
+            context.ledger.patch_global_fields(latest_timestamp=1)
+            context._default_sender = Account(creator)
+            deferred = context.txn.defer_app_call(contract.create, **args)
+            deferred._txns[-1].fields["apps"] = (protocol_app,)
+            with context.txn.create_group([deferred]):
+                contract.create(**args)
+            payment = make_usdc_payment(context, contract, creator, DEPOSIT)
+            with pytest.raises(AssertionError):
+                call_as(context, creator, contract.bootstrap, arc4.UInt64(DEPOSIT), payment, latest_timestamp=1)
+
+    def test_no_runtime_blueprint_upload_surface(self, disable_arc4_emit) -> None:
+        """Blueprint metadata is fixed at create time; runtime upload methods are gone."""
         creator = make_address()
         with algopy_testing_context() as context:
             contract = QuestionMarket()
             create_contract(context, contract, creator)
-            with pytest.raises(AssertionError):
-                call_as(context, creator, contract.store_main_blueprint, arc4.DynamicBytes(b''))
-            with pytest.raises(AssertionError):
-                call_as(context, creator, contract.store_dispute_blueprint, arc4.DynamicBytes(b''))
-
-    def test_oversized_blueprint_rejected(self) -> None:
-        """store_main_blueprint/store_dispute_blueprint reject data exceeding MAX_BLUEPRINT_SIZE.
-        Note: algopy_testing DynamicBytes caps at 4096, so we verify the
-        contract constant is set correctly and trust the on-chain assert."""
-        assert MAX_BLUEPRINT_SIZE == 8192
-        # The contract checks: raw.length <= UInt64(MAX_BLUEPRINT_SIZE)
-        # On-chain this rejects >8KB. Testing framework can't construct >4KB DynamicBytes.
-
-    def test_binary_blueprint_accepted(self, disable_arc4_emit) -> None:
-        """Contract doesn't validate JSON — it stores raw bytes. Engine validates."""
-        creator = make_address()
-        with algopy_testing_context() as context:
-            contract = QuestionMarket()
-            create_contract(context, contract, creator)
-            # Binary garbage -- contract accepts (it stores raw bytes)
-            # Engine will reject at parse time
-            call_as(context, creator, contract.store_main_blueprint, arc4.DynamicBytes(b'\x00\xff\xfe\xfd'))
-            call_as(context, creator, contract.store_dispute_blueprint, arc4.DynamicBytes(b'\x00\xff\xfe\xfd'))
-
-    def test_attacker_cannot_overwrite_blueprints(self, disable_arc4_emit) -> None:
-        """Only creator can store blueprints."""
-        creator = make_address()
-        attacker = make_address()
-        with algopy_testing_context() as context:
-            contract = QuestionMarket()
-            create_contract(context, contract, creator)
-            with pytest.raises(AssertionError):
-                call_as(context, attacker, contract.store_main_blueprint, arc4.DynamicBytes(b'{"evil": true}'))
-            with pytest.raises(AssertionError):
-                call_as(context, attacker, contract.store_dispute_blueprint, arc4.DynamicBytes(b'{"evil": true}'))
+            assert not hasattr(contract, "store_main_blueprint")
+            assert not hasattr(contract, "store_dispute_blueprint")
 
 
 # ---------------------------------------------------------------------------

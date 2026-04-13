@@ -7,10 +7,9 @@ from pathlib import Path
 
 import algosdk.logic
 import pytest
-from algopy import Account, Application, UInt64, arc4, op
+from algopy import Account, Application, Asset, UInt64, arc4, op
 from algopy_testing import algopy_testing_context
 
-from smart_contracts.abi_types import Hash32
 import smart_contracts.market_factory.contract as factory_module
 import smart_contracts.protocol_config.contract as config_module
 from smart_contracts.market_factory.contract import MarketFactory
@@ -50,6 +49,8 @@ MARKET_FACTORY_ARTIFACT = (
     ROOT_DIR / "smart_contracts" / "artifacts" / "market_factory" / "MarketFactory.approval.teal"
 )
 PROTOCOL_CONFIG_APP_ID = 7001
+CURRENCY_ASA = 31_566_704
+BLUEPRINT_CID = b"ipfs://blueprint-cid"
 
 
 def call_as(
@@ -82,6 +83,15 @@ def make_factory_funding_payment(context, contract: MarketFactory, sender: str, 
     )
 
 
+def make_factory_asset_funding(context, contract: MarketFactory, sender: str, amount: int, asset_id: int = CURRENCY_ASA):
+    return context.any.txn.asset_transfer(
+        sender=Account(sender),
+        asset_receiver=Account(get_app_address(contract)),
+        xfer_asset=Asset(asset_id),
+        asset_amount=UInt64(amount),
+    )
+
+
 def call_create_market(
     context,
     sender: str,
@@ -93,15 +103,14 @@ def call_create_market(
     if latest_timestamp is not None:
         context.ledger.patch_global_fields(latest_timestamp=latest_timestamp)
     context._default_sender = Account(sender)
-    funding = make_factory_funding_payment(context, contract, sender, funding_amount)
-    if len(args) == 14:
-        args = (*args[1:-1], arc4.UInt64(DEFAULT_LP_ENTRY_MAX_PRICE_FP))
-    elif len(args) == 12:
-        args = (*args, arc4.UInt64(DEFAULT_LP_ENTRY_MAX_PRICE_FP))
-    deferred = context.txn.defer_app_call(contract.create_market, *args, funding)
+    if len(args) == 12:
+        args = (*args[:-1], arc4.UInt64(DEFAULT_LP_ENTRY_MAX_PRICE_FP), args[-1])
+    algo_funding = make_factory_funding_payment(context, contract, sender, funding_amount)
+    usdc_funding = make_factory_asset_funding(context, contract, sender, int(args[-1].as_uint64()))
+    deferred = context.txn.defer_app_call(contract.create_market, *args, algo_funding, usdc_funding)
     deferred._txns[-1].fields["apps"] = (Application(contract.__app_id__), Application(PROTOCOL_CONFIG_APP_ID))
-    with context.txn.create_group([funding, deferred]):
-        return contract.create_market(*args, funding)
+    with context.txn.create_group([algo_funding, usdc_funding, deferred]):
+        return contract.create_market(*args, algo_funding, usdc_funding)
 
 def call_create_market_canonical(
     context,
@@ -114,15 +123,14 @@ def call_create_market_canonical(
     if latest_timestamp is not None:
         context.ledger.patch_global_fields(latest_timestamp=latest_timestamp)
     context._default_sender = Account(sender)
-    funding = make_factory_funding_payment(context, contract, sender, funding_amount)
-    if len(args) == 14:
-        args = (*args[1:-1], arc4.UInt64(DEFAULT_LP_ENTRY_MAX_PRICE_FP))
-    elif len(args) == 12:
-        args = (*args, arc4.UInt64(DEFAULT_LP_ENTRY_MAX_PRICE_FP))
-    deferred = context.txn.defer_app_call(contract.create_market, *args, funding)
+    if len(args) == 12:
+        args = (*args[:-1], arc4.UInt64(DEFAULT_LP_ENTRY_MAX_PRICE_FP), args[-1])
+    algo_funding = make_factory_funding_payment(context, contract, sender, funding_amount)
+    usdc_funding = make_factory_asset_funding(context, contract, sender, int(args[-1].as_uint64()))
+    deferred = context.txn.defer_app_call(contract.create_market, *args, algo_funding, usdc_funding)
     deferred._txns[-1].fields["apps"] = (Application(contract.__app_id__), Application(PROTOCOL_CONFIG_APP_ID))
-    with context.txn.create_group([funding, deferred]):
-        return contract.create_market(*args, funding)
+    with context.txn.create_group([algo_funding, usdc_funding, deferred]):
+        return contract.create_market(*args, algo_funding, usdc_funding)
 
 
 def create_protocol_config(
@@ -172,6 +180,8 @@ def create_market_factory(
     app_data.is_creating = False
     context.ledger.set_global_state(Application(PROTOCOL_CONFIG_APP_ID), KEY_MARKET_FACTORY_ID, contract.__app_id__)
     context.ledger.set_global_state(Application(PROTOCOL_CONFIG_APP_ID), KEY_PROTOCOL_TREASURY, Account(treasury).bytes.value)
+    context.ledger.set_box(contract, b"ap", b"a" * 5_000)
+    context.ledger.set_box(contract, b"cp", b"c")
 
 
 def seed_protocol_config_state(context, *, app_id: int, factory_id: int = 0, treasury: str | None = None) -> Application:
@@ -355,14 +365,12 @@ def test_reject_over_max_outcomes(disable_arc4_emit, monkeypatch) -> None:
                 context,
                 creator,
                 factory,
-                arc4.Address(creator),
-                arc4.UInt64(31_566_704),
+                arc4.UInt64(CURRENCY_ASA),
                 arc4.DynamicBytes(b"q" * 32),
                 arc4.UInt64(17),
                 arc4.UInt64(0),
                 arc4.UInt64(200),
-                Hash32.from_bytes(b"b" * 32),
-                Hash32.from_bytes(b"d" * 32),
+                arc4.DynamicBytes(BLUEPRINT_CID),
                 arc4.UInt64(10_000),
                 arc4.UInt64(86_400),
                 arc4.Address(admin),
@@ -390,14 +398,12 @@ def test_factory_rejects_v4_market_above_active_lp_outcome_guard(disable_arc4_em
                 context,
                 creator,
                 factory,
-                arc4.Address(creator),
-                arc4.UInt64(31_566_704),
+                arc4.UInt64(CURRENCY_ASA),
                 arc4.DynamicBytes(b"q" * 32),
                 arc4.UInt64(9),
                 arc4.UInt64(25_000_000),
                 arc4.UInt64(200),
-                Hash32.from_bytes(b"b" * 32),
-                Hash32.from_bytes(b"d" * 32),
+                arc4.DynamicBytes(BLUEPRINT_CID),
                 arc4.UInt64(10_000),
                 arc4.UInt64(86_400),
                 arc4.Address(admin),
@@ -429,14 +435,12 @@ def test_factory_rejects_challenge_window_below_protocol_minimum(disable_arc4_em
             context,
             creator,
             factory,
-            arc4.Address(creator),
-            arc4.UInt64(31_566_704),
+            arc4.UInt64(CURRENCY_ASA),
             arc4.DynamicBytes(b"q" * 32),
             arc4.UInt64(3),
             arc4.UInt64(25_000_000),
             arc4.UInt64(200),
-            Hash32.from_bytes(b"b" * 32),
-            Hash32.from_bytes(b"d" * 32),
+            arc4.DynamicBytes(BLUEPRINT_CID),
             arc4.UInt64(10_000),
             arc4.UInt64(3_600),
             arc4.Address(admin),
@@ -477,14 +481,12 @@ def test_factory_accepts_challenge_window_at_protocol_minimum(disable_arc4_emit,
             context,
             creator,
             factory,
-            arc4.Address(creator),
-            arc4.UInt64(31_566_704),
+            arc4.UInt64(CURRENCY_ASA),
             arc4.DynamicBytes(b"q" * 32),
             arc4.UInt64(3),
             arc4.UInt64(25_000_000),
             arc4.UInt64(200),
-            Hash32.from_bytes(b"b" * 32),
-            Hash32.from_bytes(b"d" * 32),
+            arc4.DynamicBytes(BLUEPRINT_CID),
             arc4.UInt64(10_000),
             arc4.UInt64(86_400),
             arc4.Address(admin),
@@ -493,8 +495,8 @@ def test_factory_accepts_challenge_window_at_protocol_minimum(disable_arc4_emit,
             arc4.UInt64(50_000_000),
         )
 
-    assert created_app_id is None
-    assert int(captured["args"][9].as_uint64()) == 86_400
+    assert int(created_app_id.as_uint64()) == 9_004_1
+    assert int(captured["args"][8].as_uint64()) == 86_400
 
 
 def test_factory_create_market_passes_protocol_default_into_child_create(disable_arc4_emit, monkeypatch) -> None:
@@ -519,14 +521,12 @@ def test_factory_create_market_passes_protocol_default_into_child_create(disable
             context,
             creator,
             factory,
-            arc4.Address(creator),
-            arc4.UInt64(31_566_704),
+            arc4.UInt64(CURRENCY_ASA),
             arc4.DynamicBytes(b"q" * 32),
             arc4.UInt64(3),
             arc4.UInt64(25_000_000),
             arc4.UInt64(200),
-            Hash32.from_bytes(b"b" * 32),
-            Hash32.from_bytes(b"d" * 32),
+            arc4.DynamicBytes(BLUEPRINT_CID),
             arc4.UInt64(10_000),
             arc4.UInt64(86_400),
             arc4.Address(admin),
@@ -536,13 +536,13 @@ def test_factory_create_market_passes_protocol_default_into_child_create(disable
             latest_timestamp=321,
         )
 
-        assert created_app_id is None
-        assert captured["create_args"][10].bytes == Account(resolver).bytes
-        assert int(captured["create_args"][11].as_uint64()) == 3_600
-        assert captured["create_args"][12].bytes == Account(admin).bytes
-        assert int(captured["create_args"][13].as_uint64()) == PROTOCOL_CONFIG_APP_ID
-        assert bool(captured["create_args"][14].native) is True
-        assert int(captured["create_args"][15].as_uint64()) == DEFAULT_LP_ENTRY_MAX_PRICE_FP
+        assert int(created_app_id.as_uint64()) == 9_005_1
+        assert captured["create_args"][9].bytes == Account(resolver).bytes
+        assert int(captured["create_args"][10].as_uint64()) == 3_600
+        assert captured["create_args"][11].bytes == Account(admin).bytes
+        assert int(captured["create_args"][12].as_uint64()) == PROTOCOL_CONFIG_APP_ID
+        assert bool(captured["create_args"][13].native) is True
+        assert int(captured["create_args"][14].as_uint64()) == DEFAULT_LP_ENTRY_MAX_PRICE_FP
 
 
 def test_factory_creation_event_all_params(disable_arc4_emit, monkeypatch) -> None:
@@ -567,14 +567,12 @@ def test_factory_creation_event_all_params(disable_arc4_emit, monkeypatch) -> No
             context,
             creator,
             factory,
-            arc4.Address(creator),
-            arc4.UInt64(31_566_704),
+            arc4.UInt64(CURRENCY_ASA),
             arc4.DynamicBytes(b"q" * 32),
             arc4.UInt64(3),
             arc4.UInt64(25_000_000),
             arc4.UInt64(200),
-            Hash32.from_bytes(b"b" * 32),
-            Hash32.from_bytes(b"d" * 32),
+            arc4.DynamicBytes(BLUEPRINT_CID),
             arc4.UInt64(10_000),
             arc4.UInt64(86_400),
             arc4.Address(admin),
@@ -607,14 +605,12 @@ def test_factory_passes_protocol_bond_formula_and_grace_period(disable_arc4_emit
             context,
             creator,
             factory,
-            arc4.Address(creator),
-            arc4.UInt64(31_566_704),
+            arc4.UInt64(CURRENCY_ASA),
             arc4.DynamicBytes(b"q" * 32),
             arc4.UInt64(3),
             arc4.UInt64(25_000_000),
             arc4.UInt64(200),
-            Hash32.from_bytes(b"b" * 32),
-            Hash32.from_bytes(b"d" * 32),
+            arc4.DynamicBytes(BLUEPRINT_CID),
             arc4.UInt64(10_000),
             arc4.UInt64(86_400),
             arc4.Address(admin),
@@ -624,7 +620,7 @@ def test_factory_passes_protocol_bond_formula_and_grace_period(disable_arc4_emit
         )
 
     args = captured["args"]
-    assert int(args[11].as_uint64()) == 7_200
+    assert int(args[10].as_uint64()) == 7_200
 
     with algopy_testing_context() as context:
         seed_protocol_config_state(context, app_id=PROTOCOL_CONFIG_APP_ID)
@@ -670,14 +666,12 @@ def test_factory_uses_sender_as_creator(disable_arc4_emit, monkeypatch) -> None:
             context,
             attacker,
             factory,
-            arc4.Address(creator),
-            arc4.UInt64(31_566_704),
+            arc4.UInt64(CURRENCY_ASA),
             arc4.DynamicBytes(b"q" * 32),
             arc4.UInt64(3),
             arc4.UInt64(25_000_000),
             arc4.UInt64(200),
-            Hash32.from_bytes(b"b" * 32),
-            Hash32.from_bytes(b"d" * 32),
+            arc4.DynamicBytes(BLUEPRINT_CID),
             arc4.UInt64(10_000),
             arc4.UInt64(86_400),
             arc4.Address(attacker),
@@ -693,7 +687,9 @@ def test_factory_source_requires_funding_payment_and_sender_binding() -> None:
     source = Path(factory_module.__file__).read_text(encoding="utf-8")
 
     assert "PaymentTransaction" in source
-    assert "funding.sender" in source
+    assert "AssetTransferTransaction" in source
+    assert "algo_funding.sender" in source
+    assert "usdc_funding.sender" in source
     assert "Txn.sender" in source
 
 

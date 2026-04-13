@@ -107,8 +107,8 @@ def test_num_outcomes_bounds() -> None:
 def test_boxes_q_layout(market: MarketAppModel) -> None:
     contract_source = source_text(CONTRACT_SOURCE)
     assert market.q == [0] * market.num_outcomes
-    assert 'BOX_KEY_Q = b"q"' in contract_source
-    assert 'outcome_quantities_box' in contract_source
+    assert "quantities_packed" in contract_source
+    assert "total_shares_packed" in contract_source
     assert 'BOX_KEY_USER_SHARES = b"us:"' in contract_source
     assert 'BOX_KEY_USER_COST_BASIS = b"uc:"' in contract_source
 
@@ -128,8 +128,7 @@ def test_global_state_schema() -> None:
         "status:",
         "deadline:",
         "question_hash:",
-        "main_blueprint_hash:",
-        "dispute_blueprint_hash:",
+        "blueprint_cid:",
         "proposed_outcome:",
         "proposal_timestamp:",
         "proposal_evidence_hash:",
@@ -517,7 +516,7 @@ def test_arc28_events_all_state_changes_core(bootstrapped_market: MarketAppModel
         'arc4.emit("Cancel(uint64)"',
         'arc4.emit("Refund(uint64)"',
         'arc4.emit("WithdrawFees(uint64)"',
-        'arc4.emit("WithdrawPayouts(uint64)")',
+        'arc4.emit("WithdrawPayouts(uint64)"',
         'arc4.emit("CommentPosted(string)"',
     ]
     for marker in expected_emit_markers:

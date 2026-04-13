@@ -121,6 +121,7 @@ RECURSIVE LpSharesSum(_)
 RECURSIVE LpWeightedEntryTotal(_)
 RECURSIVE ResidualClaimedSum(_)
 RECURSIVE PendingPayoutSum(_)
+RECURSIVE MaxClaimGap(_, _, _)
 
 UserSharesSum(us, outcome) ==
     IF us = {}
@@ -157,12 +158,27 @@ PendingPayoutSum(us) ==
         LET u == CHOOSE value \in us : TRUE
         IN pendingPayout[u] + PendingPayoutSum(us \ {u})
 
+MaxClaimGap(baseQ, floorQ, os) ==
+    IF os = {}
+    THEN 0
+    ELSE
+        LET o == CHOOSE value \in os : TRUE
+            gap == IF floorQ[o] > baseQ[o] THEN floorQ[o] - baseQ[o] ELSE 0
+        IN LmsrMax2(gap, MaxClaimGap(baseQ, floorQ, os \ {o}))
+
 OutcomeUserLiability(outcome) == UserSharesSum(Users, outcome)
 
 WinningUserLiability ==
     IF winningOutcome \in Outcomes
     THEN OutcomeUserLiability(winningOutcome)
     ELSE 0
+
+ClaimFloorQ == [o \in Outcomes |-> OutcomeUserLiability(o)]
+
+RepricedQWithClaimFloor(prices, newB) ==
+    LET baseQ == LmsrNormalizedQFromPrices(prices, newB)
+        shift == MaxClaimGap(baseQ, ClaimFloorQ, Outcomes)
+    IN [o \in Outcomes |-> baseQ[o] + shift]
 
 (* Loose bound for TLC finiteness; raise in .cfg if exploring larger trades. *)
 StateCap == 2000000000
@@ -337,6 +353,9 @@ ResidualAccountingInvariant ==
     /\ totalLpWeightedEntrySum = LpWeightedEntryTotal(Users)
     /\ totalResidualClaimed = ResidualClaimedSum(Users)
 
+ClaimInventoryCoverageInvariant ==
+    /\ \A o \in Outcomes : q[o] >= OutcomeUserLiability(o)
+
 TimestampInvariant ==
     /\ (status = "CREATED") => activationTime = 0 /\ settlementTime = 0
     /\ (status # "CREATED") => activationTime > 0
@@ -499,6 +518,7 @@ Sell ==
         /\ userShares[u][o] > 0
         /\ \E shares \in 1..userShares[u][o] :
             /\ shares % TradeShareSize = 0
+            /\ q[o] >= shares
             /\ LET gross == LmsrSellReturn(q, b, o, shares)
                    lpF == CalcFeeUp(gross, lpFeeBps)
                    protF == CalcFeeUp(gross, protocolFeeBps)
@@ -563,7 +583,7 @@ EnterLpActive ==
             curP == LmsrPrices(q, b)
             depReq == LmsrCollateralRequiredFromPrices(deltaB, curP)
             nextB == b + deltaB
-            newQ == LmsrNormalizedQFromPrices(curP, nextB)
+            newQ == RepricedQWithClaimFloor(curP, nextB)
             newPool == poolBalance + deposit
             entryWeight == deltaB * nextNow
             acc == LpAccruedFees(u)

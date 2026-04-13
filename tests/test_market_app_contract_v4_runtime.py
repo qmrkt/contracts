@@ -17,12 +17,14 @@ from smart_contracts.lmsr_math import SCALE, lmsr_prices
 
 from .test_market_app_contract_runtime import (
     contract_q,
+    contract_user_shares,
     create_contract,
+    ensure_blueprint_cid,
     last_inner_asset_transfers,
     make_address,
     make_usdc_payment,
+    opt_in_market,
     seed_protocol_config_state,
-    store_blueprints,
     call_as,
 )
 
@@ -56,9 +58,10 @@ def _normalized_residual_weight(contract: QuestionMarket, sender: str) -> int:
 def _activate_v4_market(context, contract: QuestionMarket, *, creator: str, resolver: str, deadline: int = 10_000) -> None:
     create_contract(context, contract, creator=creator, resolver=resolver, deadline=deadline)
     seed_protocol_config_state(context, admin=creator, treasury=creator)
-    store_blueprints(context, contract, creator)
+    ensure_blueprint_cid(contract)
     payment = make_usdc_payment(context, contract, creator, 200_000_000)
     call_as(context, creator, contract.bootstrap, arc4.UInt64(200_000_000), payment, latest_timestamp=1)
+    opt_in_market(context, contract, creator, latest_timestamp=2)
 
 
 @pytest.fixture()
@@ -127,6 +130,81 @@ def test_contract_active_lp_entry_preserves_prices_and_disables_legacy_lp_method
         assert max(abs(before - after) for before, after in zip(before_prices, after_prices)) <= 2
 
 
+def test_contract_balanced_positions_remain_sellable_after_active_lp_entry(disable_arc4_emit) -> None:
+    creator = make_address()
+    resolver = make_address()
+    trader = make_address()
+    lp2 = make_address()
+
+    with algopy_testing_context() as context:
+        contract = QuestionMarket()
+        _activate_v4_market(context, contract, creator=creator, resolver=resolver)
+
+        first_buy_payment = make_usdc_payment(context, contract, trader, 10_000_000)
+        call_as(
+            context,
+            trader,
+            contract.buy,
+            arc4.UInt64(0),
+            arc4.UInt64(SHARE_UNIT),
+            arc4.UInt64(10_000_000),
+            first_buy_payment,
+            latest_timestamp=5_000,
+        )
+        second_buy_payment = make_usdc_payment(context, contract, trader, 10_000_000)
+        call_as(
+            context,
+            trader,
+            contract.buy,
+            arc4.UInt64(1),
+            arc4.UInt64(SHARE_UNIT),
+            arc4.UInt64(10_000_000),
+            second_buy_payment,
+            latest_timestamp=5_001,
+        )
+        before_prices = lmsr_prices(contract_q(contract), int(contract.b.value))
+
+        lp_payment = make_usdc_payment(context, contract, lp2, 100_000_000)
+        call_as(
+            context,
+            lp2,
+            contract.enter_lp_active,
+            arc4.UInt64(25_000_000),
+            arc4.UInt64(100_000_000),
+            _price_array(before_prices),
+            arc4.UInt64(PRICE_TOLERANCE_BASE),
+            lp_payment,
+            latest_timestamp=6_000,
+        )
+
+        assert all(
+            contract_q(contract)[idx] >= int(contract._get_total_user_shares(UInt64(idx)))
+            for idx in range(int(contract.num_outcomes.value))
+        )
+
+        call_as(
+            context,
+            trader,
+            contract.sell,
+            arc4.UInt64(0),
+            arc4.UInt64(SHARE_UNIT),
+            arc4.UInt64(0),
+            latest_timestamp=6_001,
+        )
+        call_as(
+            context,
+            trader,
+            contract.sell,
+            arc4.UInt64(1),
+            arc4.UInt64(SHARE_UNIT),
+            arc4.UInt64(0),
+            latest_timestamp=6_002,
+        )
+
+        assert contract_user_shares(contract, trader, 0) == 0
+        assert contract_user_shares(contract, trader, 1) == 0
+
+
 def test_contract_active_lp_entry_rejects_market_above_skew_cap(disable_arc4_emit) -> None:
     creator = make_address()
     resolver = make_address()
@@ -137,9 +215,10 @@ def test_contract_active_lp_entry_rejects_market_above_skew_cap(disable_arc4_emi
         contract = QuestionMarket()
         create_contract(context, contract, creator=creator, resolver=resolver, num_outcomes=2)
         seed_protocol_config_state(context, admin=creator, treasury=creator)
-        store_blueprints(context, contract, creator)
+        ensure_blueprint_cid(contract)
         bootstrap_payment = make_usdc_payment(context, contract, creator, 200_000_000)
         call_as(context, creator, contract.bootstrap, arc4.UInt64(200_000_000), bootstrap_payment, latest_timestamp=1)
+        opt_in_market(context, contract, creator, latest_timestamp=2)
 
         buy_payment = make_usdc_payment(context, contract, trader, 2_000_000_000)
         call_as(

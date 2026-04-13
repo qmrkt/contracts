@@ -413,6 +413,21 @@ def lmsr_normalized_q_from_prices(prices: list[int], b: int) -> list[int]:
     return q
 
 
+def lmsr_q_from_prices_with_floor(prices: list[int], b: int, floor_q: list[int]) -> list[int]:
+    _validate_prices(prices)
+    _require(len(floor_q) == len(prices), "floor_q length mismatch")
+    for idx, floor in enumerate(floor_q):
+        _check_uint64(floor, f"floor_q[{idx}]")
+
+    normalized_q = lmsr_normalized_q_from_prices(prices, b)
+    common_shift = 0
+    for floor, q_i in zip(floor_q, normalized_q):
+        common_shift = max(common_shift, floor - q_i)
+    _check_uint64(common_shift, "common shift")
+
+    return [_check_uint64(q_i + common_shift, f"repriced q[{idx}]") for idx, q_i in enumerate(normalized_q)]
+
+
 __all__ = [
     "EXP_TAYLOR_TERMS",
     "LN_TAYLOR_TERMS",
@@ -434,6 +449,7 @@ __all__ = [
     "lmsr_liquidity_scale",
     "lmsr_log_sum_exp_fp",
     "lmsr_normalized_q_from_prices",
+    "lmsr_q_from_prices_with_floor",
     "lmsr_prices",
     "lmsr_sell_return",
 ]

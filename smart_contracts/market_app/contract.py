@@ -11,7 +11,6 @@ from algopy import (
     ARC4Contract,
     Array,
     Asset,
-    Box,
     BoxMap,
     Bytes,
     Global,
@@ -27,17 +26,16 @@ from algopy import (
     urange,
 )
 
-from smart_contracts.abi_types import Hash32
 from smart_contracts.lmsr_math_avm import (
     SCALE,
     lmsr_collateral_required_from_prices,
     lmsr_cost_delta,
-    lmsr_normalized_q_from_prices,
     lmsr_prices,
+    lmsr_q_from_prices_with_floor,
     lmsr_sell_return,
 )
 MIN_OUTCOMES = 2
-MAX_OUTCOMES = 16
+MAX_OUTCOMES = 8
 BPS_DENOMINATOR = 10_000
 PRICE_TOLERANCE_BASE = 1
 STATUS_CREATED = 0
@@ -48,7 +46,6 @@ STATUS_CANCELLED = 4
 STATUS_RESOLVED = 5
 STATUS_DISPUTED = 6
 SHARE_UNIT = SCALE
-MAX_BLUEPRINT_SIZE = 8_192
 MAX_COMMENT_BYTES = 512
 ZERO_ADDRESS_BYTES = b"\x00" * 32
 DEFAULT_WINNER_SHARE_BPS = 5_000
@@ -57,15 +54,10 @@ DEFAULT_RESIDUAL_LINEAR_LAMBDA_FP = 150_000
 DEFAULT_LP_ENTRY_MAX_PRICE_FP = 800_000
 SECONDS_PER_DAY = 86_400
 
-BOX_KEY_Q = b"q"
-BOX_KEY_MAIN_BLUEPRINT = b"mb"
-BOX_KEY_DISPUTE_BLUEPRINT = b"db"
 BOX_KEY_USER_SHARES = b"us:"
 BOX_KEY_USER_FEES = b"uf:"
 BOX_KEY_USER_COST_BASIS = b"uc:"
 BOX_KEY_PENDING_PAYOUTS = b"pp:"
-BOX_KEY_TOTAL_USER_SHARES = b"tus"
-UINT64_BYTES = 8
 
 # State and event schema consumed by the acceptance harness and ARC-56 tooling.
 # creator:
@@ -80,8 +72,9 @@ UINT64_BYTES = 8
 # status:
 # deadline:
 # question_hash:
-# main_blueprint_hash:
-# dispute_blueprint_hash:
+# blueprint_cid:
+# qp (packed q0..q7):
+# tp (packed t0..t7):
 # proposed_outcome:
 # proposal_timestamp:
 # proposal_evidence_hash:
@@ -138,7 +131,19 @@ UINT64_BYTES = 8
 class QuestionMarket(ARC4Contract):
     @arc4.baremethod(allow_actions=["OptIn"])
     def opt_in(self) -> None:
-        pass
+        # Migrate bootstrapper LP position from global state to local state
+        bsi = self.bootstrapper_info.value
+        if bsi.length > UInt64(0):
+            bs_addr = op.extract(bsi, UInt64(0), UInt64(32))
+            if Txn.sender.bytes == bs_addr:
+                bs_shares = op.btoi(op.extract(bsi, UInt64(32), UInt64(8)))
+                bs_entry = op.btoi(op.extract(bsi, UInt64(40), UInt64(8)))
+                self.lp_shares[Txn.sender] = bs_shares
+                self.fee_snapshot[Txn.sender] = self.cumulative_fee_per_share.value
+                self.withdrawable_fee_surplus[Txn.sender] = UInt64(0)
+                self.lp_weighted_entry_sum[Txn.sender] = bs_entry
+                self.residual_claimed[Txn.sender] = UInt64(0)
+                self.bootstrapper_info.value = Bytes()
 
     @arc4.baremethod(allow_actions=["NoOp"])
     def bare_noop(self) -> None:
@@ -158,8 +163,6 @@ class QuestionMarket(ARC4Contract):
         self.status = GlobalState(UInt64, key="st")
         self.deadline = GlobalState(UInt64, key="dl")
         self.question_hash = GlobalState(Bytes, key="qh")
-        self.main_blueprint_hash = GlobalState(Bytes, key="mbh")
-        self.dispute_blueprint_hash = GlobalState(Bytes, key="dbh")
         self.proposed_outcome = GlobalState(UInt64, key="po")
         self.proposal_timestamp = GlobalState(UInt64, key="pts")
         self.proposal_evidence_hash = GlobalState(Bytes, key="peh")
@@ -216,14 +219,20 @@ class QuestionMarket(ARC4Contract):
         self.lp_weighted_entry_sum = LocalState(UInt64, key="les")
         self.residual_claimed = LocalState(UInt64, key="rc")
 
-        self.outcome_quantities_box = BoxMap(UInt64, UInt64, key_prefix=BOX_KEY_Q)
+        # Packed outcome quantities: 8 x UInt64 = 64 bytes
+        self.quantities_packed = GlobalState(Bytes, key="qp")
+        # Packed total user shares: 8 x UInt64 = 64 bytes
+        self.total_shares_packed = GlobalState(Bytes, key="tp")
+
+        # IPFS CID for combined blueprint (main + dispute)
+        self.blueprint_cid = GlobalState(Bytes, key="bcid")
+        # Packed bootstrapper LP info: 32-byte address + 8-byte shares + 8-byte entry_sum
+        self.bootstrapper_info = GlobalState(Bytes, key="bsi")
+
         self.user_outcome_shares_box = BoxMap(Bytes, UInt64, key_prefix=BOX_KEY_USER_SHARES)
         self.user_claimable_fees_box = BoxMap(Bytes, UInt64, key_prefix=BOX_KEY_USER_FEES)
         self.user_cost_basis_box = BoxMap(Bytes, UInt64, key_prefix=BOX_KEY_USER_COST_BASIS)
         self.pending_payouts_box = BoxMap(Bytes, UInt64, key_prefix=BOX_KEY_PENDING_PAYOUTS)
-        self.total_user_shares_box = Box(Bytes, key=BOX_KEY_TOTAL_USER_SHARES)
-        self.main_blueprint_box = Box(Bytes, key=BOX_KEY_MAIN_BLUEPRINT)
-        self.dispute_blueprint_box = Box(Bytes, key=BOX_KEY_DISPUTE_BLUEPRINT)
 
     def _require(self, condition: bool) -> None:
         assert condition
@@ -292,27 +301,28 @@ class QuestionMarket(ARC4Contract):
     def _set_pending_payout(self, account: Bytes, value: UInt64) -> None:
         self.pending_payouts_box[account] = value
 
-    def _total_user_shares_box_size(self) -> UInt64:
-        return self.num_outcomes.value * UInt64(UINT64_BYTES)
+    def _get_quantity(self, idx: UInt64) -> UInt64:
+        return op.btoi(op.extract(self.quantities_packed.value, idx * UInt64(8), UInt64(8)))
 
-    def _total_user_shares_offset(self, outcome_index: UInt64) -> UInt64:
-        return outcome_index * UInt64(UINT64_BYTES)
-
-    def _initialize_total_user_shares_box(self) -> None:
-        size = self._total_user_shares_box_size()
-        created = self.total_user_shares_box.create(size=size)
-        self._require(created)
-        self.total_user_shares_box.value = op.bzero(size)
+    def _set_quantity(self, idx: UInt64, val: UInt64) -> None:
+        self.quantities_packed.value = op.replace(self.quantities_packed.value, idx * UInt64(8), op.itob(val))
 
     def _get_total_user_shares(self, outcome_index: UInt64) -> UInt64:
         self._assert_valid_outcome(outcome_index)
-        raw, exists = self.total_user_shares_box.maybe()
-        self._require(exists)
-        return op.extract_uint64(raw, self._total_user_shares_offset(outcome_index))
+        return op.btoi(op.extract(self.total_shares_packed.value, outcome_index * UInt64(8), UInt64(8)))
 
     def _set_total_user_shares(self, outcome_index: UInt64, value: UInt64) -> None:
         self._assert_valid_outcome(outcome_index)
-        self.total_user_shares_box.replace(self._total_user_shares_offset(outcome_index), op.itob(value))
+        self.total_shares_packed.value = op.replace(self.total_shares_packed.value, outcome_index * UInt64(8), op.itob(value))
+
+    @subroutine
+    def _get_total_user_shares_array(self) -> Array[UInt64]:
+        self._require(self.num_outcomes.value >= UInt64(1))
+        values = Array[UInt64]((self._get_total_user_shares(UInt64(0)),))
+        for offset in urange(self.num_outcomes.value - UInt64(1)):
+            idx = offset + UInt64(1)
+            values.append(self._get_total_user_shares(idx))
+        return values
 
     def _increment_total_user_shares(self, outcome_index: UInt64, amount: UInt64) -> None:
         self._set_total_user_shares(outcome_index, self._get_total_user_shares(outcome_index) + amount)
@@ -348,16 +358,16 @@ class QuestionMarket(ARC4Contract):
     @subroutine
     def _get_q(self) -> Array[UInt64]:
         self._require(self.num_outcomes.value >= UInt64(1))
-        values = Array[UInt64]((self.outcome_quantities_box.get(UInt64(0), default=UInt64(0)),))
+        values = Array[UInt64]((self._get_quantity(UInt64(0)),))
         for offset in urange(self.num_outcomes.value - UInt64(1)):
             idx = offset + UInt64(1)
-            values.append(self.outcome_quantities_box.get(idx, default=UInt64(0)))
+            values.append(self._get_quantity(idx))
         return values
 
     @subroutine
     def _set_q(self, values: Array[UInt64]) -> None:
         for idx in urange(values.length):
-            self.outcome_quantities_box[idx] = values[idx]
+            self._set_quantity(idx, values[idx])
 
     @subroutine
     def _sum_array(self, values: Array[UInt64]) -> UInt64:
@@ -494,22 +504,6 @@ class QuestionMarket(ARC4Contract):
         required_high, required_low = op.mulw(self.b.value, self._lmsr_bootstrap_multiplier())
         self._require(required_high == UInt64(0))
         self._require(deposit >= required_low)
-
-    @subroutine
-    def _store_blueprint(self, raw: Bytes, is_dispute: UInt64) -> None:
-        self._require(raw.length > UInt64(0))
-        self._require(raw.length <= UInt64(MAX_BLUEPRINT_SIZE))
-        digest = op.sha256(raw)
-        if is_dispute == UInt64(1):
-            created = self.dispute_blueprint_box.create(size=raw.length)
-            self._require(created)
-            self.dispute_blueprint_box.replace(0, raw)
-            self.dispute_blueprint_hash.value = digest
-        else:
-            created = self.main_blueprint_box.create(size=raw.length)
-            self._require(created)
-            self.main_blueprint_box.replace(0, raw)
-            self.main_blueprint_hash.value = digest
 
     def _require_status(self, expected: UInt64) -> None:
         self._require(self.status.value == expected)
@@ -663,6 +657,12 @@ class QuestionMarket(ARC4Contract):
         self._require(self._abs_diff(total_price, UInt64(SCALE)) <= self.num_outcomes.value)
 
     @subroutine
+    def _assert_claim_inventory_coverage(self) -> None:
+        q = self._get_q()
+        for idx in urange(self.num_outcomes.value):
+            self._require(q[idx] >= self._get_total_user_shares(idx))
+
+    @subroutine
     def _assert_solvency(self) -> None:
         # During active trading, LMSR's bounded-loss property means pool_balance
         # can be less than max(q) by up to b*ln(N). This is expected and provably
@@ -690,6 +690,7 @@ class QuestionMarket(ARC4Contract):
             self._require(self.winner_share_bps.value + self.dispute_sink_share_bps.value <= UInt64(BPS_DENOMINATOR))
             self._assert_solvency()
             self._assert_refund_reserve()
+            self._assert_claim_inventory_coverage()
             if self.status.value != UInt64(STATUS_RESOLVED):
                 self._assert_price_sum()
 
@@ -812,8 +813,7 @@ class QuestionMarket(ARC4Contract):
         lp_fee_bps: arc4.UInt64,
         deadline: arc4.UInt64,
         question_hash: arc4.DynamicBytes,
-        main_blueprint_hash: Hash32,
-        dispute_blueprint_hash: Hash32,
+        blueprint_cid: arc4.DynamicBytes,
         challenge_window_secs: arc4.UInt64,
         resolution_authority: arc4.Address,
         grace_period_secs: arc4.UInt64,
@@ -858,8 +858,7 @@ class QuestionMarket(ARC4Contract):
         self._require(deadline.as_uint64() > self._now())
         self.deadline.value = deadline.as_uint64()
         self.question_hash.value = question_hash.bytes
-        self.main_blueprint_hash.value = main_blueprint_hash.bytes
-        self.dispute_blueprint_hash.value = dispute_blueprint_hash.bytes
+        self.blueprint_cid.value = blueprint_cid.native
         self.proposed_outcome.value = UInt64(0)
         self.proposal_timestamp.value = UInt64(0)
         self.proposal_evidence_hash.value = Bytes()
@@ -913,7 +912,23 @@ class QuestionMarket(ARC4Contract):
         self.proposer_bond_held.value = UInt64(0)
         self.challenger_bond_held.value = UInt64(0)
 
-        # Box initialization deferred until initialize/bootstrap — app needs MBR funding first
+        # Zero-init packed outcome quantities and total user shares
+        self.quantities_packed.value = op.bzero(UInt64(64))
+        self.total_shares_packed.value = op.bzero(UInt64(64))
+        self.bootstrapper_info.value = Bytes()
+
+    @arc4.abimethod()
+    def initialize(self) -> None:
+        """Opt the app into the currency ASA. Called by the factory after funding."""
+        self._require_status(UInt64(STATUS_CREATED))
+        sender = Txn.sender.bytes
+        assert sender == self.creator.value or sender == Global.creator_address.bytes
+        itxn.AssetTransfer(
+            xfer_asset=Asset(self.currency_asa.value),
+            asset_receiver=Global.current_application_address,
+            asset_amount=0,
+            fee=0,
+        ).submit()
 
     @arc4.abimethod()
     def post_comment(self, message: arc4.String) -> None:
@@ -924,50 +939,15 @@ class QuestionMarket(ARC4Contract):
         arc4.emit("CommentPosted(string)", message)
 
     @arc4.abimethod()
-    def store_main_blueprint(self, data: arc4.DynamicBytes) -> None:
-        """Store main resolution blueprint on-chain. Creator-only, CREATED status only.
-        Must be called before bootstrap. Size capped by MAX_BLUEPRINT_SIZE."""
-        self._require_status(UInt64(STATUS_CREATED))
-        self._require_authorized(self.creator.value)
-        self._store_blueprint(data.native, UInt64(0))
-
-    @arc4.abimethod()
-    def store_dispute_blueprint(self, data: arc4.DynamicBytes) -> None:
-        """Store dispute resolution blueprint on-chain. Creator-only, CREATED status only.
-        Must be called before bootstrap. Size capped by MAX_BLUEPRINT_SIZE."""
-        self._require_status(UInt64(STATUS_CREATED))
-        self._require_authorized(self.creator.value)
-        self._store_blueprint(data.native, UInt64(1))
-
-    @arc4.abimethod()
-    def initialize(
-        self,
-    ) -> None:
-        """Prepare a CREATED market for bootstrap in a single call.
-
-        This opts the app into the currency ASA. Blueprint storage and bootstrap
-        can then be grouped after it to activate the market atomically.
-        """
-        self._require_status(UInt64(STATUS_CREATED))
-        self._require_authorized(self.creator.value)
-
-        itxn.AssetTransfer(
-            xfer_asset=Asset(self.currency_asa.value),
-            asset_receiver=Global.current_application_address,
-            asset_amount=0,
-            fee=0,
-        ).submit()
-
-        self._assert_invariants()
-
-    @arc4.abimethod()
     def bootstrap(
         self,
         deposit_amount: arc4.UInt64,
         payment: gtxn.AssetTransferTransaction,
     ) -> None:
         self._require_status(UInt64(STATUS_CREATED))
-        self._require_authorized(self.creator.value)
+        # Accept calls from the market creator OR the app creator (factory)
+        sender = Txn.sender.bytes
+        assert sender == self.creator.value or sender == Global.creator_address.bytes
         deposit = deposit_amount.as_uint64()
         budget_required = self._max_proposer_fee()
         funding_required = deposit + budget_required
@@ -975,12 +955,7 @@ class QuestionMarket(ARC4Contract):
         self._require_lmsr_bootstrap_floor(deposit)
         self._verify_payment(payment, funding_required)
 
-        self._require(bool(self.main_blueprint_box))
-        self._require(bool(self.dispute_blueprint_box))
-
-        for idx in urange(self.num_outcomes.value):
-            self.outcome_quantities_box[idx] = UInt64(0)
-        self._initialize_total_user_shares_box()
+        self._require(self.blueprint_cid.value.length > UInt64(0))
 
         initial_lp_units = self.b.value
         weighted_entry_sum = self._entry_weighted_sum_checked(initial_lp_units, self._now())
@@ -993,12 +968,10 @@ class QuestionMarket(ARC4Contract):
         self.total_lp_weighted_entry_sum.value = weighted_entry_sum
         self.total_residual_claimed.value = UInt64(0)
         self.settlement_timestamp.value = UInt64(0)
-        self._set_lp_shares(initial_lp_units)
-        self._set_fee_snapshot(self.cumulative_fee_per_share.value)
-        self._set_claimable_fees(UInt64(0))
-        self._set_withdrawable_fee_surplus(UInt64(0))
-        self._set_lp_weighted_entry_sum(weighted_entry_sum)
-        self._set_residual_claimed(UInt64(0))
+        # Store bootstrapper LP info in global state (packed: address + shares + entry_sum).
+        # The bootstrapper migrates this to local state when they opt in.
+        bootstrapper_addr = self.creator.value
+        self.bootstrapper_info.value = bootstrapper_addr + op.itob(initial_lp_units) + op.itob(weighted_entry_sum)
         self.status.value = UInt64(STATUS_ACTIVE)
 
         if payment.asset_amount > funding_required:
@@ -1123,7 +1096,7 @@ class QuestionMarket(ARC4Contract):
         self._settle_lp_fees()
 
         next_b = self.b.value + delta_b
-        self._set_q(lmsr_normalized_q_from_prices(current_prices, next_b))
+        self._set_q(lmsr_q_from_prices_with_floor(current_prices, next_b, self._get_total_user_shares_array()))
         self.b.value = next_b
         self.pool_balance.value = self.pool_balance.value + deposit_required
         self.lp_shares_total.value = self.lp_shares_total.value + delta_b
@@ -1467,11 +1440,7 @@ class QuestionMarket(ARC4Contract):
 
 
 __all__ = [
-    "BOX_KEY_Q",
-    "BOX_KEY_DISPUTE_BLUEPRINT",
-    "BOX_KEY_MAIN_BLUEPRINT",
     "BOX_KEY_PENDING_PAYOUTS",
-    "MAX_BLUEPRINT_SIZE",
     "BOX_KEY_USER_COST_BASIS",
     "BOX_KEY_USER_FEES",
     "BOX_KEY_USER_SHARES",
