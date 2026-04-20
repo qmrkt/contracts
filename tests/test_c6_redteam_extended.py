@@ -29,12 +29,13 @@ from smart_contracts.protocol_config.contract import (
     KEY_CHALLENGE_BOND,
     KEY_CHALLENGE_BOND_BPS,
     KEY_CHALLENGE_BOND_CAP,
+    KEY_DEFAULT_RESIDUAL_LINEAR_LAMBDA_FP,
+    KEY_MARKET_FACTORY_ID,
+    KEY_MAX_ACTIVE_LP_V4_OUTCOMES,
     KEY_MIN_CHALLENGE_WINDOW_SECS,
     KEY_PROPOSAL_BOND,
     KEY_PROPOSAL_BOND_BPS,
     KEY_PROPOSAL_BOND_CAP,
-    KEY_DEFAULT_RESIDUAL_LINEAR_LAMBDA_FP,
-    KEY_MAX_ACTIVE_LP_V4_OUTCOMES,
     KEY_PROPOSER_FEE_BPS,
     KEY_PROPOSER_FEE_FLOOR_BPS,
     KEY_PROTOCOL_FEE_BPS,
@@ -46,6 +47,7 @@ OUTCOME_ASA_IDS = [1000, 1001, 1002]
 DEPOSIT = 200_000_000
 MAX_COST = 50_000_000
 PROTOCOL_CONFIG_APP_ID = 77
+DEFAULT_FACTORY_APP_ID = 8_001
 
 
 def make_address() -> str:
@@ -87,13 +89,20 @@ def _seed_protocol_min_window(context, minimum: int = 86_400) -> Application:
     context.ledger.set_global_state(app, KEY_PROPOSER_FEE_FLOOR_BPS, 0)
     # Keys required by contract.create() since protocol_fee_bps/treasury/lambda moved to config
     context.ledger.set_global_state(app, KEY_PROTOCOL_FEE_BPS, 50)
-    context.ledger.set_global_state(app, KEY_PROTOCOL_TREASURY, bytes(32))
+    context.ledger.set_global_state(app, KEY_PROTOCOL_TREASURY, Account(make_address()).bytes.value)
     context.ledger.set_global_state(app, KEY_DEFAULT_RESIDUAL_LINEAR_LAMBDA_FP, 150_000)
     context.ledger.set_global_state(app, KEY_MAX_ACTIVE_LP_V4_OUTCOMES, 8)
+    context.ledger.set_global_state(app, KEY_MARKET_FACTORY_ID, DEFAULT_FACTORY_APP_ID)
     return app
 
 
-def create_contract(context, contract: QuestionMarket, creator: str) -> None:
+def create_contract(
+    context,
+    contract: QuestionMarket,
+    creator: str,
+    *,
+    blueprint_cid: bytes = b"ipfs://blueprint-cid",
+) -> None:
     protocol_app = _seed_protocol_min_window(context)
     args = dict(
         creator=arc4.Address(creator),
@@ -103,7 +112,7 @@ def create_contract(context, contract: QuestionMarket, creator: str) -> None:
         lp_fee_bps=arc4.UInt64(200),
         deadline=arc4.UInt64(100_000),
         question_hash=arc4.DynamicBytes(b"q" * 32),
-        blueprint_cid=arc4.DynamicBytes(b"ipfs://blueprint-cid"),
+        blueprint_cid=arc4.DynamicBytes(blueprint_cid),
         challenge_window_secs=arc4.UInt64(86_400),
         resolution_authority=arc4.Address(creator),
         grace_period_secs=arc4.UInt64(3_600),
@@ -112,6 +121,8 @@ def create_contract(context, contract: QuestionMarket, creator: str) -> None:
         cancellable=arc4.Bool(True),
         lp_entry_max_price_fp=arc4.UInt64(DEFAULT_LP_ENTRY_MAX_PRICE_FP),
     )
+    app_data = context.ledger._app_data[contract.__app_id__]
+    app_data.fields["creator"] = Account(algosdk.logic.get_application_address(DEFAULT_FACTORY_APP_ID))
     context.ledger.patch_global_fields(latest_timestamp=1)
     context._default_sender = Account(creator)
     deferred = context.txn.defer_app_call(contract.create, **args)
@@ -259,30 +270,7 @@ class TestMaliciousResolutionLogic:
         creator = make_address()
         with algopy_testing_context() as context:
             contract = QuestionMarket()
-            protocol_app = _seed_protocol_min_window(context)
-            args = dict(
-                creator=arc4.Address(creator),
-                currency_asa=arc4.UInt64(CURRENCY_ASA),
-                num_outcomes=arc4.UInt64(3),
-                initial_b=arc4.UInt64(100_000_000),
-                lp_fee_bps=arc4.UInt64(200),
-                deadline=arc4.UInt64(100_000),
-                question_hash=arc4.DynamicBytes(b"q" * 32),
-                blueprint_cid=arc4.DynamicBytes(b""),
-                challenge_window_secs=arc4.UInt64(86_400),
-                resolution_authority=arc4.Address(creator),
-                grace_period_secs=arc4.UInt64(3_600),
-                market_admin=arc4.Address(creator),
-                protocol_config_id=arc4.UInt64(PROTOCOL_CONFIG_APP_ID),
-                cancellable=arc4.Bool(True),
-                lp_entry_max_price_fp=arc4.UInt64(DEFAULT_LP_ENTRY_MAX_PRICE_FP),
-            )
-            context.ledger.patch_global_fields(latest_timestamp=1)
-            context._default_sender = Account(creator)
-            deferred = context.txn.defer_app_call(contract.create, **args)
-            deferred._txns[-1].fields["apps"] = (protocol_app,)
-            with context.txn.create_group([deferred]):
-                contract.create(**args)
+            create_contract(context, contract, creator, blueprint_cid=b"")
             payment = make_usdc_payment(context, contract, creator, DEPOSIT)
             with pytest.raises(AssertionError):
                 call_as(context, creator, contract.bootstrap, arc4.UInt64(DEPOSIT), payment, latest_timestamp=1)

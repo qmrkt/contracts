@@ -24,13 +24,14 @@ from smart_contracts.market_app.contract import (
     ZERO_ADDRESS_BYTES,
 )
 from smart_contracts.lmsr_math import lmsr_prices
-from smart_contracts.market_app.model import MarketAppModel
+from smart_contracts.market_app.model import MarketAppModel, ZERO_ADDRESS
 from smart_contracts.protocol_config.contract import (
     KEY_CHALLENGE_BOND,
     KEY_CHALLENGE_BOND_BPS,
     KEY_CHALLENGE_BOND_CAP,
     KEY_DEFAULT_RESIDUAL_LINEAR_LAMBDA_FP,
     KEY_MAX_ACTIVE_LP_V4_OUTCOMES,
+    KEY_MARKET_FACTORY_ID,
     KEY_MIN_CHALLENGE_WINDOW_SECS,
     KEY_PROPOSAL_BOND,
     KEY_PROPOSAL_BOND_BPS,
@@ -43,6 +44,7 @@ from smart_contracts.protocol_config.contract import (
 
 CURRENCY_ASA = 31_566_704
 PROTOCOL_CONFIG_APP_ID = 7_001
+DEFAULT_FACTORY_APP_ID = 8_001
 LARGE_ACTIVE_POOL = 100_000_000_000
 LARGE_PROVIDE_DEPOSIT = 18_446_744_073_710
 LARGE_CLAIM_POOL = 18_446_744_073_710
@@ -84,12 +86,16 @@ def create_contract(
     *,
     creator: str,
     resolver: str,
+    sender: str | None = None,
+    market_admin: str | None = None,
     blueprint_cid: bytes = b"ipfs://blueprint-cid",
     deadline: int = 10_000,
     num_outcomes: int = 3,
     initial_b: int = 100_000_000,
     cancellable: bool = True,
     protocol_treasury: str | None = None,
+    factory_id: int = DEFAULT_FACTORY_APP_ID,
+    app_creator: str | None = None,
     challenge_window_secs: int = 86_400,
     protocol_min_challenge_window_secs: int = 86_400,
     challenge_bond: int = 10_000_000,
@@ -101,11 +107,14 @@ def create_contract(
     proposer_fee_bps: int = 0,
     proposer_fee_floor_bps: int = 0,
 ) -> None:
+    txn_sender = sender or creator
+    admin = market_admin or creator
     treasury = protocol_treasury or creator
     protocol_app = seed_protocol_config_state(
         context,
-        admin=creator,
+        admin=txn_sender,
         treasury=treasury,
+        factory_id=factory_id,
         min_challenge_window_secs=protocol_min_challenge_window_secs,
         challenge_bond=challenge_bond,
         proposal_bond=proposal_bond,
@@ -128,13 +137,15 @@ def create_contract(
         challenge_window_secs=arc4.UInt64(challenge_window_secs),
         resolution_authority=arc4.Address(resolver),
         grace_period_secs=arc4.UInt64(3_600),
-        market_admin=arc4.Address(creator),
+        market_admin=arc4.Address(admin),
         protocol_config_id=arc4.UInt64(PROTOCOL_CONFIG_APP_ID),
         cancellable=arc4.Bool(cancellable),
         lp_entry_max_price_fp=arc4.UInt64(DEFAULT_LP_ENTRY_MAX_PRICE_FP),
     )
+    app_data = context.ledger._app_data[contract.__app_id__]
+    app_data.fields["creator"] = Account(app_creator or algosdk.logic.get_application_address(factory_id))
     context.ledger.patch_global_fields(latest_timestamp=1)
-    context._default_sender = Account(creator)
+    context._default_sender = Account(txn_sender)
     deferred = context.txn.defer_app_call(contract.create, **args)
     deferred._txns[-1].fields["apps"] = (protocol_app,)
     with context.txn.create_group([deferred]):
@@ -206,6 +217,7 @@ def seed_protocol_config_state(
     *,
     admin: str,
     treasury: str,
+    factory_id: int = DEFAULT_FACTORY_APP_ID,
     min_challenge_window_secs: int = 86_400,
     challenge_bond: int = 10_000_000,
     proposal_bond: int = 10_000_000,
@@ -224,6 +236,7 @@ def seed_protocol_config_state(
         app = context.any.application(id=PROTOCOL_CONFIG_APP_ID)
     context.ledger.set_global_state(app, b"admin", Account(admin).bytes.value)
     context.ledger.set_global_state(app, KEY_PROTOCOL_TREASURY, Account(treasury).bytes.value)
+    context.ledger.set_global_state(app, KEY_MARKET_FACTORY_ID, factory_id)
     context.ledger.set_global_state(app, KEY_MAX_ACTIVE_LP_V4_OUTCOMES, 8)
     context.ledger.set_global_state(app, KEY_MIN_CHALLENGE_WINDOW_SECS, min_challenge_window_secs)
     context.ledger.set_global_state(app, KEY_CHALLENGE_BOND, challenge_bond)
@@ -351,10 +364,11 @@ def test_contract_create_and_bootstrap_persist_state(disable_arc4_emit) -> None:
         assert int(contract.status.value) == STATUS_ACTIVE
         assert int(contract.pool_balance.value) == 200_000_000
         assert int(contract.lp_shares_total.value) == int(contract.b.value)
-        assert contract.bootstrapper_info.value.length > UInt64(0)
+        assert contract.bootstrapper_lp_shares.value > UInt64(0)
+        assert contract.bootstrapper_lp_entry.value > UInt64(0)
 
         opt_in_market(context, contract, creator, latest_timestamp=2)
-        assert contract.bootstrapper_info.value.length == UInt64(0)
+        assert contract.bootstrapper_lp_shares.value == UInt64(0)
         assert int(contract.lp_shares[Account(creator)]) == int(contract.b.value)
 
 
@@ -374,6 +388,52 @@ def test_contract_create_persists_explicit_challenge_window(disable_arc4_emit) -
         )
 
         assert int(contract.challenge_window_secs.value) == 3_600
+
+
+def test_contract_create_rejects_unapproved_factory_creator(disable_arc4_emit) -> None:
+    creator = make_address()
+    resolver = make_address()
+
+    with algopy_testing_context() as context:
+        contract = QuestionMarket()
+        with pytest.raises(AssertionError):
+            create_contract(
+                context,
+                contract,
+                creator=creator,
+                resolver=resolver,
+                factory_id=DEFAULT_FACTORY_APP_ID,
+                app_creator=algosdk.logic.get_application_address(DEFAULT_FACTORY_APP_ID + 1),
+            )
+
+
+@pytest.mark.parametrize("label", ["creator", "resolution_authority", "market_admin", "protocol_treasury"])
+def test_contract_create_rejects_zero_address_roles(disable_arc4_emit, label) -> None:
+    creator = make_address()
+    resolver = make_address()
+    market_admin = make_address()
+    treasury = make_address()
+    params = {
+        "creator": creator,
+        "resolver": resolver,
+        "sender": creator,
+        "market_admin": market_admin,
+        "protocol_treasury": treasury,
+    }
+    if label == "creator":
+        params["creator"] = ZERO_ADDRESS
+        params["sender"] = make_address()
+    elif label == "resolution_authority":
+        params["resolver"] = ZERO_ADDRESS
+    elif label == "market_admin":
+        params["market_admin"] = ZERO_ADDRESS
+    else:
+        params["protocol_treasury"] = ZERO_ADDRESS
+
+    with algopy_testing_context() as context:
+        contract = QuestionMarket()
+        with pytest.raises(AssertionError):
+            create_contract(context, contract, **params)
 
 
 def test_contract_post_comment_emits_for_lp_and_holder(monkeypatch) -> None:
@@ -531,7 +591,8 @@ def test_contract_initialize_then_bootstrap_persist_state(disable_arc4_emit) -> 
         assert int(contract.status.value) == STATUS_ACTIVE
         assert int(contract.pool_balance.value) == 200_000_000
         assert int(contract.lp_shares_total.value) == int(contract.b.value)
-        assert contract.bootstrapper_info.value.length > UInt64(0)
+        assert contract.bootstrapper_lp_shares.value > UInt64(0)
+        assert contract.bootstrapper_lp_entry.value > UInt64(0)
 
         opt_in_market(context, contract, creator, latest_timestamp=2)
         assert int(contract.lp_shares[Account(creator)]) == int(contract.b.value)

@@ -48,6 +48,23 @@ tests/               # 30+ test files: lifecycle, adversarial, LMSR, disputes
 tla/                 # TLA+ formal specifications and model checker configs
 ```
 
+## Launch gate
+
+The canonical contracts launch gate lives in [scripts/contracts-launch-gate.sh](scripts/contracts-launch-gate.sh).
+
+It rebuilds the three shipped contracts and runs the launch-critical suites, including:
+
+- LMSR math and no-free-money/property coverage
+- protocol/factory and market runtime regressions
+- adversarial launch/payment coverage
+- artifact surface checks
+
+Run it from the repo root with:
+
+```bash
+bash ./scripts/contracts-launch-gate.sh
+```
+
 ## LMSR pricing
 
 The protocol uses a Logarithmic Market Scoring Rule for automated market making. Two implementations exist:

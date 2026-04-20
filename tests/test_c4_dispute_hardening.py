@@ -755,10 +755,13 @@ class TestRound3_ModelContractDivergence:
         """Verify state updates happen before any payout side effect in dispute settlement methods."""
         from tests.market_app_test_utils import CONTRACT_SOURCE, source_text
         src = source_text(CONTRACT_SOURCE)
-        fd_section = src[src.index("def finalize_dispute"):]
-        fd_section = fd_section[:fd_section.index("\n    @")]  # until next method
-        status_line = fd_section.index("self.status.value = UInt64(STATUS_RESOLVED)")
-        payout_line = fd_section.index("_settle_dispute_and_credit")
+        if "def _resolve_dispute_core" in src:
+            dispute_section = src[src.index("def _resolve_dispute_core"):]
+        else:
+            dispute_section = src[src.index("def finalize_dispute"):]
+        dispute_section = dispute_section[:dispute_section.index("\n    @")]  # until next method
+        status_line = dispute_section.index("self.status.value = UInt64(STATUS_RESOLVED)")
+        payout_line = dispute_section.index("_settle_dispute_and_credit")
         assert status_line < payout_line, "P9 violation: status update must precede payout credit"
 
     def test_contract_p9_ordering_in_cancel_dispute(self):

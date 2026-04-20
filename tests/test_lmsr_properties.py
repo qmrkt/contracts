@@ -130,6 +130,27 @@ def test_cross_outcome_round_trip_no_free_money_regression() -> None:
     assert cost_0 + cost_1 >= ret_0 + ret_1
 
 
+def test_same_outcome_multi_leg_round_trip_regression() -> None:
+    b = 40_158_285
+    q = [0, 10 * SHARE_UNIT, 8 * SHARE_UNIT, 9 * SHARE_UNIT]
+    first_shares = 358 * SHARE_UNIT
+    second_shares = 320 * SHARE_UNIT
+
+    first_cost = lmsr_cost_delta(q, b, 0, first_shares)
+    q1 = q.copy()
+    q1[0] += first_shares
+    second_cost = lmsr_cost_delta(q1, b, 0, second_shares)
+    q2 = q1.copy()
+    q2[0] += second_shares
+
+    first_return = lmsr_sell_return(q2, b, 0, first_shares)
+    q3 = q2.copy()
+    q3[0] -= first_shares
+    second_return = lmsr_sell_return(q3, b, 0, second_shares)
+
+    assert first_cost + second_cost >= first_return + second_return
+
+
 def test_multi_leg_round_trip_no_free_money_5000_random_states() -> None:
     rng = random.Random(20260333)
     for _ in range(5_000):

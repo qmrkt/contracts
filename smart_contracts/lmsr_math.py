@@ -19,6 +19,9 @@ LN2_FP = 693_147
 MAX_UINT64 = (1 << 64) - 1
 MAX_UINT128 = (1 << 128) - 1
 BUY_APPROXIMATION_MARGIN = 6
+BUY_LOG_SAFETY_MARGIN_FP = 1
+SELL_ROUNDING_SAFETY_UNITS = 2
+MAX_TRADE_GROWTH_EXP_FP = 20 * SCALE
 
 
 class LMSRMathError(ValueError):
@@ -227,6 +230,14 @@ def ln_fp(x_fp: int) -> int:
     return result
 
 
+def ln_fp_ceil(x_fp: int) -> int:
+    """Return a ceil-like ln bound that is consistent with exp_fp's fixed-point domain."""
+    result = ln_fp(x_fp)
+    while exp_fp(result) < x_fp:
+        result += 1
+    return result
+
+
 # ---------------------------------------------------------------------------
 # LMSR helpers
 # ---------------------------------------------------------------------------
@@ -268,6 +279,18 @@ def lmsr_log_sum_exp_fp(q: list[int], b: int) -> LogSumExpResult:
     return log_sum_exp_fp(exponent_inputs_fp(q, b))
 
 
+def _outcome_weight_sum(q: list[int], b: int, outcome: int) -> tuple[int, int]:
+    _validate_state(q, b)
+    _require(0 <= outcome < len(q), "outcome index out of range")
+
+    lse = lmsr_log_sum_exp_fp(q, b)
+    return lse.shifted_exp_fp[outcome], lse.sum_exp_fp
+
+
+def _trade_growth_exponent_fp(shares: int, b: int) -> int:
+    return _mul_div_floor(shares, SCALE, b)
+
+
 def _sum_shifted_exp_fp(exponents_fp: list[int], shared_max_fp: int) -> int:
     total = 0
     for exponent_fp in exponents_fp:
@@ -301,34 +324,47 @@ def lmsr_cost_delta(q: list[int], b: int, outcome: int, shares: int) -> int:
 
     q_after = list(q)
     q_after[outcome] = _check_uint64(q_after[outcome] + shares, f"q[{outcome}] after buy")
-    numerator_before = _lmsr_cost_numerator(q, b)
-    numerator_after = _lmsr_cost_numerator(q_after, b)
-    direct_delta = numerator_after - numerator_before if numerator_after > numerator_before else 0
-    direct_quote = _ceil_div(direct_delta, SCALE) if direct_delta > 0 else 0
-    round_trip_floor = _floor_div(direct_delta, SCALE) if direct_delta > 0 else 0
-    padded_direct_quote = direct_quote
-    if shares > 0:
-        padded_direct_quote = _check_uint64(direct_quote + BUY_APPROXIMATION_MARGIN, "buy padded quote")
+    delta_exponent_fp = _trade_growth_exponent_fp(shares, b)
+    if delta_exponent_fp > MAX_TRADE_GROWTH_EXP_FP:
+        numerator_before = _lmsr_cost_numerator(q, b)
+        numerator_after = _lmsr_cost_numerator(q_after, b)
+        result = _ceil_div(numerator_after, SCALE) - _floor_div(numerator_before, SCALE)
+        return _check_uint64(result, "lmsr_cost_delta")
 
-    exponents_before = exponent_inputs_fp(q, b)
-    exponents_after = exponent_inputs_fp(q_after, b)
-    shared_max_fp = max(max(exponents_before), max(exponents_after))
-    sum_before_fp = _sum_shifted_exp_fp(exponents_before, shared_max_fp)
-    sum_after_fp = _sum_shifted_exp_fp(exponents_after, shared_max_fp)
+    weight_before_fp, sum_before_fp = _outcome_weight_sum(q, b, outcome)
+    price_before_ceil = _check_uint64(_mul_div_ceil(weight_before_fp, SCALE, sum_before_fp), "price_before_ceil")
+    weight_after_fp_buy, sum_after_fp_buy = _outcome_weight_sum(q_after, b, outcome)
+    price_after_ceil = _check_uint64(
+        _mul_div_ceil(weight_after_fp_buy, SCALE, sum_after_fp_buy),
+        "price_after_ceil",
+    )
+    growth_fp = exp_fp(delta_exponent_fp)
+    growth_minus_fp = 0
+    if growth_fp > SCALE:
+        growth_minus_fp = growth_fp - SCALE
 
-    if sum_before_fp == 0:
-        ratio_quote = _ceil_div(numerator_after, SCALE) - _floor_div(numerator_before, SCALE)
+    increment_fp = _mul_div_ceil(weight_before_fp, growth_minus_fp, sum_before_fp)
+    linear_quote = _ceil_div(_checked_mul(price_after_ceil, shares, "buy linear numerator"), SCALE)
+
+    if increment_fp <= 1:
+        core_quote = linear_quote
     else:
-        ratio_fp = _mul_div_ceil(sum_after_fp, SCALE, sum_before_fp)
-        _require(ratio_fp >= SCALE, "buy ratio must be >= 1")
-        delta_numerator = _checked_mul(b, ln_fp(ratio_fp), "buy delta numerator")
-        ratio_quote = _ceil_div(delta_numerator, SCALE)
+        ratio_fp = _check_uint64(SCALE + increment_fp, "buy ratio")
+        delta_ln_fp = ln_fp_ceil(ratio_fp)
+        delta_numerator = _checked_mul(b, delta_ln_fp, "buy delta numerator")
+        core_quote = _ceil_div(delta_numerator, SCALE)
 
-    # Keep the buy side contract-favoring even when ln/log-sum-exp quantization
-    # makes the ratio path a few microunits too cheap, but do not let the
-    # separately rounded direct path overshoot arbitrarily.
-    ratio_cap = _check_uint64(ratio_quote + BUY_APPROXIMATION_MARGIN, "buy ratio cap")
-    result = max(ratio_quote, min(padded_direct_quote, ratio_cap), round_trip_floor)
+    sell_floor = lmsr_sell_return(q_after, b, outcome, shares)
+    result = max(core_quote, sell_floor)
+    cost_before_floor = _floor_div(_lmsr_cost_numerator(q, b), SCALE)
+    cost_after_ceil = _ceil_div(_lmsr_cost_numerator(q_after, b), SCALE)
+    if cost_after_ceil > cost_before_floor:
+        direct_upper = cost_after_ceil - cost_before_floor
+        direct_margin = max(16, result // 50)
+        if price_before_ceil <= 64 and direct_upper > result:
+            result = direct_upper
+        elif direct_upper > result and direct_upper - result <= direct_margin:
+            result = direct_upper
     return _check_uint64(result, "lmsr_cost_delta")
 
 
@@ -341,12 +377,34 @@ def lmsr_sell_return(q: list[int], b: int, outcome: int, shares: int) -> int:
 
     q_after = list(q)
     q_after[outcome] -= shares
+    delta_exponent_fp = _trade_growth_exponent_fp(shares, b)
     numerator_before = _lmsr_cost_numerator(q, b)
     numerator_after = _lmsr_cost_numerator(q_after, b)
-    if numerator_before <= numerator_after:
-        result = 0
+    direct_floor = 0
+    if numerator_before > numerator_after:
+        direct_floor = _floor_div(numerator_before - numerator_after, SCALE)
+    if delta_exponent_fp > MAX_TRADE_GROWTH_EXP_FP:
+        return _check_uint64(direct_floor, "lmsr_sell_return")
+
+    weight_after_fp, sum_after_fp = _outcome_weight_sum(q_after, b, outcome)
+    price_after_floor = _check_uint64(_mul_div_floor(weight_after_fp, SCALE, sum_after_fp), "price_after_floor")
+    growth_fp = exp_fp(delta_exponent_fp)
+    growth_minus_fp = 0
+    if growth_fp > SCALE:
+        growth_minus_fp = growth_fp - SCALE
+
+    increment_fp = _mul_div_floor(weight_after_fp, growth_minus_fp, sum_after_fp)
+    linear_floor = _floor_div(_checked_mul(price_after_floor, shares, "sell linear numerator"), SCALE)
+
+    if increment_fp <= 1:
+        result = linear_floor
     else:
-        result = _floor_div(numerator_before - numerator_after, SCALE)
+        ratio_fp = _check_uint64(SCALE + increment_fp, "sell ratio")
+        delta_numerator = _checked_mul(b, ln_fp(ratio_fp), "sell delta numerator")
+        nonlinear_floor = _floor_div(delta_numerator, SCALE)
+        result = max(linear_floor, nonlinear_floor)
+    if 0 < direct_floor < result:
+        result = direct_floor
     return _check_uint64(result, "lmsr_sell_return")
 
 

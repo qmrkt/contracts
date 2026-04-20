@@ -25,16 +25,14 @@ from tests.contracts.test_protocol_config_factory import (
     call_create_market_canonical,
     create_market_factory,
     disable_arc4_emit,
+    max_proposer_fee,
     make_address,
+    patch_factory_inner_create,
+    set_created_market_factory_creator,
     seed_protocol_config_state,
 )
 
 CURRENCY_ASA = 31_566_704
-
-
-class FakeCreateResult:
-    def __init__(self, app_id: int):
-        self.created_app = Application(app_id)
 
 
 def get_app_address(contract: QuestionMarket) -> str:
@@ -63,13 +61,7 @@ def test_factory_created_market_passes_c2_lifecycle(disable_arc4_emit, monkeypat
 
     monkeypatch.setattr(market_app_module.arc4, "emit", lambda *args, **kwargs: None)
 
-    def fake_arc4_create(method, *args, **kwargs):
-        captured["method"] = method
-        captured["args"] = args
-        captured["kwargs"] = kwargs
-        return FakeCreateResult(9_999)
-
-    monkeypatch.setattr(factory_module.arc4, "arc4_create", fake_arc4_create)
+    patch_factory_inner_create(monkeypatch, 9_999, captured)
 
     with algopy_testing_context() as context:
         seed_protocol_config_state(context, app_id=PROTOCOL_CONFIG_APP_ID)
@@ -100,6 +92,7 @@ def test_factory_created_market_passes_c2_lifecycle(disable_arc4_emit, monkeypat
 
         # Create market from captured factory args
         market = QuestionMarket()
+        set_created_market_factory_creator(context, market, factory.__app_id__)
         call_as(
             context,
             creator,
@@ -170,12 +163,7 @@ def test_factory_created_market_bootstraps_and_enters_active_lp(disable_arc4_emi
 
     monkeypatch.setattr(market_app_module.arc4, "emit", lambda *args, **kwargs: None)
 
-    def fake_arc4_create(method, *args, **kwargs):
-        captured["create_method"] = method
-        captured["create_args"] = args
-        return FakeCreateResult(10_001)
-
-    monkeypatch.setattr(factory_module.arc4, "arc4_create", fake_arc4_create)
+    patch_factory_inner_create(monkeypatch, 10_001, captured)
 
     with algopy_testing_context() as context:
         seed_protocol_config_state(context, app_id=PROTOCOL_CONFIG_APP_ID)
@@ -209,6 +197,7 @@ def test_factory_created_market_bootstraps_and_enters_active_lp(disable_arc4_emi
         assert int(captured["create_args"][14].as_uint64()) == DEFAULT_LP_ENTRY_MAX_PRICE_FP
 
         market = QuestionMarket()
+        set_created_market_factory_creator(context, market, factory.__app_id__)
         call_as(
             context,
             creator,
@@ -260,3 +249,73 @@ def test_factory_created_market_bootstraps_and_enters_active_lp(disable_arc4_emi
             int(market.b.value),
         )
         assert max(abs(before - after) for before, after in zip(prices_before, prices_after)) <= 2
+
+
+def test_factory_created_market_handles_nonzero_proposer_fee_budget(disable_arc4_emit, monkeypatch) -> None:
+    admin = make_address()
+    creator = make_address()
+    resolver = make_address()
+    captured: dict[str, object] = {}
+    requested_window = 86_400
+    deposit_amount = 50_000_000
+    budget_required = max_proposer_fee(
+        proposal_bond=10_000_000,
+        proposal_bond_cap=100_000_000,
+        proposer_fee_bps=500,
+        proposer_fee_floor_bps=100,
+        challenge_window_secs=requested_window,
+    )
+
+    monkeypatch.setattr(market_app_module.arc4, "emit", lambda *args, **kwargs: None)
+
+    patch_factory_inner_create(monkeypatch, 10_002, captured)
+
+    with algopy_testing_context() as context:
+        seed_protocol_config_state(
+            context,
+            app_id=PROTOCOL_CONFIG_APP_ID,
+            proposer_fee_bps=500,
+            proposer_fee_floor_bps=100,
+            min_challenge_window_secs=3_600,
+        )
+        factory = MarketFactory()
+        create_market_factory(context, factory, admin=admin, resolution_authority=resolver)
+
+        created_app_id = call_create_market_canonical(
+            context,
+            creator,
+            factory,
+            arc4.UInt64(CURRENCY_ASA),
+            arc4.DynamicBytes(b"q" * 32),
+            arc4.UInt64(3),
+            arc4.UInt64(25_000_000),
+            arc4.UInt64(200),
+            arc4.DynamicBytes(BLUEPRINT_CID),
+            arc4.UInt64(10_000),
+            arc4.UInt64(requested_window),
+            arc4.Address(admin),
+            arc4.UInt64(3_600),
+            arc4.Bool(True),
+            arc4.UInt64(deposit_amount),
+            usdc_funding_amount=deposit_amount + budget_required,
+            latest_timestamp=1,
+        )
+
+        assert int(created_app_id.as_uint64()) == 10_002
+
+        market = QuestionMarket()
+        set_created_market_factory_creator(context, market, factory.__app_id__)
+        call_as(
+            context,
+            creator,
+            market.create,
+            *captured["create_args"],
+            latest_timestamp=1,
+            apps=(Application(PROTOCOL_CONFIG_APP_ID),),
+        )
+
+        payment = make_usdc_payment(context, market, creator, deposit_amount + budget_required)
+        call_as(context, creator, market.bootstrap, arc4.UInt64(deposit_amount), payment, latest_timestamp=2)
+
+        assert int(market.status.value) == STATUS_ACTIVE
+        assert int(market.resolution_budget_balance.value) == budget_required

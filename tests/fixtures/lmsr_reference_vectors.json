@@ -7,7 +7,7 @@
         "shares": 250000
       },
       "cost": 1193149,
-      "cost_delta": 132797,
+      "cost_delta": 132794,
       "id": "n2_balanced",
       "liquidity_scale": {
         "scaled_b": 1125000,
@@ -36,7 +36,7 @@
         "shares": 125000
       },
       "cost": 1673382,
-      "cost_delta": 27933,
+      "cost_delta": 27929,
       "id": "n5_skewed",
       "liquidity_scale": {
         "scaled_b": 875000,

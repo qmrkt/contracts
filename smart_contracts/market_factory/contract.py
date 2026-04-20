@@ -10,7 +10,6 @@ from algopy import (
     Asset,
     Box,
     Bytes,
-    CompiledContract,
     Global,
     Txn,
     UInt64,
@@ -18,11 +17,14 @@ from algopy import (
     gtxn,
     itxn,
     op,
+    subroutine,
 )
 
 from smart_contracts.market_factory.market_stub import MarketStub
 
 MAX_ACTIVE_LP_OUTCOMES = 8
+BPS_DENOMINATOR = 10_000
+SECONDS_PER_DAY = 86_400
 FACTORY_RESERVE = 100_000
 MARKET_APP_MIN_FUNDING = 1_616_400
 APP_CREATE_BASE_MIN_BALANCE = 100_000
@@ -30,8 +32,10 @@ APP_PAGE_MIN_BALANCE = 100_000
 APP_GLOBAL_UINT_MIN_BALANCE = 28_500
 APP_GLOBAL_BYTES_MIN_BALANCE = 50_000
 QUESTION_MARKET_EXTRA_PAGES = 3
-QUESTION_MARKET_GLOBAL_UINTS = 48
-QUESTION_MARKET_GLOBAL_BYTES = 15
+QUESTION_MARKET_GLOBAL_UINTS = 49
+QUESTION_MARKET_GLOBAL_BYTES = 14
+QUESTION_MARKET_LOCAL_UINTS = 5
+QUESTION_MARKET_LOCAL_BYTES = 0
 MARKET_CREATOR_MIN_BALANCE = (
     APP_CREATE_BASE_MIN_BALANCE
     + QUESTION_MARKET_EXTRA_PAGES * APP_PAGE_MIN_BALANCE
@@ -54,6 +58,43 @@ class MarketFactory(ARC4Contract):
     def __init__(self) -> None:
         self.approval_program_box = Box(Bytes, key=b"ap")
         self.clear_program_box = Box(Bytes, key=b"cp")
+
+    @subroutine
+    def _config_uint64(self, app: Application, key: Bytes) -> UInt64:
+        value, exists = op.AppGlobal.get_ex_uint64(app, key)
+        assert exists
+        return value
+
+    @subroutine
+    def _mul_div_ceil(self, a: UInt64, b: UInt64, denominator: UInt64) -> UInt64:
+        assert denominator > UInt64(0)
+        product_high, product_low = op.mulw(a, b)
+        quotient_high, quotient_low, remainder_high, remainder_low = op.divmodw(
+            product_high,
+            product_low,
+            UInt64(0),
+            denominator,
+        )
+        assert quotient_high == UInt64(0)
+        if remainder_high == UInt64(0) and remainder_low == UInt64(0):
+            return quotient_low
+        return quotient_low + UInt64(1)
+
+    @subroutine
+    def _max_proposer_fee(
+        self,
+        proposal_bond: UInt64,
+        proposal_bond_cap: UInt64,
+        proposer_fee_bps: UInt64,
+        proposer_fee_floor_bps: UInt64,
+        challenge_window_secs: UInt64,
+    ) -> UInt64:
+        floor_fee = self._mul_div_ceil(proposal_bond, proposer_fee_floor_bps, UInt64(BPS_DENOMINATOR))
+        daily_fee = self._mul_div_ceil(proposal_bond_cap, proposer_fee_bps, UInt64(BPS_DENOMINATOR))
+        window_fee = self._mul_div_ceil(daily_fee, challenge_window_secs, UInt64(SECONDS_PER_DAY))
+        if window_fee > floor_fee:
+            return window_fee
+        return floor_fee
 
     @arc4.baremethod(create="require")
     def create(self) -> None:
@@ -127,46 +168,67 @@ class MarketFactory(ARC4Contract):
 
         assert num_outcomes.as_uint64() <= MAX_ACTIVE_LP_OUTCOMES
         protocol_config_id = Txn.applications(1).id
-        linked_factory_id, _exists = op.AppGlobal.get_ex_uint64(
-            Application(protocol_config_id), b"mfi"
-        )
+        protocol_config_app = Application(protocol_config_id)
+        linked_factory_id = self._config_uint64(protocol_config_app, Bytes(b"mfi"))
         assert linked_factory_id == Global.current_application_id.id
+        budget_required = self._max_proposer_fee(
+            self._config_uint64(protocol_config_app, Bytes(b"pb")),
+            self._config_uint64(protocol_config_app, Bytes(b"pbc")),
+            self._config_uint64(protocol_config_app, Bytes(b"pfd")),
+            self._config_uint64(protocol_config_app, Bytes(b"pff")),
+            challenge_window_secs.as_uint64(),
+        )
+        assert usdc_funding.asset_amount >= deposit_amount.as_uint64() + budget_required
 
         # Read stored bytecode from boxes in chunks (AVM stack limit: 4096 bytes per value)
         ap_len, _ap_exists = op.Box.length(Bytes(b"ap"))
-        ap_page0 = op.Box.extract(Bytes(b"ap"), UInt64(0), UInt64(4096))
-        ap_page1 = op.Box.extract(Bytes(b"ap"), UInt64(4096), ap_len - UInt64(4096))
+        ap_page0_len = ap_len
+        if ap_page0_len > UInt64(4096):
+            ap_page0_len = UInt64(4096)
+        ap_page0 = op.Box.extract(Bytes(b"ap"), UInt64(0), ap_page0_len)
+        ap_page1 = Bytes()
+        ap_page2 = Bytes()
+        if ap_len > UInt64(4096):
+            ap_page1_len = ap_len - UInt64(4096)
+            if ap_page1_len > UInt64(4096):
+                ap_page1_len = UInt64(4096)
+            ap_page1 = op.Box.extract(Bytes(b"ap"), UInt64(4096), ap_page1_len)
+        if ap_len > UInt64(8192):
+            ap_page2 = op.Box.extract(Bytes(b"ap"), UInt64(8192), ap_len - UInt64(8192))
         clear_program = self.clear_program_box.value
 
-        # ── Inner txn 1: Create market app via arc4_create with compiled bytecode ──
-        create_itxn = arc4.arc4_create(
-            MarketStub.create,
-            arc4.Address(Txn.sender),
-            currency_asa,
-            num_outcomes,
-            initial_liquidity_b,
-            lp_fee_bps,
-            deadline,
-            question_hash,
-            blueprint_cid,
-            challenge_window_secs,
-            arc4.Address(Global.creator_address),
-            grace_period_secs,
-            market_admin,
-            arc4.UInt64(protocol_config_id),
-            cancellable,
-            lp_entry_max_price_fp,
-            compiled=CompiledContract(
-                approval_program=(ap_page0, ap_page1),
-                clear_state_program=(clear_program, Bytes()),
-                extra_program_pages=UInt64(3),
-                global_uints=UInt64(48),
-                global_bytes=UInt64(15),
-                local_uints=UInt64(6),
-                local_bytes=UInt64(0),
+        # The current market approval program spans five 2KB AVM pages, which no
+        # longer fits through CompiledContract's two-slot page tuple. Use a manual
+        # inner app-create so we can append all approval pages explicitly.
+        market_create_sel = Bytes.from_hex("6F22BE0A")
+        create_itxn = itxn.ApplicationCall(
+            approval_program=(ap_page0, ap_page1, ap_page2),
+            clear_state_program=(clear_program,),
+            global_num_uint=UInt64(QUESTION_MARKET_GLOBAL_UINTS),
+            global_num_bytes=UInt64(QUESTION_MARKET_GLOBAL_BYTES),
+            local_num_uint=UInt64(QUESTION_MARKET_LOCAL_UINTS),
+            local_num_bytes=UInt64(QUESTION_MARKET_LOCAL_BYTES),
+            extra_program_pages=UInt64(QUESTION_MARKET_EXTRA_PAGES),
+            app_args=(
+                market_create_sel,
+                arc4.Address(Txn.sender),
+                currency_asa,
+                num_outcomes,
+                initial_liquidity_b,
+                lp_fee_bps,
+                deadline,
+                question_hash,
+                blueprint_cid,
+                challenge_window_secs,
+                arc4.Address(Global.creator_address),
+                grace_period_secs,
+                market_admin,
+                arc4.UInt64(protocol_config_id),
+                cancellable,
+                lp_entry_max_price_fp,
             ),
             fee=0,
-        )
+        ).submit()
 
         created_app = create_itxn.created_app
         created_app_addr = created_app.address
@@ -189,8 +251,6 @@ class MarketFactory(ARC4Contract):
         ).submit()
 
         # ── Inner txns 4+5: Forward USDC + bootstrap as a grouped pair ──
-        # bootstrap expects a gtxn.AssetTransferTransaction, so the USDC transfer
-        # must be in the same inner group as the bootstrap call.
         market_bootstrap_sel = Bytes.from_hex("B49094E1")
         itxn.submit_txns(
             itxn.AssetTransfer(

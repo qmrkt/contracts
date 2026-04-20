@@ -4,7 +4,7 @@
 // algopy.arc4.ARC4Contract.approval_program() -> uint64:
 main:
     intcblock 8 1 10000 0 1000000
-    bytecblock "admin" 0x6362 0x7062 0x636263 0x706263 0x706662 0x70726f746f636f6c5f6665655f6365696c696e675f627073 0x6d61785f6f7574636f6d6573 0x6d696e5f626f6f7473747261705f6465706f736974 0x636262 0x706262 0x706664 0x706666 0x64656661756c745f62 0x7074 0x6d6669 0x6d6377 0x6d696e5f67726163655f706572696f645f73656373 0x6d61785f6c705f6665655f627073 0x726c66 0x6d61785f6163746976655f6c705f76345f6f7574636f6d6573
+    bytecblock "admin" 0x6362 0x7062 0x636263 0x706263 0x706662 0x70726f746f636f6c5f6665655f6365696c696e675f627073 0x6d61785f6f7574636f6d6573 0x6d61785f6163746976655f6c705f76345f6f7574636f6d6573 0x6d696e5f626f6f7473747261705f6465706f736974 0x636262 0x706262 0x706664 0x706666 0x64656661756c745f62 0x7074 0x6d6669 0x6d6377 0x6d696e5f67726163655f706572696f645f73656373 0x6d61785f6c705f6665655f627073 0x726c66 0x0000000000000000000000000000000000000000000000000000000000000000
     // smart_contracts/protocol_config/contract.py:40
     // class ProtocolConfig(ARC4Contract):
     txn NumAppArgs
@@ -20,7 +20,7 @@ main:
     err
 
 main_noop_route@28:
-    // smart_contracts/protocol_config/contract.py:290
+    // smart_contracts/protocol_config/contract.py:292
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -34,7 +34,7 @@ main_create_NoOp@30:
     err
 
 main_bare_noop@34:
-    // smart_contracts/protocol_config/contract.py:272
+    // smart_contracts/protocol_config/contract.py:274
     // @arc4.baremethod()
     txn OnCompletion
     !
@@ -402,7 +402,7 @@ create:
     // self.min_bootstrap_deposit.value = min_bootstrap_deposit.as_uint64()
     uncover 19
     btoi
-    bytec 8 // 0x6d696e5f626f6f7473747261705f6465706f736974
+    bytec 9 // 0x6d696e5f626f6f7473747261705f6465706f736974
     swap
     app_global_put
     // smart_contracts/protocol_config/contract.py:127
@@ -417,12 +417,12 @@ create:
     app_global_put
     // smart_contracts/protocol_config/contract.py:129
     // self.challenge_bond_bps.value = challenge_bond_bps.as_uint64()
-    bytec 9 // 0x636262
+    bytec 10 // 0x636262
     uncover 9
     app_global_put
     // smart_contracts/protocol_config/contract.py:130
     // self.proposal_bond_bps.value = proposal_bond_bps.as_uint64()
-    bytec 10 // 0x706262
+    bytec 11 // 0x706262
     uncover 8
     app_global_put
     // smart_contracts/protocol_config/contract.py:131
@@ -437,17 +437,17 @@ create:
     app_global_put
     // smart_contracts/protocol_config/contract.py:133
     // self.proposer_fee_bps.value = proposer_fee_bps.as_uint64()
-    bytec 11 // 0x706664
+    bytec 12 // 0x706664
     uncover 7
     app_global_put
     // smart_contracts/protocol_config/contract.py:134
     // self.proposer_fee_floor_bps.value = proposer_fee_floor_bps.as_uint64()
-    bytec 12 // 0x706666
+    bytec 13 // 0x706666
     uncover 6
     app_global_put
     // smart_contracts/protocol_config/contract.py:135
     // self.default_b.value = default_b.as_uint64()
-    bytec 13 // 0x64656661756c745f62
+    bytec 14 // 0x64656661756c745f62
     uncover 9
     app_global_put
     // smart_contracts/protocol_config/contract.py:136
@@ -462,7 +462,7 @@ create:
     app_global_put
     // smart_contracts/protocol_config/contract.py:138
     // self.protocol_treasury.value = protocol_treasury.bytes
-    bytec 14 // 0x7074
+    bytec 15 // 0x7074
     uncover 8
     app_global_put
     // smart_contracts/protocol_config/contract.py:139
@@ -474,7 +474,7 @@ create:
     // smart_contracts/protocol_config/contract.py:139
     // self.market_factory_id.value = market_factory_id.as_uint64()
     extract_uint64
-    bytec 15 // 0x6d6669
+    bytec 16 // 0x6d6669
     swap
     app_global_put
     // smart_contracts/protocol_config/contract.py:140
@@ -484,27 +484,27 @@ create:
     app_global_put
     // smart_contracts/protocol_config/contract.py:141
     // self.min_challenge_window_secs.value = min_challenge_window_secs.as_uint64()
-    bytec 16 // 0x6d6377
+    bytec 17 // 0x6d6377
     uncover 5
     app_global_put
     // smart_contracts/protocol_config/contract.py:142
     // self.min_grace_period_secs.value = min_grace_period_secs.as_uint64()
-    bytec 17 // 0x6d696e5f67726163655f706572696f645f73656373
+    bytec 18 // 0x6d696e5f67726163655f706572696f645f73656373
     uncover 4
     app_global_put
     // smart_contracts/protocol_config/contract.py:143
     // self.max_lp_fee_bps.value = max_lp_fee_bps.as_uint64()
-    bytec 18 // 0x6d61785f6c705f6665655f627073
+    bytec 19 // 0x6d61785f6c705f6665655f627073
     uncover 3
     app_global_put
     // smart_contracts/protocol_config/contract.py:144
     // self.default_residual_linear_lambda_fp.value = default_residual_linear_lambda_fp.as_uint64()
-    bytec 19 // 0x726c66
+    bytec 20 // 0x726c66
     uncover 2
     app_global_put
     // smart_contracts/protocol_config/contract.py:145
     // self.max_active_lp_v4_outcomes.value = max_active_lp_v4_outcomes.as_uint64()
-    bytec 20 // 0x6d61785f6163746976655f6c705f76345f6f7574636f6d6573
+    bytec 8 // 0x6d61785f6163746976655f6c705f76345f6f7574636f6d6573
     swap
     app_global_put
     // smart_contracts/protocol_config/contract.py:82
@@ -529,7 +529,7 @@ update_admin:
     // smart_contracts/protocol_config/contract.py:150
     // self._require(admin.bytes != Bytes(b"\x00" * 32))
     dup
-    pushbytes 0x0000000000000000000000000000000000000000000000000000000000000000
+    bytec 21 // 0x0000000000000000000000000000000000000000000000000000000000000000
     !=
     // smart_contracts/protocol_config/contract.py:67
     // assert condition
@@ -561,7 +561,7 @@ update_min_bootstrap_deposit:
     // smart_contracts/protocol_config/contract.py:156
     // self.min_bootstrap_deposit.value = value.as_uint64()
     btoi
-    bytec 8 // 0x6d696e5f626f6f7473747261705f6465706f736974
+    bytec 9 // 0x6d696e5f626f6f7473747261705f6465706f736974
     swap
     app_global_put
     // smart_contracts/protocol_config/contract.py:153
@@ -680,7 +680,7 @@ update_challenge_bond_bps:
     assert
     // smart_contracts/protocol_config/contract.py:174
     // self.challenge_bond_bps.value = value.as_uint64()
-    bytec 9 // 0x636262
+    bytec 10 // 0x636262
     swap
     app_global_put
     // smart_contracts/protocol_config/contract.py:170
@@ -715,7 +715,7 @@ update_proposal_bond_bps:
     assert
     // smart_contracts/protocol_config/contract.py:180
     // self.proposal_bond_bps.value = value.as_uint64()
-    bytec 10 // 0x706262
+    bytec 11 // 0x706262
     swap
     app_global_put
     // smart_contracts/protocol_config/contract.py:176
@@ -838,7 +838,7 @@ update_proposer_fee_bps:
     assert
     // smart_contracts/protocol_config/contract.py:198
     // self.proposer_fee_bps.value = value.as_uint64()
-    bytec 11 // 0x706664
+    bytec 12 // 0x706664
     swap
     app_global_put
     // smart_contracts/protocol_config/contract.py:194
@@ -873,7 +873,7 @@ update_proposer_fee_floor_bps:
     assert
     // smart_contracts/protocol_config/contract.py:204
     // self.proposer_fee_floor_bps.value = value.as_uint64()
-    bytec 12 // 0x706666
+    bytec 13 // 0x706666
     swap
     app_global_put
     // smart_contracts/protocol_config/contract.py:200
@@ -904,7 +904,7 @@ update_default_b:
     assert
     // smart_contracts/protocol_config/contract.py:210
     // self.default_b.value = value.as_uint64()
-    bytec 13 // 0x64656661756c745f62
+    bytec 14 // 0x64656661756c745f62
     swap
     app_global_put
     // smart_contracts/protocol_config/contract.py:206
@@ -1013,8 +1013,16 @@ update_protocol_treasury:
     // self._require_admin()
     callsub _require_admin
     // smart_contracts/protocol_config/contract.py:228
+    // self._require(value.bytes != Bytes(b"\x00" * 32))
+    dup
+    bytec 21 // 0x0000000000000000000000000000000000000000000000000000000000000000
+    !=
+    // smart_contracts/protocol_config/contract.py:67
+    // assert condition
+    assert
+    // smart_contracts/protocol_config/contract.py:229
     // self.protocol_treasury.value = value.bytes
-    bytec 14 // 0x7074
+    bytec 15 // 0x7074
     swap
     app_global_put
     // smart_contracts/protocol_config/contract.py:225
@@ -1025,7 +1033,7 @@ update_protocol_treasury:
 
 // smart_contracts.protocol_config.contract.ProtocolConfig.update_market_factory_id[routing]() -> void:
 update_market_factory_id:
-    // smart_contracts/protocol_config/contract.py:230
+    // smart_contracts/protocol_config/contract.py:231
     // @arc4.abimethod()
     txna ApplicationArgs 1
     dup
@@ -1033,16 +1041,16 @@ update_market_factory_id:
     intc_0 // 8
     ==
     assert // invalid number of bytes for arc4.uint64
-    // smart_contracts/protocol_config/contract.py:232
+    // smart_contracts/protocol_config/contract.py:233
     // self._require_admin()
     callsub _require_admin
-    // smart_contracts/protocol_config/contract.py:233
+    // smart_contracts/protocol_config/contract.py:234
     // self.market_factory_id.value = value.as_uint64()
     btoi
-    bytec 15 // 0x6d6669
+    bytec 16 // 0x6d6669
     swap
     app_global_put
-    // smart_contracts/protocol_config/contract.py:230
+    // smart_contracts/protocol_config/contract.py:231
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -1050,7 +1058,7 @@ update_market_factory_id:
 
 // smart_contracts.protocol_config.contract.ProtocolConfig.update_max_outcomes[routing]() -> void:
 update_max_outcomes:
-    // smart_contracts/protocol_config/contract.py:235
+    // smart_contracts/protocol_config/contract.py:236
     // @arc4.abimethod()
     txna ApplicationArgs 1
     dup
@@ -1058,10 +1066,10 @@ update_max_outcomes:
     intc_0 // 8
     ==
     assert // invalid number of bytes for arc4.uint64
-    // smart_contracts/protocol_config/contract.py:237
+    // smart_contracts/protocol_config/contract.py:238
     // self._require_admin()
     callsub _require_admin
-    // smart_contracts/protocol_config/contract.py:238
+    // smart_contracts/protocol_config/contract.py:239
     // self._require(value.as_uint64() >= UInt64(MIN_OUTCOMES))
     btoi
     dup
@@ -1070,12 +1078,23 @@ update_max_outcomes:
     // smart_contracts/protocol_config/contract.py:67
     // assert condition
     assert
-    // smart_contracts/protocol_config/contract.py:239
+    // smart_contracts/protocol_config/contract.py:240
+    // self._require(value.as_uint64() >= self.max_active_lp_v4_outcomes.value)
+    intc_3 // 0
+    bytec 8 // 0x6d61785f6163746976655f6c705f76345f6f7574636f6d6573
+    app_global_get_ex
+    assert // check self.max_active_lp_v4_outcomes exists
+    dig 1
+    <=
+    // smart_contracts/protocol_config/contract.py:67
+    // assert condition
+    assert
+    // smart_contracts/protocol_config/contract.py:241
     // self.max_outcomes.value = value.as_uint64()
     bytec 7 // 0x6d61785f6f7574636f6d6573
     swap
     app_global_put
-    // smart_contracts/protocol_config/contract.py:235
+    // smart_contracts/protocol_config/contract.py:236
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -1083,7 +1102,7 @@ update_max_outcomes:
 
 // smart_contracts.protocol_config.contract.ProtocolConfig.update_min_challenge_window_secs[routing]() -> void:
 update_min_challenge_window_secs:
-    // smart_contracts/protocol_config/contract.py:241
+    // smart_contracts/protocol_config/contract.py:243
     // @arc4.abimethod()
     txna ApplicationArgs 1
     dup
@@ -1091,22 +1110,22 @@ update_min_challenge_window_secs:
     intc_0 // 8
     ==
     assert // invalid number of bytes for arc4.uint64
-    // smart_contracts/protocol_config/contract.py:243
+    // smart_contracts/protocol_config/contract.py:245
     // self._require_admin()
     callsub _require_admin
-    // smart_contracts/protocol_config/contract.py:244
+    // smart_contracts/protocol_config/contract.py:246
     // self._require(value.as_uint64() > UInt64(0))
     btoi
     // smart_contracts/protocol_config/contract.py:67
     // assert condition
     dup
     assert
-    // smart_contracts/protocol_config/contract.py:245
+    // smart_contracts/protocol_config/contract.py:247
     // self.min_challenge_window_secs.value = value.as_uint64()
-    bytec 16 // 0x6d6377
+    bytec 17 // 0x6d6377
     swap
     app_global_put
-    // smart_contracts/protocol_config/contract.py:241
+    // smart_contracts/protocol_config/contract.py:243
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -1114,7 +1133,7 @@ update_min_challenge_window_secs:
 
 // smart_contracts.protocol_config.contract.ProtocolConfig.update_min_grace_period_secs[routing]() -> void:
 update_min_grace_period_secs:
-    // smart_contracts/protocol_config/contract.py:247
+    // smart_contracts/protocol_config/contract.py:249
     // @arc4.abimethod()
     txna ApplicationArgs 1
     dup
@@ -1122,22 +1141,22 @@ update_min_grace_period_secs:
     intc_0 // 8
     ==
     assert // invalid number of bytes for arc4.uint64
-    // smart_contracts/protocol_config/contract.py:249
+    // smart_contracts/protocol_config/contract.py:251
     // self._require_admin()
     callsub _require_admin
-    // smart_contracts/protocol_config/contract.py:250
+    // smart_contracts/protocol_config/contract.py:252
     // self._require(value.as_uint64() > UInt64(0))
     btoi
     // smart_contracts/protocol_config/contract.py:67
     // assert condition
     dup
     assert
-    // smart_contracts/protocol_config/contract.py:251
+    // smart_contracts/protocol_config/contract.py:253
     // self.min_grace_period_secs.value = value.as_uint64()
-    bytec 17 // 0x6d696e5f67726163655f706572696f645f73656373
+    bytec 18 // 0x6d696e5f67726163655f706572696f645f73656373
     swap
     app_global_put
-    // smart_contracts/protocol_config/contract.py:247
+    // smart_contracts/protocol_config/contract.py:249
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -1145,7 +1164,7 @@ update_min_grace_period_secs:
 
 // smart_contracts.protocol_config.contract.ProtocolConfig.update_max_lp_fee_bps[routing]() -> void:
 update_max_lp_fee_bps:
-    // smart_contracts/protocol_config/contract.py:253
+    // smart_contracts/protocol_config/contract.py:255
     // @arc4.abimethod()
     txna ApplicationArgs 1
     dup
@@ -1153,10 +1172,10 @@ update_max_lp_fee_bps:
     intc_0 // 8
     ==
     assert // invalid number of bytes for arc4.uint64
-    // smart_contracts/protocol_config/contract.py:255
+    // smart_contracts/protocol_config/contract.py:257
     // self._require_admin()
     callsub _require_admin
-    // smart_contracts/protocol_config/contract.py:256
+    // smart_contracts/protocol_config/contract.py:258
     // self._require_bps(value.as_uint64())
     btoi
     // smart_contracts/protocol_config/contract.py:76
@@ -1167,12 +1186,12 @@ update_max_lp_fee_bps:
     // smart_contracts/protocol_config/contract.py:67
     // assert condition
     assert
-    // smart_contracts/protocol_config/contract.py:257
+    // smart_contracts/protocol_config/contract.py:259
     // self.max_lp_fee_bps.value = value.as_uint64()
-    bytec 18 // 0x6d61785f6c705f6665655f627073
+    bytec 19 // 0x6d61785f6c705f6665655f627073
     swap
     app_global_put
-    // smart_contracts/protocol_config/contract.py:253
+    // smart_contracts/protocol_config/contract.py:255
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -1180,7 +1199,7 @@ update_max_lp_fee_bps:
 
 // smart_contracts.protocol_config.contract.ProtocolConfig.update_default_residual_linear_lambda_fp[routing]() -> void:
 update_default_residual_linear_lambda_fp:
-    // smart_contracts/protocol_config/contract.py:259
+    // smart_contracts/protocol_config/contract.py:261
     // @arc4.abimethod()
     txna ApplicationArgs 1
     dup
@@ -1188,10 +1207,10 @@ update_default_residual_linear_lambda_fp:
     intc_0 // 8
     ==
     assert // invalid number of bytes for arc4.uint64
-    // smart_contracts/protocol_config/contract.py:261
+    // smart_contracts/protocol_config/contract.py:263
     // self._require_admin()
     callsub _require_admin
-    // smart_contracts/protocol_config/contract.py:262
+    // smart_contracts/protocol_config/contract.py:264
     // self._require(value.as_uint64() <= UInt64(RESIDUAL_WEIGHT_SCALE_FP))
     btoi
     dup
@@ -1200,12 +1219,12 @@ update_default_residual_linear_lambda_fp:
     // smart_contracts/protocol_config/contract.py:67
     // assert condition
     assert
-    // smart_contracts/protocol_config/contract.py:263
+    // smart_contracts/protocol_config/contract.py:265
     // self.default_residual_linear_lambda_fp.value = value.as_uint64()
-    bytec 19 // 0x726c66
+    bytec 20 // 0x726c66
     swap
     app_global_put
-    // smart_contracts/protocol_config/contract.py:259
+    // smart_contracts/protocol_config/contract.py:261
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -1213,7 +1232,7 @@ update_default_residual_linear_lambda_fp:
 
 // smart_contracts.protocol_config.contract.ProtocolConfig.update_max_active_lp_v4_outcomes[routing]() -> void:
 update_max_active_lp_v4_outcomes:
-    // smart_contracts/protocol_config/contract.py:265
+    // smart_contracts/protocol_config/contract.py:267
     // @arc4.abimethod()
     txna ApplicationArgs 1
     dup
@@ -1221,10 +1240,10 @@ update_max_active_lp_v4_outcomes:
     intc_0 // 8
     ==
     assert // invalid number of bytes for arc4.uint64
-    // smart_contracts/protocol_config/contract.py:267
+    // smart_contracts/protocol_config/contract.py:269
     // self._require_admin()
     callsub _require_admin
-    // smart_contracts/protocol_config/contract.py:268
+    // smart_contracts/protocol_config/contract.py:270
     // self._require(value.as_uint64() >= UInt64(MIN_OUTCOMES))
     btoi
     dup
@@ -1233,7 +1252,7 @@ update_max_active_lp_v4_outcomes:
     // smart_contracts/protocol_config/contract.py:67
     // assert condition
     assert
-    // smart_contracts/protocol_config/contract.py:269
+    // smart_contracts/protocol_config/contract.py:271
     // self._require(value.as_uint64() <= self.max_outcomes.value)
     intc_3 // 0
     bytec 7 // 0x6d61785f6f7574636f6d6573
@@ -1244,12 +1263,12 @@ update_max_active_lp_v4_outcomes:
     // smart_contracts/protocol_config/contract.py:67
     // assert condition
     assert
-    // smart_contracts/protocol_config/contract.py:270
+    // smart_contracts/protocol_config/contract.py:272
     // self.max_active_lp_v4_outcomes.value = value.as_uint64()
-    bytec 20 // 0x6d61785f6163746976655f6c705f76345f6f7574636f6d6573
+    bytec 8 // 0x6d61785f6163746976655f6c705f76345f6f7574636f6d6573
     swap
     app_global_put
-    // smart_contracts/protocol_config/contract.py:265
+    // smart_contracts/protocol_config/contract.py:267
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -1257,7 +1276,7 @@ update_max_active_lp_v4_outcomes:
 
 // smart_contracts.protocol_config.contract.ProtocolConfig.op_up[routing]() -> void:
 op_up:
-    // smart_contracts/protocol_config/contract.py:276
+    // smart_contracts/protocol_config/contract.py:278
     // @arc4.abimethod()
     txna ApplicationArgs 1
     dup
@@ -1265,60 +1284,60 @@ op_up:
     intc_0 // 8
     ==
     assert // invalid number of bytes for arc4.uint64
-    // smart_contracts/protocol_config/contract.py:278
+    // smart_contracts/protocol_config/contract.py:280
     // count_val = count.as_uint64()
     btoi
     dup
     // smart_contracts/protocol_config/contract.py:67
     // assert condition
     assert
-    // smart_contracts/protocol_config/contract.py:280
+    // smart_contracts/protocol_config/contract.py:282
     // target_app_id = Txn.applications(1).id
     txna Applications 1
     dup
     // smart_contracts/protocol_config/contract.py:67
     // assert condition
     assert
-    // smart_contracts/protocol_config/contract.py:283
+    // smart_contracts/protocol_config/contract.py:285
     // for _i in urange(count_val):
     intc_3 // 0
 
 op_up_for_header@2:
-    // smart_contracts/protocol_config/contract.py:283
+    // smart_contracts/protocol_config/contract.py:285
     // for _i in urange(count_val):
     dup
     dig 3
     <
     bz op_up_after_for@6
-    // smart_contracts/protocol_config/contract.py:284-288
+    // smart_contracts/protocol_config/contract.py:286-290
     // itxn.ApplicationCall(
     //     app_id=target_app,
     //     on_completion=OnCompleteAction.NoOp,
     //     fee=0,
     // ).submit()
     itxn_begin
-    // smart_contracts/protocol_config/contract.py:286
+    // smart_contracts/protocol_config/contract.py:288
     // on_completion=OnCompleteAction.NoOp,
     intc_3 // NoOp
     itxn_field OnCompletion
     dig 1
     itxn_field ApplicationID
-    // smart_contracts/protocol_config/contract.py:284
+    // smart_contracts/protocol_config/contract.py:286
     // itxn.ApplicationCall(
     pushint 6 // appl
     itxn_field TypeEnum
-    // smart_contracts/protocol_config/contract.py:287
+    // smart_contracts/protocol_config/contract.py:289
     // fee=0,
     intc_3 // 0
     itxn_field Fee
-    // smart_contracts/protocol_config/contract.py:284-288
+    // smart_contracts/protocol_config/contract.py:286-290
     // itxn.ApplicationCall(
     //     app_id=target_app,
     //     on_completion=OnCompleteAction.NoOp,
     //     fee=0,
     // ).submit()
     itxn_submit
-    // smart_contracts/protocol_config/contract.py:283
+    // smart_contracts/protocol_config/contract.py:285
     // for _i in urange(count_val):
     dup
     intc_1 // 1
@@ -1327,7 +1346,7 @@ op_up_for_header@2:
     b op_up_for_header@2
 
 op_up_after_for@6:
-    // smart_contracts/protocol_config/contract.py:276
+    // smart_contracts/protocol_config/contract.py:278
     // @arc4.abimethod()
     intc_1 // 1
     return

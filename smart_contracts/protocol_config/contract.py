@@ -225,6 +225,7 @@ class ProtocolConfig(ARC4Contract):
     @arc4.abimethod()
     def update_protocol_treasury(self, value: arc4.Address) -> None:
         self._require_admin()
+        self._require(value.bytes != Bytes(b"\x00" * 32))
         self.protocol_treasury.value = value.bytes
 
     @arc4.abimethod()
@@ -236,6 +237,7 @@ class ProtocolConfig(ARC4Contract):
     def update_max_outcomes(self, value: arc4.UInt64) -> None:
         self._require_admin()
         self._require(value.as_uint64() >= UInt64(MIN_OUTCOMES))
+        self._require(value.as_uint64() >= self.max_active_lp_v4_outcomes.value)
         self.max_outcomes.value = value.as_uint64()
 
     @arc4.abimethod()

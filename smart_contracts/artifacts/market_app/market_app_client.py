@@ -136,30 +136,21 @@ class QuestionMarket(algopy.arc4.ARC4Client, typing.Protocol):
         self,
         outcome_index: algopy.arc4.UIntN[typing.Literal[64]],
         ruling_hash: algopy.arc4.DynamicBytes,
-    ) -> None:
-        """
-        Creator adjudicates the dispute. Creator-only, DISPUTED status only.
-        """
+    ) -> None: ...
 
     @algopy.arc4.abimethod
     def admin_resolve_dispute(
         self,
         outcome_index: algopy.arc4.UIntN[typing.Literal[64]],
         ruling_hash: algopy.arc4.DynamicBytes,
-    ) -> None:
-        """
-        Market admin adjudicates the dispute as final fallback. Admin-only, DISPUTED status only.
-        """
+    ) -> None: ...
 
     @algopy.arc4.abimethod
     def finalize_dispute(
         self,
         outcome_index: algopy.arc4.UIntN[typing.Literal[64]],
         ruling_hash: algopy.arc4.DynamicBytes,
-    ) -> None:
-        """
-        Finalize a dispute with a ruling. Resolution-authority-only, DISPUTED status only.
-        """
+    ) -> None: ...
 
     @algopy.arc4.abimethod
     def abort_early_resolution(

@@ -180,6 +180,63 @@ def test_rounding_favors_contract() -> None:
     assert buy_cost >= sell_return
 
 
+def test_skewed_buy_quote_regression_stays_within_expected_band() -> None:
+    q = [126_000_000, 78_000_000, 464_000_000, 527_000_000, 527_000_000, 527_000_000]
+    b = 77_053_616
+    outcome = 0
+    shares = 1_000_000
+
+    actual = lmsr_cost_delta(q, b, outcome, shares)
+    expected = dec_cost_delta_up(q, b, outcome, shares)
+
+    assert actual >= expected
+    assert actual - expected <= 100
+
+
+def test_tiny_high_liquidity_buy_quote_regression() -> None:
+    q = [0, 413_183_000_000]
+    b = 552_598_671_409
+    outcome = 0
+    shares = 1_000_000
+
+    actual = lmsr_cost_delta(q, b, outcome, shares)
+    expected = dec_cost_delta_up(q, b, outcome, shares)
+
+    assert actual == expected
+
+
+def test_high_liquidity_sell_return_regression_stays_near_decimal() -> None:
+    q = [
+        246_146_000_000,
+        31_183_000_000,
+        226_666_000_000,
+        28_279_000_000,
+        218_551_000_000,
+        8_974_000_000,
+        198_480_000_000,
+        69_226_000_000,
+        165_243_000_000,
+        177_503_000_000,
+        39_509_000_000,
+        87_091_000_000,
+        234_848_000_000,
+        229_155_000_000,
+        152_636_000_000,
+        235_499_000_000,
+    ]
+    b = 26_496_545_535
+    outcome = 11
+    shares = 78_000_000
+    q_after = q.copy()
+    q_after[outcome] += shares
+
+    actual = lmsr_sell_return(q_after, b, outcome, shares)
+    expected = dec_sell_return_down(q_after, b, outcome, shares)
+
+    assert actual <= expected
+    assert expected - actual <= 128
+
+
 def test_reference_vectors_n2_n5_n16() -> None:
     fixture = load_fixture()
     assert fixture["scale"] == SCALE

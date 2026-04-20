@@ -36,6 +36,7 @@ from smart_contracts.protocol_config.contract import (
     KEY_CHALLENGE_BOND_CAP,
     KEY_DEFAULT_RESIDUAL_LINEAR_LAMBDA_FP,
     KEY_MAX_ACTIVE_LP_V4_OUTCOMES,
+    KEY_MARKET_FACTORY_ID,
     KEY_MIN_CHALLENGE_WINDOW_SECS,
     KEY_PROPOSAL_BOND,
     KEY_PROPOSAL_BOND_BPS,
@@ -55,6 +56,7 @@ WRONG_ASA = 99_999
 B = 100_000_000
 DEPOSIT = 200_000_000
 PROTOCOL_CONFIG_APP_ID = 77
+DEFAULT_FACTORY_APP_ID = 8_001
 
 
 def _make_addr():
@@ -103,9 +105,10 @@ def _seed_protocol_min_window(context, minimum: int = 86_400) -> Application:
     context.ledger.set_global_state(app, KEY_PROPOSER_FEE_BPS, 0)
     context.ledger.set_global_state(app, KEY_PROPOSER_FEE_FLOOR_BPS, 0)
     context.ledger.set_global_state(app, KEY_PROTOCOL_FEE_BPS, 50)
-    context.ledger.set_global_state(app, KEY_PROTOCOL_TREASURY, bytes(32))
+    context.ledger.set_global_state(app, KEY_PROTOCOL_TREASURY, Account(_make_addr()).bytes.value)
     context.ledger.set_global_state(app, KEY_DEFAULT_RESIDUAL_LINEAR_LAMBDA_FP, 150_000)
     context.ledger.set_global_state(app, KEY_MAX_ACTIVE_LP_V4_OUTCOMES, 8)
+    context.ledger.set_global_state(app, KEY_MARKET_FACTORY_ID, DEFAULT_FACTORY_APP_ID)
     return app
 
 
@@ -128,6 +131,8 @@ def _create_contract(context, contract, creator):
         cancellable=arc4.Bool(True),
         lp_entry_max_price_fp=arc4.UInt64(DEFAULT_LP_ENTRY_MAX_PRICE_FP),
     )
+    app_data = context.ledger._app_data[contract.__app_id__]
+    app_data.fields["creator"] = Account(algosdk.logic.get_application_address(DEFAULT_FACTORY_APP_ID))
     context.ledger.patch_global_fields(latest_timestamp=1)
     context._default_sender = Account(creator)
     deferred = context.txn.defer_app_call(contract.create, **args)

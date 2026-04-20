@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import smart_contracts.market_factory.contract as factory_module
+
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 ARTIFACTS_DIR = ROOT_DIR / "smart_contracts" / "artifacts"
@@ -48,3 +50,13 @@ def test_generated_python_clients_expose_active_lp_methods() -> None:
     assert "create_market" in factory_client
     assert "update_default_residual_linear_lambda_fp" in protocol_client
     assert "update_max_active_lp_v4_outcomes" in protocol_client
+
+
+def test_market_factory_schema_constants_track_market_artifact() -> None:
+    data = json.loads((ARTIFACTS_DIR / "market_app" / "QuestionMarket.arc56.json").read_text(encoding="utf-8"))
+    schema = data["state"]["schema"]
+
+    assert schema["global"]["ints"] == factory_module.QUESTION_MARKET_GLOBAL_UINTS
+    assert schema["global"]["bytes"] == factory_module.QUESTION_MARKET_GLOBAL_BYTES
+    assert schema["local"]["ints"] == factory_module.QUESTION_MARKET_LOCAL_UINTS
+    assert schema["local"]["bytes"] == factory_module.QUESTION_MARKET_LOCAL_BYTES
