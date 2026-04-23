@@ -61,6 +61,30 @@ BOX_KEY_USER_FEES = b"uf:"
 BOX_KEY_USER_COST_BASIS = b"uc:"
 BOX_KEY_PENDING_PAYOUTS = b"pp:"
 
+# ---------------------------------------------------------------------------
+# Per-box MBR top-up costs.
+# AVM formula: MBR = 2_500 + 400 * (key_size + value_size).
+# Every BoxMap below stores a UInt64 (8-byte) value.
+#
+#   us: key = "us:"(3) + sender(32) + outcome index u64(8) = 43 bytes
+#   uc: key = "uc:"(3) + sender(32) + outcome index u64(8) = 43 bytes
+#   uf: key = "uf:"(3) + sender(32)                        = 35 bytes
+#   pp: key = "pp:"(3) + account(32)                       = 35 bytes
+#
+# Trader-facing actions (buy / sell / claim / refund / LP methods) pay
+# these at call time via an ALGO payment grouped with the call, and are
+# refunded the same amount when the corresponding box is deleted on full
+# exit (delete-on-zero). Net cost of a round-trip is zero, modulo inner-txn
+# fees covered by Algorand's fee pooling on the outer txn.
+#
+# Dispute-resolution methods still create pp: boxes, but they are paid out
+# of the market app account's MARKET_APP_MIN_FUNDING prefund — see the
+# buffer decomposition in smart_contracts/market_factory/contract.py.
+SHARE_BOX_MBR = 2_500 + 400 * (3 + 32 + 8 + 8)   # 22_900
+COST_BOX_MBR = 2_500 + 400 * (3 + 32 + 8 + 8)    # 22_900
+FEE_BOX_MBR = 2_500 + 400 * (3 + 32 + 8)         # 19_700
+PENDING_PAYOUT_BOX_MBR = 2_500 + 400 * (3 + 32 + 8)  # 19_700
+
 # State and event schema consumed by the acceptance harness and ARC-56 tooling.
 # creator:
 # currency_asa:
@@ -664,8 +688,84 @@ class QuestionMarket(ARC4Contract):
             fee=0,
         ).submit()
 
+    # -----------------------------------------------------------------
+    # MBR top-up helpers.
+    # -----------------------------------------------------------------
+
+    @subroutine
+    def _verify_mbr_topup(
+        self, mbr_payment: gtxn.PaymentTransaction, required: UInt64
+    ) -> None:
+        """Validate that an ALGO payment in the same atomic group funds the
+        exact MBR for boxes this call will create. Strict equality so the
+        refund on delete-on-zero returns the same amount the trader paid."""
+        self._require(mbr_payment.sender.bytes == Txn.sender.bytes)
+        self._require(
+            mbr_payment.receiver.bytes == Global.current_application_address.bytes
+        )
+        self._require(mbr_payment.amount == required)
+        self._require(mbr_payment.rekey_to.bytes == Global.zero_address.bytes)
+        self._require(
+            mbr_payment.close_remainder_to.bytes == Global.zero_address.bytes
+        )
+
+    @subroutine
+    def _new_buy_box_mbr(self, outcome: UInt64) -> UInt64:
+        """MBR required for a buy: sum over us: and uc: boxes for
+        (sender, outcome) that do not yet exist. 0 for repeat buys."""
+        required = UInt64(0)
+        outcome_key = op.concat(Txn.sender.bytes, op.itob(outcome))
+        _s, shares_exists = self.user_outcome_shares_box.maybe(outcome_key)
+        if not shares_exists:
+            required = required + UInt64(SHARE_BOX_MBR)
+        _c, cost_exists = self.user_cost_basis_box.maybe(outcome_key)
+        if not cost_exists:
+            required = required + UInt64(COST_BOX_MBR)
+        return required
+
+    @subroutine
+    def _new_lp_box_mbr(self) -> UInt64:
+        """MBR required for any LP-side method that may trigger
+        _settle_lp_fees and create the uf: box. 0 on repeat calls."""
+        _v, fee_exists = self.user_claimable_fees_box.maybe(self._sender_fee_key())
+        if fee_exists:
+            return UInt64(0)
+        return UInt64(FEE_BOX_MBR)
+
+    @subroutine
+    def _refund_mbr(self, amount: UInt64) -> None:
+        """Inner ALGO payment back to Txn.sender. fee=0 — the outer txn
+        must pay the inner fee via Algorand fee pooling."""
+        if amount > UInt64(0):
+            itxn.Payment(
+                receiver=Txn.sender,
+                amount=amount,
+                fee=0,
+            ).submit()
+
+    @subroutine
+    def _maybe_delete_zero_position(self, outcome: UInt64) -> None:
+        """After a state update that may have zeroed the user's (outcome)
+        position: delete us:/uc: boxes if they exist and refund MBR."""
+        if self._get_user_outcome_shares(outcome) != UInt64(0):
+            return
+        outcome_key = op.concat(Txn.sender.bytes, op.itob(outcome))
+        refund = UInt64(0)
+        _s, shares_exists = self.user_outcome_shares_box.maybe(outcome_key)
+        if shares_exists:
+            del self.user_outcome_shares_box[outcome_key]
+            refund = refund + UInt64(SHARE_BOX_MBR)
+        _c, cost_exists = self.user_cost_basis_box.maybe(outcome_key)
+        if cost_exists:
+            del self.user_cost_basis_box[outcome_key]
+            refund = refund + UInt64(COST_BOX_MBR)
+        self._refund_mbr(refund)
+
     @arc4.abimethod()
-    def claim_lp_fees(self) -> None:
+    def claim_lp_fees(self, mbr_payment: gtxn.PaymentTransaction) -> None:
+        # _settle_lp_fees may create the uf: box on first call for this LP.
+        # Required MBR is 0 for repeat callers (box already exists).
+        self._verify_mbr_topup(mbr_payment, self._new_lp_box_mbr())
         self._settle_lp_fees()
         claimable = self._get_claimable_fees()
         self._require(claimable > UInt64(0))
@@ -674,7 +774,10 @@ class QuestionMarket(ARC4Contract):
         arc4.emit("ClaimLpFees(uint64)", arc4.UInt64(claimable))
 
     @arc4.abimethod()
-    def withdraw_lp_fees(self, amount: arc4.UInt64) -> None:
+    def withdraw_lp_fees(
+        self, amount: arc4.UInt64, mbr_payment: gtxn.PaymentTransaction
+    ) -> None:
+        self._verify_mbr_topup(mbr_payment, self._new_lp_box_mbr())
         self._settle_lp_fees()
         withdraw_amount = amount.as_uint64()
         self._require(withdraw_amount > UInt64(0))
@@ -937,6 +1040,7 @@ class QuestionMarket(ARC4Contract):
         shares: arc4.UInt64,
         max_cost: arc4.UInt64,
         payment: gtxn.AssetTransferTransaction,
+        mbr_payment: gtxn.PaymentTransaction,
     ) -> None:
         self._active_before_deadline()
         outcome = outcome_index.as_uint64()
@@ -946,6 +1050,11 @@ class QuestionMarket(ARC4Contract):
         self._require_share_granularity(shares_val)
         max_total = max_cost.as_uint64()
         self._require(max_total > UInt64(0))
+
+        # Trader funds the MBR for any us:/uc: box this buy will create.
+        # Strict equality — refund on full exit (delete-on-zero) returns the
+        # same amount. Returns 0 for repeat buys of (sender, outcome).
+        self._verify_mbr_topup(mbr_payment, self._new_buy_box_mbr(outcome))
 
         q = self._get_q()
         cost = lmsr_cost_delta(q, self.b.value, outcome, shares_val)
@@ -1010,6 +1119,9 @@ class QuestionMarket(ARC4Contract):
         # Send USDC to seller
         self._send_currency(Txn.sender, net_return)
 
+        # Full exit from this outcome deletes us:/uc: boxes and refunds MBR.
+        self._maybe_delete_zero_position(outcome)
+
         arc4.emit("Sell(uint64)", outcome_index)
         self._assert_invariants()
 
@@ -1021,6 +1133,7 @@ class QuestionMarket(ARC4Contract):
         expected_prices: arc4.DynamicArray[arc4.UInt64],
         price_tolerance: arc4.UInt64,
         payment: gtxn.AssetTransferTransaction,
+        mbr_payment: gtxn.PaymentTransaction,
     ) -> None:
         self._active_before_deadline()
         delta_b = target_delta_b.as_uint64()
@@ -1029,6 +1142,10 @@ class QuestionMarket(ARC4Contract):
         self._require(delta_b > UInt64(0))
         self._require(max_deposit_val > UInt64(0))
         self._require(expected_prices.length == self.num_outcomes.value)
+
+        # LP may trigger _settle_lp_fees below which creates the uf: box on
+        # first call. MBR is 0 on repeat entries.
+        self._verify_mbr_topup(mbr_payment, self._new_lp_box_mbr())
 
         current_prices = lmsr_prices(self._get_q(), self.b.value)
         max_price = UInt64(0)
@@ -1302,6 +1419,9 @@ class QuestionMarket(ARC4Contract):
         # Send payout to claimer
         self._send_currency(Txn.sender, payout)
 
+        # Full exit deletes us:/uc: boxes and refunds MBR.
+        self._maybe_delete_zero_position(outcome)
+
         arc4.emit("Claim(uint64)", outcome_index)
         self._assert_solvency()
 
@@ -1348,6 +1468,9 @@ class QuestionMarket(ARC4Contract):
 
         # Send refund to user
         self._send_currency(Txn.sender, basis_reduction)
+
+        # Full exit deletes us:/uc: boxes and refunds MBR.
+        self._maybe_delete_zero_position(outcome)
 
         arc4.emit("Refund(uint64)", outcome_index)
         self._assert_solvency()

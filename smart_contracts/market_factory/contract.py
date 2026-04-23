@@ -26,7 +26,26 @@ MAX_ACTIVE_LP_OUTCOMES = 8
 BPS_DENOMINATOR = 10_000
 SECONDS_PER_DAY = 86_400
 FACTORY_RESERVE = 100_000
-MARKET_APP_MIN_FUNDING = 1_616_400
+
+# MBR the factory transfers to the new market app account. Must cover:
+#   1. App-account base                            100_000  (0.1 ALGO)
+#   2. USDC ASA opt-in                             100_000  (0.1 ALGO)
+#   3. Dispute-resolution pp: box buffer          ~197_000  (~10 boxes × 19_700)
+#
+# User-facing boxes (us:, uc:, uf:) are NOT prefunded here — traders and LPs
+# pay per-action MBR top-ups in the market contract's box-creating methods,
+# and are refunded on delete-on-zero. See SHARE_BOX_MBR etc. in market_app.
+#
+# The dispute-resolution pp: buffer covers creator/admin/authority resolve
+# paths that credit proposer/challenger payouts — these can't practically
+# charge the caller (the caller isn't the recipient).
+APP_ACCOUNT_BASE_MBR = 100_000
+USDC_OPTIN_MBR = 100_000
+DISPUTE_PP_BUFFER = 200_000  # ~10 pp: boxes at 19_700 μA each
+MARKET_APP_MIN_FUNDING = (
+    APP_ACCOUNT_BASE_MBR + USDC_OPTIN_MBR + DISPUTE_PP_BUFFER
+)  # 400_000 μA = 0.4 ALGO
+
 APP_CREATE_BASE_MIN_BALANCE = 100_000
 APP_PAGE_MIN_BALANCE = 100_000
 APP_GLOBAL_UINT_MIN_BALANCE = 28_500

@@ -5,7 +5,7 @@
 main:
     intcblock 0 8 1 2 4096 8192
     bytecblock 0x6170 0x
-    // smart_contracts/market_factory/contract.py:51
+    // smart_contracts/market_factory/contract.py:70
     // class MarketFactory(ARC4Contract):
     txn NumAppArgs
     bz main_create@14
@@ -20,13 +20,13 @@ main:
     err
 
 main_noop_route@6:
-    // smart_contracts/market_factory/contract.py:103
+    // smart_contracts/market_factory/contract.py:122
     // @arc4.abimethod()
     intc_2 // 1
     return
 
 main_create@14:
-    // smart_contracts/market_factory/contract.py:99
+    // smart_contracts/market_factory/contract.py:118
     // @arc4.baremethod(create="require")
     txn OnCompletion
     !
@@ -38,7 +38,7 @@ main_create@14:
 
 // smart_contracts.market_factory.contract.MarketFactory.create_program_box[routing]() -> void:
 create_program_box:
-    // smart_contracts/market_factory/contract.py:108
+    // smart_contracts/market_factory/contract.py:127
     // @arc4.abimethod()
     txna ApplicationArgs 1
     dup
@@ -57,32 +57,32 @@ create_program_box:
     intc_1 // 8
     ==
     assert // invalid number of bytes for arc4.uint64
-    // smart_contracts/market_factory/contract.py:111
+    // smart_contracts/market_factory/contract.py:130
     // assert Txn.sender == Global.creator_address
     txn Sender
     global CreatorAddress
     ==
     assert
-    // smart_contracts/market_factory/contract.py:112
+    // smart_contracts/market_factory/contract.py:131
     // key = box_key.native
     extract 2 0
     dup
-    // smart_contracts/market_factory/contract.py:113
+    // smart_contracts/market_factory/contract.py:132
     // _existed, _val = op.Box.get(key)
     box_get
     pop
-    // smart_contracts/market_factory/contract.py:114
+    // smart_contracts/market_factory/contract.py:133
     // if _existed:
     len
     bz create_program_box_after_if_else@3
-    // smart_contracts/market_factory/contract.py:115
+    // smart_contracts/market_factory/contract.py:134
     // op.Box.delete(key)
     dup
     box_del
     pop
 
 create_program_box_after_if_else@3:
-    // smart_contracts/market_factory/contract.py:116
+    // smart_contracts/market_factory/contract.py:135
     // op.Box.create(key, size.as_uint64())
     dig 1
     btoi
@@ -90,7 +90,7 @@ create_program_box_after_if_else@3:
     swap
     box_create
     pop
-    // smart_contracts/market_factory/contract.py:108
+    // smart_contracts/market_factory/contract.py:127
     // @arc4.abimethod()
     intc_2 // 1
     return
@@ -98,7 +98,7 @@ create_program_box_after_if_else@3:
 
 // smart_contracts.market_factory.contract.MarketFactory.write_program_chunk[routing]() -> void:
 write_program_chunk:
-    // smart_contracts/market_factory/contract.py:118
+    // smart_contracts/market_factory/contract.py:137
     // @arc4.abimethod()
     txna ApplicationArgs 1
     dup
@@ -126,13 +126,13 @@ write_program_chunk:
     len
     ==
     assert // invalid number of bytes for arc4.dynamic_array<arc4.uint8>
-    // smart_contracts/market_factory/contract.py:121
+    // smart_contracts/market_factory/contract.py:140
     // assert Txn.sender == Global.creator_address
     txn Sender
     global CreatorAddress
     ==
     assert
-    // smart_contracts/market_factory/contract.py:122
+    // smart_contracts/market_factory/contract.py:141
     // op.Box.replace(box_key.native, offset.as_uint64(), data.native)
     uncover 2
     extract 2 0
@@ -141,7 +141,7 @@ write_program_chunk:
     uncover 2
     extract 2 0
     box_replace
-    // smart_contracts/market_factory/contract.py:118
+    // smart_contracts/market_factory/contract.py:137
     // @arc4.abimethod()
     intc_2 // 1
     return
@@ -149,7 +149,7 @@ write_program_chunk:
 
 // smart_contracts.market_factory.contract.MarketFactory.opt_into_asset[routing]() -> void:
 opt_into_asset:
-    // smart_contracts/market_factory/contract.py:124
+    // smart_contracts/market_factory/contract.py:143
     // @arc4.abimethod()
     txna ApplicationArgs 1
     dup
@@ -157,13 +157,13 @@ opt_into_asset:
     intc_1 // 8
     ==
     assert // invalid number of bytes for arc4.uint64
-    // smart_contracts/market_factory/contract.py:127
+    // smart_contracts/market_factory/contract.py:146
     // assert Txn.sender == Global.creator_address
     txn Sender
     global CreatorAddress
     ==
     assert
-    // smart_contracts/market_factory/contract.py:128-133
+    // smart_contracts/market_factory/contract.py:147-152
     // itxn.AssetTransfer(
     //     xfer_asset=Asset(asset.as_uint64()),
     //     asset_receiver=Global.current_application_address,
@@ -171,27 +171,27 @@ opt_into_asset:
     //     fee=0,
     // ).submit()
     itxn_begin
-    // smart_contracts/market_factory/contract.py:129
+    // smart_contracts/market_factory/contract.py:148
     // xfer_asset=Asset(asset.as_uint64()),
     btoi
-    // smart_contracts/market_factory/contract.py:130
+    // smart_contracts/market_factory/contract.py:149
     // asset_receiver=Global.current_application_address,
     global CurrentApplicationAddress
-    // smart_contracts/market_factory/contract.py:131
+    // smart_contracts/market_factory/contract.py:150
     // asset_amount=0,
     intc_0 // 0
     itxn_field AssetAmount
     itxn_field AssetReceiver
     itxn_field XferAsset
-    // smart_contracts/market_factory/contract.py:128
+    // smart_contracts/market_factory/contract.py:147
     // itxn.AssetTransfer(
     pushint 4 // axfer
     itxn_field TypeEnum
-    // smart_contracts/market_factory/contract.py:132
+    // smart_contracts/market_factory/contract.py:151
     // fee=0,
     intc_0 // 0
     itxn_field Fee
-    // smart_contracts/market_factory/contract.py:128-133
+    // smart_contracts/market_factory/contract.py:147-152
     // itxn.AssetTransfer(
     //     xfer_asset=Asset(asset.as_uint64()),
     //     asset_receiver=Global.current_application_address,
@@ -199,7 +199,7 @@ opt_into_asset:
     //     fee=0,
     // ).submit()
     itxn_submit
-    // smart_contracts/market_factory/contract.py:124
+    // smart_contracts/market_factory/contract.py:143
     // @arc4.abimethod()
     intc_2 // 1
     return
@@ -211,7 +211,7 @@ create_market:
     dupn 2
     bytec_1 // ""
     dupn 2
-    // smart_contracts/market_factory/contract.py:135
+    // smart_contracts/market_factory/contract.py:154
     // @arc4.abimethod()
     txna ApplicationArgs 1
     dupn 2
@@ -332,7 +332,7 @@ create_market:
     pushint 4 // axfer
     ==
     assert // transaction type is axfer
-    // smart_contracts/market_factory/contract.py:154-155
+    // smart_contracts/market_factory/contract.py:173-174
     // # Validate ALGO funding
     // assert algo_funding.sender == Txn.sender
     dig 1
@@ -340,37 +340,37 @@ create_market:
     txn Sender
     ==
     assert
-    // smart_contracts/market_factory/contract.py:156
+    // smart_contracts/market_factory/contract.py:175
     // assert algo_funding.receiver == Global.current_application_address
     dig 1
     gtxns Receiver
     global CurrentApplicationAddress
     ==
     assert
-    // smart_contracts/market_factory/contract.py:157
+    // smart_contracts/market_factory/contract.py:176
     // assert algo_funding.amount >= CREATE_MARKET_MIN_FUNDING
     dig 1
     gtxns Amount
     dup
     cover 7
-    pushint 4212900
+    pushint 2996500
     >=
     assert
-    // smart_contracts/market_factory/contract.py:158
+    // smart_contracts/market_factory/contract.py:177
     // assert algo_funding.rekey_to == Global.zero_address
     dig 1
     gtxns RekeyTo
     global ZeroAddress
     ==
     assert
-    // smart_contracts/market_factory/contract.py:159
+    // smart_contracts/market_factory/contract.py:178
     // assert algo_funding.close_remainder_to == Global.zero_address
     swap
     gtxns CloseRemainderTo
     global ZeroAddress
     ==
     assert
-    // smart_contracts/market_factory/contract.py:161-162
+    // smart_contracts/market_factory/contract.py:180-181
     // # Validate USDC funding
     // assert usdc_funding.sender == Txn.sender
     dup
@@ -378,14 +378,14 @@ create_market:
     txn Sender
     ==
     assert
-    // smart_contracts/market_factory/contract.py:163
+    // smart_contracts/market_factory/contract.py:182
     // assert usdc_funding.asset_receiver == Global.current_application_address
     dup
     gtxns AssetReceiver
     global CurrentApplicationAddress
     ==
     assert
-    // smart_contracts/market_factory/contract.py:164
+    // smart_contracts/market_factory/contract.py:183
     // assert usdc_funding.xfer_asset.id == currency_asa.as_uint64()
     dup
     gtxns XferAsset
@@ -395,7 +395,7 @@ create_market:
     cover 6
     ==
     assert
-    // smart_contracts/market_factory/contract.py:165
+    // smart_contracts/market_factory/contract.py:184
     // assert usdc_funding.asset_amount >= deposit_amount.as_uint64()
     dup
     gtxns AssetAmount
@@ -407,101 +407,101 @@ create_market:
     cover 5
     >=
     assert
-    // smart_contracts/market_factory/contract.py:166
+    // smart_contracts/market_factory/contract.py:185
     // assert usdc_funding.rekey_to == Global.zero_address
     dup
     gtxns RekeyTo
     global ZeroAddress
     ==
     assert
-    // smart_contracts/market_factory/contract.py:167
+    // smart_contracts/market_factory/contract.py:186
     // assert usdc_funding.asset_close_to == Global.zero_address
     gtxns AssetCloseTo
     global ZeroAddress
     ==
     assert
-    // smart_contracts/market_factory/contract.py:169
+    // smart_contracts/market_factory/contract.py:188
     // assert num_outcomes.as_uint64() <= MAX_ACTIVE_LP_OUTCOMES
     swap
     btoi
     intc_1 // 8
     <=
     assert
-    // smart_contracts/market_factory/contract.py:170
+    // smart_contracts/market_factory/contract.py:189
     // protocol_config_id = Txn.applications(1).id
     txna Applications 1
     dup
     cover 2
-    // smart_contracts/market_factory/contract.py:64
+    // smart_contracts/market_factory/contract.py:83
     // value, exists = op.AppGlobal.get_ex_uint64(app, key)
     dup
-    // smart_contracts/market_factory/contract.py:172
+    // smart_contracts/market_factory/contract.py:191
     // linked_factory_id = self._config_uint64(protocol_config_app, Bytes(b"mfi"))
     pushbytes 0x6d6669
-    // smart_contracts/market_factory/contract.py:64
+    // smart_contracts/market_factory/contract.py:83
     // value, exists = op.AppGlobal.get_ex_uint64(app, key)
     app_global_get_ex
-    // smart_contracts/market_factory/contract.py:65
+    // smart_contracts/market_factory/contract.py:84
     // assert exists
     assert
-    // smart_contracts/market_factory/contract.py:173
+    // smart_contracts/market_factory/contract.py:192
     // assert linked_factory_id == Global.current_application_id.id
     global CurrentApplicationID
     ==
     assert
-    // smart_contracts/market_factory/contract.py:64
+    // smart_contracts/market_factory/contract.py:83
     // value, exists = op.AppGlobal.get_ex_uint64(app, key)
     dup
-    // smart_contracts/market_factory/contract.py:175
+    // smart_contracts/market_factory/contract.py:194
     // self._config_uint64(protocol_config_app, Bytes(b"pb")),
     pushbytes 0x7062
-    // smart_contracts/market_factory/contract.py:64
+    // smart_contracts/market_factory/contract.py:83
     // value, exists = op.AppGlobal.get_ex_uint64(app, key)
     app_global_get_ex
-    // smart_contracts/market_factory/contract.py:65
+    // smart_contracts/market_factory/contract.py:84
     // assert exists
     assert
-    // smart_contracts/market_factory/contract.py:64
+    // smart_contracts/market_factory/contract.py:83
     // value, exists = op.AppGlobal.get_ex_uint64(app, key)
     dig 1
-    // smart_contracts/market_factory/contract.py:176
+    // smart_contracts/market_factory/contract.py:195
     // self._config_uint64(protocol_config_app, Bytes(b"pbc")),
     pushbytes 0x706263
-    // smart_contracts/market_factory/contract.py:64
+    // smart_contracts/market_factory/contract.py:83
     // value, exists = op.AppGlobal.get_ex_uint64(app, key)
     app_global_get_ex
-    // smart_contracts/market_factory/contract.py:65
+    // smart_contracts/market_factory/contract.py:84
     // assert exists
     assert
-    // smart_contracts/market_factory/contract.py:64
+    // smart_contracts/market_factory/contract.py:83
     // value, exists = op.AppGlobal.get_ex_uint64(app, key)
     dig 2
-    // smart_contracts/market_factory/contract.py:177
+    // smart_contracts/market_factory/contract.py:196
     // self._config_uint64(protocol_config_app, Bytes(b"pfd")),
     pushbytes 0x706664
-    // smart_contracts/market_factory/contract.py:64
+    // smart_contracts/market_factory/contract.py:83
     // value, exists = op.AppGlobal.get_ex_uint64(app, key)
     app_global_get_ex
-    // smart_contracts/market_factory/contract.py:65
+    // smart_contracts/market_factory/contract.py:84
     // assert exists
     assert
-    // smart_contracts/market_factory/contract.py:64
+    // smart_contracts/market_factory/contract.py:83
     // value, exists = op.AppGlobal.get_ex_uint64(app, key)
     uncover 3
-    // smart_contracts/market_factory/contract.py:178
+    // smart_contracts/market_factory/contract.py:197
     // self._config_uint64(protocol_config_app, Bytes(b"pff")),
     pushbytes 0x706666
-    // smart_contracts/market_factory/contract.py:64
+    // smart_contracts/market_factory/contract.py:83
     // value, exists = op.AppGlobal.get_ex_uint64(app, key)
     app_global_get_ex
-    // smart_contracts/market_factory/contract.py:65
+    // smart_contracts/market_factory/contract.py:84
     // assert exists
     assert
-    // smart_contracts/market_factory/contract.py:179
+    // smart_contracts/market_factory/contract.py:198
     // challenge_window_secs.as_uint64(),
     uncover 4
     btoi
-    // smart_contracts/market_factory/contract.py:92
+    // smart_contracts/market_factory/contract.py:111
     // floor_fee = self._mul_div_ceil(proposal_bond, proposer_fee_floor_bps, UInt64(BPS_DENOMINATOR))
     uncover 4
     uncover 2
@@ -510,34 +510,34 @@ create_market:
     dup
     cover 2
     cover 4
-    // smart_contracts/market_factory/contract.py:93
+    // smart_contracts/market_factory/contract.py:112
     // daily_fee = self._mul_div_ceil(proposal_bond_cap, proposer_fee_bps, UInt64(BPS_DENOMINATOR))
     uncover 3
     uncover 3
     pushint 10000
     callsub _mul_div_ceil
-    // smart_contracts/market_factory/contract.py:94
+    // smart_contracts/market_factory/contract.py:113
     // window_fee = self._mul_div_ceil(daily_fee, challenge_window_secs, UInt64(SECONDS_PER_DAY))
     swap
     pushint 86400
     callsub _mul_div_ceil
     dup
     uncover 2
-    // smart_contracts/market_factory/contract.py:95
+    // smart_contracts/market_factory/contract.py:114
     // if window_fee > floor_fee:
     >
     bz create_market_after_if_else@12
     dup
 
 create_market_after_inlined_smart_contracts.market_factory.contract.MarketFactory._max_proposer_fee@13:
-    // smart_contracts/market_factory/contract.py:181
+    // smart_contracts/market_factory/contract.py:200
     // assert usdc_funding.asset_amount >= deposit_amount.as_uint64() + budget_required
     dig 4
     +
     dig 5
     <=
     assert
-    // smart_contracts/market_factory/contract.py:183-184
+    // smart_contracts/market_factory/contract.py:202-203
     // # Read stored bytecode from boxes in chunks (AVM stack limit: 4096 bytes per value)
     // ap_len, _ap_exists = op.Box.length(Bytes(b"ap"))
     bytec_0 // 0x6170
@@ -545,7 +545,7 @@ create_market_after_inlined_smart_contracts.market_factory.contract.MarketFactor
     pop
     dup
     bury 24
-    // smart_contracts/market_factory/contract.py:186
+    // smart_contracts/market_factory/contract.py:205
     // if ap_page0_len > UInt64(4096):
     intc 4 // 4096
     >
@@ -555,44 +555,44 @@ create_market_after_inlined_smart_contracts.market_factory.contract.MarketFactor
     dig 22
 
 create_market_after_if_else@3:
-    // smart_contracts/market_factory/contract.py:188
+    // smart_contracts/market_factory/contract.py:207
     // ap_page0 = op.Box.extract(Bytes(b"ap"), UInt64(0), ap_page0_len)
     bytec_0 // 0x6170
     intc_0 // 0
     uncover 2
     box_extract
     bury 26
-    // smart_contracts/market_factory/contract.py:189
+    // smart_contracts/market_factory/contract.py:208
     // ap_page1 = Bytes()
     bytec_1 // 0x
     bury 25
-    // smart_contracts/market_factory/contract.py:190
+    // smart_contracts/market_factory/contract.py:209
     // ap_page2 = Bytes()
     bytec_1 // 0x
     bury 24
-    // smart_contracts/market_factory/contract.py:191
+    // smart_contracts/market_factory/contract.py:210
     // if ap_len > UInt64(4096):
     dig 20
     bz create_market_after_if_else@7
-    // smart_contracts/market_factory/contract.py:192
+    // smart_contracts/market_factory/contract.py:211
     // ap_page1_len = ap_len - UInt64(4096)
     dig 22
     intc 4 // 4096
     -
     dup
     bury 23
-    // smart_contracts/market_factory/contract.py:193
+    // smart_contracts/market_factory/contract.py:212
     // if ap_page1_len > UInt64(4096):
     intc 4 // 4096
     >
     bz create_market_after_if_else@6
-    // smart_contracts/market_factory/contract.py:194
+    // smart_contracts/market_factory/contract.py:213
     // ap_page1_len = UInt64(4096)
     intc 4 // 4096
     bury 22
 
 create_market_after_if_else@6:
-    // smart_contracts/market_factory/contract.py:195
+    // smart_contracts/market_factory/contract.py:214
     // ap_page1 = op.Box.extract(Bytes(b"ap"), UInt64(4096), ap_page1_len)
     bytec_0 // 0x6170
     intc 4 // 4096
@@ -601,13 +601,13 @@ create_market_after_if_else@6:
     bury 25
 
 create_market_after_if_else@7:
-    // smart_contracts/market_factory/contract.py:196
+    // smart_contracts/market_factory/contract.py:215
     // if ap_len > UInt64(8192):
     dig 22
     intc 5 // 8192
     >
     bz create_market_after_if_else@9
-    // smart_contracts/market_factory/contract.py:197
+    // smart_contracts/market_factory/contract.py:216
     // ap_page2 = op.Box.extract(Bytes(b"ap"), UInt64(8192), ap_len - UInt64(8192))
     dig 22
     intc 5 // 8192
@@ -619,12 +619,12 @@ create_market_after_if_else@7:
     bury 24
 
 create_market_after_if_else@9:
-    // smart_contracts/market_factory/contract.py:198
+    // smart_contracts/market_factory/contract.py:217
     // clear_program = self.clear_program_box.value
     pushbytes 0x6370
     box_get
     assert // check self.clear_program_box exists
-    // smart_contracts/market_factory/contract.py:204-231
+    // smart_contracts/market_factory/contract.py:223-250
     // create_itxn = itxn.ApplicationCall(
     //     approval_program=(ap_page0, ap_page1, ap_page2),
     //     clear_state_program=(clear_program,),
@@ -654,17 +654,17 @@ create_market_after_if_else@9:
     //     fee=0,
     // ).submit()
     itxn_begin
-    // smart_contracts/market_factory/contract.py:214
+    // smart_contracts/market_factory/contract.py:233
     // arc4.Address(Txn.sender),
     txn Sender
-    // smart_contracts/market_factory/contract.py:223
+    // smart_contracts/market_factory/contract.py:242
     // arc4.Address(Global.creator_address),
     global CreatorAddress
-    // smart_contracts/market_factory/contract.py:226
+    // smart_contracts/market_factory/contract.py:245
     // arc4.UInt64(protocol_config_id),
     dig 5
     itob
-    // smart_contracts/market_factory/contract.py:200-203
+    // smart_contracts/market_factory/contract.py:219-222
     // # The current market approval program spans five 2KB AVM pages, which no
     // # longer fits through CompiledContract's two-slot page tuple. Use a manual
     // # inner app-create so we can append all approval pages explicitly.
@@ -700,19 +700,19 @@ create_market_after_if_else@9:
     itxn_field ApplicationArgs
     dig 9
     itxn_field ApplicationArgs
-    // smart_contracts/market_factory/contract.py:211
+    // smart_contracts/market_factory/contract.py:230
     // extra_program_pages=UInt64(QUESTION_MARKET_EXTRA_PAGES),
     pushint 3
     itxn_field ExtraProgramPages
-    // smart_contracts/market_factory/contract.py:209
+    // smart_contracts/market_factory/contract.py:228
     // local_num_uint=UInt64(QUESTION_MARKET_LOCAL_UINTS),
     pushint 5
     itxn_field LocalNumUint
-    // smart_contracts/market_factory/contract.py:208
+    // smart_contracts/market_factory/contract.py:227
     // global_num_bytes=UInt64(QUESTION_MARKET_GLOBAL_BYTES),
     pushint 14
     itxn_field GlobalNumByteSlice
-    // smart_contracts/market_factory/contract.py:207
+    // smart_contracts/market_factory/contract.py:226
     // global_num_uint=UInt64(QUESTION_MARKET_GLOBAL_UINTS),
     pushint 49
     itxn_field GlobalNumUint
@@ -723,15 +723,15 @@ create_market_after_if_else@9:
     itxn_field ApprovalProgramPages
     dig 23
     itxn_field ApprovalProgramPages
-    // smart_contracts/market_factory/contract.py:204
+    // smart_contracts/market_factory/contract.py:223
     // create_itxn = itxn.ApplicationCall(
     pushint 6 // appl
     itxn_field TypeEnum
-    // smart_contracts/market_factory/contract.py:230
+    // smart_contracts/market_factory/contract.py:249
     // fee=0,
     intc_0 // 0
     itxn_field Fee
-    // smart_contracts/market_factory/contract.py:204-231
+    // smart_contracts/market_factory/contract.py:223-250
     // create_itxn = itxn.ApplicationCall(
     //     approval_program=(ap_page0, ap_page1, ap_page2),
     //     clear_state_program=(clear_program,),
@@ -762,12 +762,12 @@ create_market_after_if_else@9:
     // ).submit()
     itxn_submit
     itxn CreatedApplicationID
-    // smart_contracts/market_factory/contract.py:234
+    // smart_contracts/market_factory/contract.py:253
     // created_app_addr = created_app.address
     dup
     app_params_get AppAddress
     assert // application exists
-    // smart_contracts/market_factory/contract.py:236-242
+    // smart_contracts/market_factory/contract.py:255-261
     // # Retain the creator-side app MBR in the factory account; only forward the
     // # created market's app-account funding to the new app address.
     // itxn.Payment(
@@ -776,7 +776,7 @@ create_market_after_if_else@9:
     //     fee=0,
     // ).submit()
     itxn_begin
-    // smart_contracts/market_factory/contract.py:240
+    // smart_contracts/market_factory/contract.py:259
     // amount=algo_funding.amount - FACTORY_RESERVE - MARKET_CREATOR_MIN_BALANCE,
     dig 8
     pushint 100000
@@ -786,17 +786,17 @@ create_market_after_if_else@9:
     itxn_field Amount
     dup
     itxn_field Receiver
-    // smart_contracts/market_factory/contract.py:236-238
+    // smart_contracts/market_factory/contract.py:255-257
     // # Retain the creator-side app MBR in the factory account; only forward the
     // # created market's app-account funding to the new app address.
     // itxn.Payment(
     intc_2 // pay
     itxn_field TypeEnum
-    // smart_contracts/market_factory/contract.py:241
+    // smart_contracts/market_factory/contract.py:260
     // fee=0,
     intc_0 // 0
     itxn_field Fee
-    // smart_contracts/market_factory/contract.py:236-242
+    // smart_contracts/market_factory/contract.py:255-261
     // # Retain the creator-side app MBR in the factory account; only forward the
     // # created market's app-account funding to the new app address.
     // itxn.Payment(
@@ -805,7 +805,7 @@ create_market_after_if_else@9:
     //     fee=0,
     // ).submit()
     itxn_submit
-    // smart_contracts/market_factory/contract.py:246-251
+    // smart_contracts/market_factory/contract.py:265-270
     // itxn.ApplicationCall(
     //     app_id=created_app,
     //     app_args=(market_initialize_sel,),
@@ -816,22 +816,22 @@ create_market_after_if_else@9:
     dig 7
     dup
     itxn_field Assets
-    // smart_contracts/market_factory/contract.py:244-245
+    // smart_contracts/market_factory/contract.py:263-264
     // # ── Inner txn 3: Call initialize (opt into currency ASA) ──
     // market_initialize_sel = Bytes.from_hex("FD2C93CD")
     pushbytes 0xfd2c93cd
     itxn_field ApplicationArgs
     dig 2
     itxn_field ApplicationID
-    // smart_contracts/market_factory/contract.py:246
+    // smart_contracts/market_factory/contract.py:265
     // itxn.ApplicationCall(
     pushint 6 // appl
     itxn_field TypeEnum
-    // smart_contracts/market_factory/contract.py:249
+    // smart_contracts/market_factory/contract.py:268
     // fee=0,
     intc_0 // 0
     itxn_field Fee
-    // smart_contracts/market_factory/contract.py:246-251
+    // smart_contracts/market_factory/contract.py:265-270
     // itxn.ApplicationCall(
     //     app_id=created_app,
     //     app_args=(market_initialize_sel,),
@@ -839,7 +839,7 @@ create_market_after_if_else@9:
     //     assets=(Asset(currency_asa.as_uint64()),),
     // ).submit()
     itxn_submit
-    // smart_contracts/market_factory/contract.py:255-267
+    // smart_contracts/market_factory/contract.py:274-286
     // itxn.submit_txns(
     //     itxn.AssetTransfer(
     //         xfer_asset=Asset(currency_asa.as_uint64()),
@@ -858,22 +858,22 @@ create_market_after_if_else@9:
     itxn_field AssetAmount
     itxn_field XferAsset
     itxn_field AssetReceiver
-    // smart_contracts/market_factory/contract.py:256
+    // smart_contracts/market_factory/contract.py:275
     // itxn.AssetTransfer(
     pushint 4 // axfer
     itxn_field TypeEnum
-    // smart_contracts/market_factory/contract.py:260
+    // smart_contracts/market_factory/contract.py:279
     // fee=0,
     intc_0 // 0
     itxn_field Fee
-    // smart_contracts/market_factory/contract.py:262-266
+    // smart_contracts/market_factory/contract.py:281-285
     // itxn.ApplicationCall(
     //     app_id=created_app,
     //     app_args=(market_bootstrap_sel, deposit_amount.bytes),
     //     fee=0,
     // ),
     itxn_next
-    // smart_contracts/market_factory/contract.py:253-254
+    // smart_contracts/market_factory/contract.py:272-273
     // # ── Inner txns 4+5: Forward USDC + bootstrap as a grouped pair ──
     // market_bootstrap_sel = Bytes.from_hex("B49094E1")
     pushbytes 0xb49094e1
@@ -882,15 +882,15 @@ create_market_after_if_else@9:
     itxn_field ApplicationArgs
     dup
     itxn_field ApplicationID
-    // smart_contracts/market_factory/contract.py:262
+    // smart_contracts/market_factory/contract.py:281
     // itxn.ApplicationCall(
     pushint 6 // appl
     itxn_field TypeEnum
-    // smart_contracts/market_factory/contract.py:265
+    // smart_contracts/market_factory/contract.py:284
     // fee=0,
     intc_0 // 0
     itxn_field Fee
-    // smart_contracts/market_factory/contract.py:255-267
+    // smart_contracts/market_factory/contract.py:274-286
     // itxn.submit_txns(
     //     itxn.AssetTransfer(
     //         xfer_asset=Asset(currency_asa.as_uint64()),
@@ -905,10 +905,10 @@ create_market_after_if_else@9:
     //     ),
     // )
     itxn_submit
-    // smart_contracts/market_factory/contract.py:269
+    // smart_contracts/market_factory/contract.py:288
     // return arc4.UInt64(created_app.id)
     itob
-    // smart_contracts/market_factory/contract.py:135
+    // smart_contracts/market_factory/contract.py:154
     // @arc4.abimethod()
     pushbytes 0x151f7c75
     swap
@@ -918,14 +918,14 @@ create_market_after_if_else@9:
     return
 
 create_market_if_body@2:
-    // smart_contracts/market_factory/contract.py:187
+    // smart_contracts/market_factory/contract.py:206
     // ap_page0_len = UInt64(4096)
     intc 4 // 4096
     b create_market_after_if_else@3
 
 create_market_after_if_else@12:
     dig 1
-    // smart_contracts/market_factory/contract.py:174-180
+    // smart_contracts/market_factory/contract.py:193-199
     // budget_required = self._max_proposer_fee(
     //     self._config_uint64(protocol_config_app, Bytes(b"pb")),
     //     self._config_uint64(protocol_config_app, Bytes(b"pbc")),
@@ -938,23 +938,23 @@ create_market_after_if_else@12:
 
 // smart_contracts.market_factory.contract.MarketFactory._mul_div_ceil(a: uint64, b: uint64, denominator: uint64) -> uint64:
 _mul_div_ceil:
-    // smart_contracts/market_factory/contract.py:68-69
+    // smart_contracts/market_factory/contract.py:87-88
     // @subroutine
     // def _mul_div_ceil(self, a: UInt64, b: UInt64, denominator: UInt64) -> UInt64:
     proto 3 1
-    // smart_contracts/market_factory/contract.py:70
+    // smart_contracts/market_factory/contract.py:89
     // assert denominator > UInt64(0)
     frame_dig -1
     assert
-    // smart_contracts/market_factory/contract.py:71
+    // smart_contracts/market_factory/contract.py:90
     // product_high, product_low = op.mulw(a, b)
     frame_dig -3
     frame_dig -2
     mulw
-    // smart_contracts/market_factory/contract.py:75
+    // smart_contracts/market_factory/contract.py:94
     // UInt64(0),
     intc_0 // 0
-    // smart_contracts/market_factory/contract.py:72-77
+    // smart_contracts/market_factory/contract.py:91-96
     // quotient_high, quotient_low, remainder_high, remainder_low = op.divmodw(
     //     product_high,
     //     product_low,
@@ -965,23 +965,23 @@ _mul_div_ceil:
     divmodw
     cover 3
     uncover 2
-    // smart_contracts/market_factory/contract.py:78
+    // smart_contracts/market_factory/contract.py:97
     // assert quotient_high == UInt64(0)
     !
     assert
-    // smart_contracts/market_factory/contract.py:79
+    // smart_contracts/market_factory/contract.py:98
     // if remainder_high == UInt64(0) and remainder_low == UInt64(0):
     bnz _mul_div_ceil_after_if_else@3
     frame_dig 0
     bnz _mul_div_ceil_after_if_else@3
-    // smart_contracts/market_factory/contract.py:80
+    // smart_contracts/market_factory/contract.py:99
     // return quotient_low
     frame_dig 1
     frame_bury 0
     retsub
 
 _mul_div_ceil_after_if_else@3:
-    // smart_contracts/market_factory/contract.py:81
+    // smart_contracts/market_factory/contract.py:100
     // return quotient_low + UInt64(1)
     frame_dig 1
     intc_2 // 1

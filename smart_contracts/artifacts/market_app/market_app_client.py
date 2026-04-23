@@ -10,12 +10,14 @@ class QuestionMarket(algopy.arc4.ARC4Client, typing.Protocol):
     @algopy.arc4.abimethod
     def claim_lp_fees(
         self,
+        mbr_payment: algopy.gtxn.PaymentTransaction,
     ) -> None: ...
 
     @algopy.arc4.abimethod
     def withdraw_lp_fees(
         self,
         amount: algopy.arc4.UIntN[typing.Literal[64]],
+        mbr_payment: algopy.gtxn.PaymentTransaction,
     ) -> None: ...
 
     @algopy.arc4.abimethod
@@ -71,6 +73,7 @@ class QuestionMarket(algopy.arc4.ARC4Client, typing.Protocol):
         shares: algopy.arc4.UIntN[typing.Literal[64]],
         max_cost: algopy.arc4.UIntN[typing.Literal[64]],
         payment: algopy.gtxn.AssetTransferTransaction,
+        mbr_payment: algopy.gtxn.PaymentTransaction,
     ) -> None: ...
 
     @algopy.arc4.abimethod
@@ -89,6 +92,7 @@ class QuestionMarket(algopy.arc4.ARC4Client, typing.Protocol):
         expected_prices: algopy.arc4.DynamicArray[algopy.arc4.UIntN[typing.Literal[64]]],
         price_tolerance: algopy.arc4.UIntN[typing.Literal[64]],
         payment: algopy.gtxn.AssetTransferTransaction,
+        mbr_payment: algopy.gtxn.PaymentTransaction,
     ) -> None: ...
 
     @algopy.arc4.abimethod
