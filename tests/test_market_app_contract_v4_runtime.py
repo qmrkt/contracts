@@ -4,10 +4,13 @@ from algopy_testing import algopy_testing_context
 
 import smart_contracts.market_app.contract as contract_module
 from smart_contracts.market_app.contract import (
+    COST_BOX_MBR,
     DEFAULT_LP_ENTRY_MAX_PRICE_FP,
     DEFAULT_RESIDUAL_LINEAR_LAMBDA_FP,
+    FEE_BOX_MBR,
     PRICE_TOLERANCE_BASE,
     QuestionMarket,
+    SHARE_BOX_MBR,
     SHARE_UNIT,
     STATUS_ACTIVE,
     STATUS_CANCELLED,
@@ -22,6 +25,7 @@ from .test_market_app_contract_runtime import (
     ensure_blueprint_cid,
     last_inner_asset_transfers,
     make_address,
+    make_mbr_payment,
     make_usdc_payment,
     opt_in_market,
     seed_protocol_config_state,
@@ -106,6 +110,7 @@ def test_contract_active_lp_entry_preserves_prices_and_disables_legacy_lp_method
             arc4.UInt64(SHARE_UNIT),
             arc4.UInt64(10_000_000),
             buy_payment,
+            make_mbr_payment(context, contract, trader, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_000,
         )
         before_prices = lmsr_prices(contract_q(contract), int(contract.b.value))
@@ -149,6 +154,7 @@ def test_contract_balanced_positions_remain_sellable_after_active_lp_entry(disab
             arc4.UInt64(SHARE_UNIT),
             arc4.UInt64(10_000_000),
             first_buy_payment,
+            make_mbr_payment(context, contract, trader, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_000,
         )
         second_buy_payment = make_usdc_payment(context, contract, trader, 10_000_000)
@@ -160,6 +166,7 @@ def test_contract_balanced_positions_remain_sellable_after_active_lp_entry(disab
             arc4.UInt64(SHARE_UNIT),
             arc4.UInt64(10_000_000),
             second_buy_payment,
+            make_mbr_payment(context, contract, trader, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_001,
         )
         before_prices = lmsr_prices(contract_q(contract), int(contract.b.value))
@@ -229,6 +236,7 @@ def test_contract_active_lp_entry_rejects_market_above_skew_cap(disable_arc4_emi
             arc4.UInt64(150 * SHARE_UNIT),
             arc4.UInt64(2_000_000_000),
             buy_payment,
+            make_mbr_payment(context, contract, trader, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_000,
         )
         current_prices = lmsr_prices(contract_q(contract), int(contract.b.value))
@@ -315,6 +323,7 @@ def test_contract_buy_rejects_sub_share_granularity(disable_arc4_emit) -> None:
                 arc4.UInt64(SHARE_UNIT - 1),
                 arc4.UInt64(10_000_000),
                 buy_payment,
+                make_mbr_payment(context, contract, trader, SHARE_BOX_MBR + COST_BOX_MBR),
                 latest_timestamp=5_000,
             )
 
@@ -339,6 +348,7 @@ def test_contract_lp_fees_are_strictly_prospective_and_withdrawable(disable_arc4
             arc4.UInt64(SHARE_UNIT),
             arc4.UInt64(10_000_000),
             first_buy_payment,
+            make_mbr_payment(context, contract, buyer1, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_000,
         )
         call_as(context, creator, contract.claim_lp_fees, latest_timestamp=5_001)
@@ -371,9 +381,12 @@ def test_contract_lp_fees_are_strictly_prospective_and_withdrawable(disable_arc4
             arc4.UInt64(SHARE_UNIT),
             arc4.UInt64(10_000_000),
             second_buy_payment,
+            make_mbr_payment(context, contract, buyer2, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=6_001,
         )
         call_as(context, creator, contract.claim_lp_fees, latest_timestamp=6_002)
+        # lp2's earlier claim_lp_fees (line 377) failed before settle ran, so
+        # the uf: box still doesn't exist on this call — must pay FEE_BOX_MBR.
         call_as(context, lp2, contract.claim_lp_fees, latest_timestamp=6_002)
 
         creator_total_surplus = _withdrawable_fee_surplus(contract, creator)
@@ -387,6 +400,7 @@ def test_contract_lp_fees_are_strictly_prospective_and_withdrawable(disable_arc4
         pool_before = int(contract.pool_balance.value)
         lp_fee_balance_before = int(contract.lp_fee_balance.value)
         withdraw_amount = lp2_surplus // 2
+        # lp2's uf: box was created in the claim_lp_fees at 6_002 above.
         call_as(context, lp2, contract.withdraw_lp_fees, arc4.UInt64(withdraw_amount), latest_timestamp=6_003)
         transfers = last_inner_asset_transfers(context)
 
@@ -417,6 +431,7 @@ def test_contract_residual_claim_respects_winner_reserve_and_tracks_settlement(d
             arc4.UInt64(SHARE_UNIT),
             arc4.UInt64(10_000_000),
             winner_buy_payment,
+            make_mbr_payment(context, contract, winner, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_000,
         )
         loser_buy_payment = make_usdc_payment(context, contract, loser, 10_000_000)
@@ -428,6 +443,7 @@ def test_contract_residual_claim_respects_winner_reserve_and_tracks_settlement(d
             arc4.UInt64(SHARE_UNIT),
             arc4.UInt64(10_000_000),
             loser_buy_payment,
+            make_mbr_payment(context, contract, loser, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_001,
         )
 

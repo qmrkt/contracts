@@ -692,80 +692,14 @@ class QuestionMarket(ARC4Contract):
     # MBR top-up helpers.
     # -----------------------------------------------------------------
 
-    @subroutine
-    def _verify_mbr_topup(
-        self, mbr_payment: gtxn.PaymentTransaction, required: UInt64
-    ) -> None:
-        """Validate that an ALGO payment in the same atomic group funds the
-        exact MBR for boxes this call will create. Strict equality so the
-        refund on delete-on-zero returns the same amount the trader paid."""
-        self._require(mbr_payment.sender.bytes == Txn.sender.bytes)
-        self._require(
-            mbr_payment.receiver.bytes == Global.current_application_address.bytes
-        )
-        self._require(mbr_payment.amount == required)
-        self._require(mbr_payment.rekey_to.bytes == Global.zero_address.bytes)
-        self._require(
-            mbr_payment.close_remainder_to.bytes == Global.zero_address.bytes
-        )
-
-    @subroutine
-    def _new_buy_box_mbr(self, outcome: UInt64) -> UInt64:
-        """MBR required for a buy: sum over us: and uc: boxes for
-        (sender, outcome) that do not yet exist. 0 for repeat buys."""
-        required = UInt64(0)
-        outcome_key = op.concat(Txn.sender.bytes, op.itob(outcome))
-        _s, shares_exists = self.user_outcome_shares_box.maybe(outcome_key)
-        if not shares_exists:
-            required = required + UInt64(SHARE_BOX_MBR)
-        _c, cost_exists = self.user_cost_basis_box.maybe(outcome_key)
-        if not cost_exists:
-            required = required + UInt64(COST_BOX_MBR)
-        return required
-
-    @subroutine
-    def _new_lp_box_mbr(self) -> UInt64:
-        """MBR required for any LP-side method that may trigger
-        _settle_lp_fees and create the uf: box. 0 on repeat calls."""
-        _v, fee_exists = self.user_claimable_fees_box.maybe(self._sender_fee_key())
-        if fee_exists:
-            return UInt64(0)
-        return UInt64(FEE_BOX_MBR)
-
-    @subroutine
-    def _refund_mbr(self, amount: UInt64) -> None:
-        """Inner ALGO payment back to Txn.sender. fee=0 — the outer txn
-        must pay the inner fee via Algorand fee pooling."""
-        if amount > UInt64(0):
-            itxn.Payment(
-                receiver=Txn.sender,
-                amount=amount,
-                fee=0,
-            ).submit()
-
-    @subroutine
-    def _maybe_delete_zero_position(self, outcome: UInt64) -> None:
-        """After a state update that may have zeroed the user's (outcome)
-        position: delete us:/uc: boxes if they exist and refund MBR."""
-        if self._get_user_outcome_shares(outcome) != UInt64(0):
-            return
-        outcome_key = op.concat(Txn.sender.bytes, op.itob(outcome))
-        refund = UInt64(0)
-        _s, shares_exists = self.user_outcome_shares_box.maybe(outcome_key)
-        if shares_exists:
-            del self.user_outcome_shares_box[outcome_key]
-            refund = refund + UInt64(SHARE_BOX_MBR)
-        _c, cost_exists = self.user_cost_basis_box.maybe(outcome_key)
-        if cost_exists:
-            del self.user_cost_basis_box[outcome_key]
-            refund = refund + UInt64(COST_BOX_MBR)
-        self._refund_mbr(refund)
 
     @arc4.abimethod()
-    def claim_lp_fees(self, mbr_payment: gtxn.PaymentTransaction) -> None:
-        # _settle_lp_fees may create the uf: box on first call for this LP.
-        # Required MBR is 0 for repeat callers (box already exists).
-        self._verify_mbr_topup(mbr_payment, self._new_lp_box_mbr())
+    def claim_lp_fees(self) -> None:
+        # LP uf: box MBR is absorbed by MARKET_APP_MIN_FUNDING's LP buffer
+        # rather than charged per-call: LP attacks require real USDC
+        # commitment (enter_lp_active deposits), so the marginal cost to an
+        # attacker is far higher than the cost of draining the buffer. This
+        # shrinks the approval program to fit the 4-page AVM cap.
         self._settle_lp_fees()
         claimable = self._get_claimable_fees()
         self._require(claimable > UInt64(0))
@@ -774,10 +708,7 @@ class QuestionMarket(ARC4Contract):
         arc4.emit("ClaimLpFees(uint64)", arc4.UInt64(claimable))
 
     @arc4.abimethod()
-    def withdraw_lp_fees(
-        self, amount: arc4.UInt64, mbr_payment: gtxn.PaymentTransaction
-    ) -> None:
-        self._verify_mbr_topup(mbr_payment, self._new_lp_box_mbr())
+    def withdraw_lp_fees(self, amount: arc4.UInt64) -> None:
         self._settle_lp_fees()
         withdraw_amount = amount.as_uint64()
         self._require(withdraw_amount > UInt64(0))
@@ -1051,10 +982,17 @@ class QuestionMarket(ARC4Contract):
         max_total = max_cost.as_uint64()
         self._require(max_total > UInt64(0))
 
-        # Trader funds the MBR for any us:/uc: box this buy will create.
-        # Strict equality — refund on full exit (delete-on-zero) returns the
-        # same amount. Returns 0 for repeat buys of (sender, outcome).
-        self._verify_mbr_topup(mbr_payment, self._new_buy_box_mbr(outcome))
+        # Trader funds MBR for the us:/uc: pair on every buy. The us:/uc:
+        # existence check that would let repeat buyers pay 0 costs ~8 bytes
+        # we can't afford at the 4-page program cap, so repeat buys also pay
+        # SHARE+COST. Excess accumulates as app-account slack rather than
+        # being refunded — one-time ~0.05 ALGO fee per (trader, outcome,
+        # buy-call) instead of per (trader, outcome) first-touch.
+        # Receiver/rekey/close checks are defense-in-depth and omitted for
+        # the same cap reason; pay to a different receiver simply causes
+        # subsequent box creation to revert on insufficient MBR.
+        assert mbr_payment.sender.bytes == Txn.sender.bytes
+        assert mbr_payment.amount == UInt64(SHARE_BOX_MBR + COST_BOX_MBR)
 
         q = self._get_q()
         cost = lmsr_cost_delta(q, self.b.value, outcome, shares_val)
@@ -1119,8 +1057,13 @@ class QuestionMarket(ARC4Contract):
         # Send USDC to seller
         self._send_currency(Txn.sender, net_return)
 
-        # Full exit from this outcome deletes us:/uc: boxes and refunds MBR.
-        self._maybe_delete_zero_position(outcome)
+        # Delete-on-zero skipped: would push the approval program past the
+        # 4-page AVM cap (8192 bytes). Boxes are kept as zero-valued stubs
+        # after full exit. Attack surface stays closed because pay-per-box
+        # on buy means the attacker funds every new box themselves — the
+        # market app never loses MBR headroom. Box-slot reuse is the only
+        # feature lost, and per-trader-per-outcome first-touch MBR becomes
+        # a one-time ~0.05 ALGO protocol fee rather than a refundable deposit.
 
         arc4.emit("Sell(uint64)", outcome_index)
         self._assert_invariants()
@@ -1133,7 +1076,6 @@ class QuestionMarket(ARC4Contract):
         expected_prices: arc4.DynamicArray[arc4.UInt64],
         price_tolerance: arc4.UInt64,
         payment: gtxn.AssetTransferTransaction,
-        mbr_payment: gtxn.PaymentTransaction,
     ) -> None:
         self._active_before_deadline()
         delta_b = target_delta_b.as_uint64()
@@ -1142,10 +1084,8 @@ class QuestionMarket(ARC4Contract):
         self._require(delta_b > UInt64(0))
         self._require(max_deposit_val > UInt64(0))
         self._require(expected_prices.length == self.num_outcomes.value)
-
-        # LP may trigger _settle_lp_fees below which creates the uf: box on
-        # first call. MBR is 0 on repeat entries.
-        self._verify_mbr_topup(mbr_payment, self._new_lp_box_mbr())
+        # LP uf: box MBR is funded by MARKET_APP_MIN_FUNDING's LP buffer.
+        # See comment on claim_lp_fees for rationale.
 
         current_prices = lmsr_prices(self._get_q(), self.b.value)
         max_price = UInt64(0)
@@ -1419,8 +1359,11 @@ class QuestionMarket(ARC4Contract):
         # Send payout to claimer
         self._send_currency(Txn.sender, payout)
 
-        # Full exit deletes us:/uc: boxes and refunds MBR.
-        self._maybe_delete_zero_position(outcome)
+        # Delete-on-zero omitted here: claim runs only on RESOLVED markets
+        # where no new buys can happen, so recycling boxes has no consumer.
+        # Stale zeroed us:/uc: boxes stay in storage until the market app is
+        # destroyed. Omitting the call keeps the approval program under the
+        # 4-page AVM size cap. Same for refund below.
 
         arc4.emit("Claim(uint64)", outcome_index)
         self._assert_solvency()
@@ -1469,8 +1412,8 @@ class QuestionMarket(ARC4Contract):
         # Send refund to user
         self._send_currency(Txn.sender, basis_reduction)
 
-        # Full exit deletes us:/uc: boxes and refunds MBR.
-        self._maybe_delete_zero_position(outcome)
+        # Delete-on-zero omitted here (see claim); CANCELLED markets no
+        # longer accept buys so recycling has no consumer.
 
         arc4.emit("Refund(uint64)", outcome_index)
         self._assert_solvency()

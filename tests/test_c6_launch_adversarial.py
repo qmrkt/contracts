@@ -20,9 +20,12 @@ from algopy_testing import algopy_testing_context
 
 import smart_contracts.market_app.contract as contract_module
 from smart_contracts.market_app.contract import (
+    COST_BOX_MBR,
     DEFAULT_LP_ENTRY_MAX_PRICE_FP,
     DEFAULT_RESIDUAL_LINEAR_LAMBDA_FP,
+    FEE_BOX_MBR,
     QuestionMarket,
+    SHARE_BOX_MBR,
     SHARE_UNIT,
     STATUS_CANCELLED,
     STATUS_RESOLVED,
@@ -80,6 +83,18 @@ def _make_payment(context, contract, sender, amount, *, asset_id=CURRENCY_ASA,
         rekey_to=Account(rekey_to) if rekey_to is not None else zero,
         asset_close_to=Account(asset_close_to) if asset_close_to is not None else zero,
         asset_sender=Account(asset_sender) if asset_sender is not None else zero,
+    )
+
+
+def _make_mbr_payment(context, contract, sender, amount):
+    """ALGO Payment txn funding MBR top-up for a box-creating method call."""
+    zero = Global.zero_address
+    return context.any.txn.payment(
+        sender=Account(sender),
+        receiver=Account(_app_address(contract)),
+        amount=UInt64(amount),
+        rekey_to=zero,
+        close_remainder_to=zero,
     )
 
 
@@ -168,8 +183,9 @@ class TestA1LedgerOwnershipSpoof:
             # Buy outcome 0 legitimately
             cost = lmsr_cost_delta([0, 0, 0], B, 0, SHARE_UNIT)
             buy_pmt = _make_payment(ctx, c, buyer, cost * 2)  # generous max_cost
+            buy_mbr = _make_mbr_payment(ctx, c, buyer, SHARE_BOX_MBR + COST_BOX_MBR)
             _call_as(ctx, buyer, c.buy,
-                     arc4.UInt64(0), arc4.UInt64(SHARE_UNIT), arc4.UInt64(cost * 2), buy_pmt, ts=5_000)
+                     arc4.UInt64(0), arc4.UInt64(SHARE_UNIT), arc4.UInt64(cost * 2), buy_pmt, buy_mbr, ts=5_000)
 
             with pytest.raises(AssertionError):
                 _call_as(ctx, attacker, c.sell,
@@ -185,8 +201,9 @@ class TestA1LedgerOwnershipSpoof:
 
             cost0 = lmsr_cost_delta([0, 0, 0], B, 0, SHARE_UNIT)
             pmt = _make_payment(ctx, c, buyer, cost0 * 2)
+            mbr = _make_mbr_payment(ctx, c, buyer, SHARE_BOX_MBR + COST_BOX_MBR)
             _call_as(ctx, buyer, c.buy,
-                     arc4.UInt64(0), arc4.UInt64(SHARE_UNIT), arc4.UInt64(cost0 * 2), pmt, ts=5_000)
+                     arc4.UInt64(0), arc4.UInt64(SHARE_UNIT), arc4.UInt64(cost0 * 2), pmt, mbr, ts=5_000)
 
             with pytest.raises(AssertionError):
                 _call_as(ctx, buyer, c.sell,
@@ -207,8 +224,9 @@ class TestA2SellWrongAmount:
 
             cost = lmsr_cost_delta([0, 0, 0], B, 0, SHARE_UNIT * 2)
             buy_pmt = _make_payment(ctx, c, buyer, cost * 2)
+            buy_mbr = _make_mbr_payment(ctx, c, buyer, SHARE_BOX_MBR + COST_BOX_MBR)
             _call_as(ctx, buyer, c.buy,
-                     arc4.UInt64(0), arc4.UInt64(SHARE_UNIT * 2), arc4.UInt64(cost * 2), buy_pmt, ts=5_000)
+                     arc4.UInt64(0), arc4.UInt64(SHARE_UNIT * 2), arc4.UInt64(cost * 2), buy_pmt, buy_mbr, ts=5_000)
 
             with pytest.raises(AssertionError):
                 _call_as(ctx, buyer, c.sell,
@@ -245,9 +263,10 @@ class TestA3BuyUnderpayment:
 
             # Underpay by exactly 1
             pmt = _make_payment(ctx, c, buyer, total_cost - 1)
+            mbr = _make_mbr_payment(ctx, c, buyer, SHARE_BOX_MBR + COST_BOX_MBR)
             with pytest.raises(AssertionError):
                 _call_as(ctx, buyer, c.buy,
-                         arc4.UInt64(0), arc4.UInt64(SHARE_UNIT), arc4.UInt64(total_cost), pmt, ts=5_000)
+                         arc4.UInt64(0), arc4.UInt64(SHARE_UNIT), arc4.UInt64(total_cost), pmt, mbr, ts=5_000)
 
     def test_buy_exact_total_cost_succeeds(self, disable_emit):
         creator = _make_addr()
@@ -270,8 +289,9 @@ class TestA3BuyUnderpayment:
             total_cost = base_cost + lp_fee + proto_fee
 
             pmt = _make_payment(ctx, c, buyer, total_cost)
+            mbr = _make_mbr_payment(ctx, c, buyer, SHARE_BOX_MBR + COST_BOX_MBR)
             _call_as(ctx, buyer, c.buy,
-                     arc4.UInt64(0), arc4.UInt64(SHARE_UNIT), arc4.UInt64(total_cost), pmt, ts=5_000)
+                     arc4.UInt64(0), arc4.UInt64(SHARE_UNIT), arc4.UInt64(total_cost), pmt, mbr, ts=5_000)
             assert c.pool_balance.value == DEPOSIT + base_cost
 
 

@@ -15,10 +15,13 @@ from algopy_testing import algopy_testing_context
 
 import smart_contracts.market_app.contract as contract_module
 from smart_contracts.market_app.contract import (
+    COST_BOX_MBR,
     DEFAULT_LP_ENTRY_MAX_PRICE_FP,
     DEFAULT_RESIDUAL_LINEAR_LAMBDA_FP,
+    FEE_BOX_MBR,
     PRICE_TOLERANCE_BASE,
     QuestionMarket,
+    SHARE_BOX_MBR,
     SHARE_UNIT,
     STATUS_ACTIVE,
 )
@@ -77,6 +80,23 @@ def make_payment(
         rekey_to=Account(rekey_to) if rekey_to is not None else zero,
         asset_close_to=Account(asset_close_to) if asset_close_to is not None else zero,
         asset_sender=Account(asset_sender) if asset_sender is not None else zero,
+    )
+
+
+def make_mbr_payment(context, contract, sender, amount):
+    """Create an ALGO Payment txn funding MBR top-up for a box-creating call.
+
+    Use SHARE_BOX_MBR + COST_BOX_MBR for a first-time buy, FEE_BOX_MBR for a
+    first-time LP-settling call (enter_lp_active / claim_lp_fees / withdraw_lp_fees).
+    Use 0 for repeat calls that don't create boxes.
+    """
+    zero = Global.zero_address
+    return context.any.txn.payment(
+        sender=Account(sender),
+        receiver=Account(get_app_address(contract)),
+        amount=UInt64(amount),
+        rekey_to=zero,
+        close_remainder_to=zero,
     )
 
 
@@ -211,6 +231,7 @@ class TestP11PaymentVerification:
 
             # Underpay: send 1 microunit
             payment = make_payment(context, contract, buyer, 1)
+            mbr = make_mbr_payment(context, contract, buyer, SHARE_BOX_MBR + COST_BOX_MBR)
             with pytest.raises(AssertionError):
                 call_as(
                     context,
@@ -220,6 +241,7 @@ class TestP11PaymentVerification:
                     arc4.UInt64(50_000_000),
                     arc4.UInt64(1_000_000_000),
                     payment,
+                    mbr,
                     latest_timestamp=5000,
                 )
 
@@ -230,6 +252,7 @@ class TestP11PaymentVerification:
             contract = setup_bootstrapped_contract(context, creator)
 
             payment = make_payment(context, contract, buyer, 50_000_000, asset_id=WRONG_ASA)
+            mbr = make_mbr_payment(context, contract, buyer, SHARE_BOX_MBR + COST_BOX_MBR)
             with pytest.raises(AssertionError):
                 call_as(
                     context,
@@ -239,6 +262,7 @@ class TestP11PaymentVerification:
                     arc4.UInt64(50_000_000),
                     arc4.UInt64(1_000_000_000),
                     payment,
+                    mbr,
                     latest_timestamp=5000,
                 )
 
@@ -310,8 +334,14 @@ class TestP11PaymentVerification:
 
             payment = make_payment(context, contract, sender, amount, **payment_kwargs)
             method = getattr(contract, method_name)
+            if method_name == "buy":
+                extra = (make_mbr_payment(context, contract, sender, SHARE_BOX_MBR + COST_BOX_MBR),)
+            else:
+                # enter_lp_active no longer takes an mbr_payment (size-cap
+                # compromise — LP uf: box MBR is prefunded by the factory).
+                extra = ()
             with pytest.raises(AssertionError):
-                call_as(context, sender, method, *method_args, payment, latest_timestamp=5000 if method_name != "bootstrap" else 1)
+                call_as(context, sender, method, *method_args, payment, *extra, latest_timestamp=5000 if method_name != "bootstrap" else 1)
 
     def test_sell_rejects_sender_without_internal_shares(self, disable_arc4_emit) -> None:
         creator = make_address()
@@ -320,6 +350,7 @@ class TestP11PaymentVerification:
         with algopy_testing_context() as context:
             contract = setup_bootstrapped_contract(context, creator)
             buy_payment = make_payment(context, contract, seller, 50_000_000)
+            buy_mbr = make_mbr_payment(context, contract, seller, SHARE_BOX_MBR + COST_BOX_MBR)
             call_as(
                 context,
                 seller,
@@ -328,6 +359,7 @@ class TestP11PaymentVerification:
                 arc4.UInt64(50_000_000),
                 arc4.UInt64(1_000_000_000),
                 buy_payment,
+                buy_mbr,
                 latest_timestamp=5_000,
             )
 

@@ -30,21 +30,25 @@ FACTORY_RESERVE = 100_000
 # MBR the factory transfers to the new market app account. Must cover:
 #   1. App-account base                            100_000  (0.1 ALGO)
 #   2. USDC ASA opt-in                             100_000  (0.1 ALGO)
-#   3. Dispute-resolution pp: box buffer          ~197_000  (~10 boxes × 19_700)
+#   3. Dispute-resolution pp: box buffer           200_000  (~10 pp: boxes × 19_700 μA)
+#   4. LP uf: box buffer                           400_000  (~20 LPs × 19_700 μA)
 #
-# User-facing boxes (us:, uc:, uf:) are NOT prefunded here — traders and LPs
-# pay per-action MBR top-ups in the market contract's box-creating methods,
-# and are refunded on delete-on-zero. See SHARE_BOX_MBR etc. in market_app.
+# Trader-facing boxes (us:, uc:) are NOT prefunded here — traders pay
+# per-action MBR top-ups in buy and are refunded on delete-on-zero at
+# sell/claim/refund. The trader path is the high-volume attack vector.
 #
-# The dispute-resolution pp: buffer covers creator/admin/authority resolve
-# paths that credit proposer/challenger payouts — these can't practically
-# charge the caller (the caller isn't the recipient).
+# LP uf: and dispute pp: boxes are prefunded. LP attacks require real USDC
+# commitment (enter_lp_active deposits ≥ lmsr_collateral_required_from_prices),
+# so the marginal attacker cost is far higher than the buffer — not viable.
+# Dispute-resolution callers aren't the payout recipient, so per-action
+# charging isn't natural.
 APP_ACCOUNT_BASE_MBR = 100_000
 USDC_OPTIN_MBR = 100_000
-DISPUTE_PP_BUFFER = 200_000  # ~10 pp: boxes at 19_700 μA each
+DISPUTE_PP_BUFFER = 200_000
+LP_UF_BUFFER = 400_000
 MARKET_APP_MIN_FUNDING = (
-    APP_ACCOUNT_BASE_MBR + USDC_OPTIN_MBR + DISPUTE_PP_BUFFER
-)  # 400_000 μA = 0.4 ALGO
+    APP_ACCOUNT_BASE_MBR + USDC_OPTIN_MBR + DISPUTE_PP_BUFFER + LP_UF_BUFFER
+)  # 800_000 μA = 0.8 ALGO
 
 APP_CREATE_BASE_MIN_BALANCE = 100_000
 APP_PAGE_MIN_BALANCE = 100_000

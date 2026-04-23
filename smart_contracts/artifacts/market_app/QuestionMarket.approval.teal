@@ -3,8 +3,8 @@
 
 // algopy.arc4.ARC4Contract.approval_program() -> uint64:
 main:
-    intcblock 0 1 1000000 8 10000 22900 20000000
-    bytecblock "st" 0x 0x7062 "no" "tcb" "pbh" "les" 0x0000000000000000000000000000000000000000000000000000000000000000 "b" "sts" "wo" "pts" "cbh" "cr" "lst" "dl" "ch" "ra" "pfbl" "dsb" "ls" "cfs" "po" "rbb" "pr" 0x000a "fs" "wfs" "lfbl" "rct" "doa" 0x726c66 0x706263 0x706662 "ca" "bd" "peh" "cws" "ats" "wsb" "rh" "rpu" "prr" "qp" "tp" 0x75733a 0x75633a "bls" "rc" 0x6362 0x636262 0x706262 0x636263 0x706664 0x706666 0x7074 "lfb" "prb" "cn" "crc" "ceh" "drh" "ddl" "dbk" 0x70703a 0x75663a "ble" "bcid" "lpm" "gps" "ma" "ssb" 0x0001 0x0012
+    intcblock 0 1 1000000 8 10000 20000000
+    bytecblock "st" 0x 0x7062 "no" "tcb" "pbh" "les" 0x0000000000000000000000000000000000000000000000000000000000000000 "b" "sts" "wo" "pts" "cbh" "cr" "lst" "dl" "ch" "ra" "pfbl" "dsb" "ls" "cfs" "po" "rbb" "pr" 0x000a "fs" "wfs" "lfbl" "rct" "doa" 0x726c66 0x706263 0x706662 "ca" "bd" "peh" "cws" "ats" "wsb" "rh" "rpu" "prr" "qp" "tp" "bls" "rc" 0x6362 0x636262 0x706262 0x636263 0x706664 0x706666 0x7074 "lfb" "prb" "cn" "crc" "ceh" "drh" "ddl" "dbk" 0x70703a "ble" "bcid" "lpm" "gps" "ma" "ssb" 0x0001 0x0012 0x75663a 0x75733a 0x75633a
     bytec_1 // ""
     // smart_contracts/market_app/contract.py:157
     // class QuestionMarket(ARC4Contract):
@@ -15,7 +15,7 @@ main:
     assert
     txn ApplicationID
     bz main_create_NoOp@33
-    pushbytess 0xbe9a365c 0xb7157bb5 0x5216de3c 0xfd2c93cd 0xc3b841ee 0xb49094e1 0x9579a379 0x4d7d0373 0x243897fb 0xedb865aa 0xc205abd8 0x8eac78ab 0x77c36311 0x8497db66 0x51c3aa8f 0x2bf5c4f1 0x491239e2 0x4aa4ca99 0x94b8c0ff 0xa31e8589 0x834cf031 0x31f26a9b 0x00b3496f 0x508e4bb8 0xbc13d367 0x4fe96e46 // method "claim_lp_fees(pay)void", method "withdraw_lp_fees(uint64,pay)void", method "claim_lp_residual()void", method "initialize()void", method "post_comment(string)void", method "bootstrap(uint64,axfer)void", method "buy(uint64,uint64,uint64,axfer,pay)void", method "sell(uint64,uint64,uint64)void", method "enter_lp_active(uint64,uint64,uint64[],uint64,axfer,pay)void", method "trigger_resolution()void", method "propose_resolution(uint64,byte[],axfer)void", method "propose_early_resolution(uint64,byte[],axfer)void", method "challenge_resolution(axfer,uint64,byte[])void", method "register_dispute(byte[],uint64,uint64)void", method "creator_resolve_dispute(uint64,byte[])void", method "admin_resolve_dispute(uint64,byte[])void", method "finalize_dispute(uint64,byte[])void", method "abort_early_resolution(byte[])void", method "cancel_dispute_and_market(byte[])void", method "finalize_resolution()void", method "claim(uint64,uint64)void", method "cancel()void", method "withdraw_protocol_fees()void", method "refund(uint64,uint64)void", method "withdraw_pending_payouts()void", method "reclaim_resolution_budget()void"
+    pushbytess 0x1e9db7db 0x02416b1e 0x5216de3c 0xfd2c93cd 0xc3b841ee 0xb49094e1 0x9579a379 0x4d7d0373 0xf54edafb 0xedb865aa 0xc205abd8 0x8eac78ab 0x77c36311 0x8497db66 0x51c3aa8f 0x2bf5c4f1 0x491239e2 0x4aa4ca99 0x94b8c0ff 0xa31e8589 0x834cf031 0x31f26a9b 0x00b3496f 0x508e4bb8 0xbc13d367 0x4fe96e46 // method "claim_lp_fees()void", method "withdraw_lp_fees(uint64)void", method "claim_lp_residual()void", method "initialize()void", method "post_comment(string)void", method "bootstrap(uint64,axfer)void", method "buy(uint64,uint64,uint64,axfer,pay)void", method "sell(uint64,uint64,uint64)void", method "enter_lp_active(uint64,uint64,uint64[],uint64,axfer)void", method "trigger_resolution()void", method "propose_resolution(uint64,byte[],axfer)void", method "propose_early_resolution(uint64,byte[],axfer)void", method "challenge_resolution(axfer,uint64,byte[])void", method "register_dispute(byte[],uint64,uint64)void", method "creator_resolve_dispute(uint64,byte[])void", method "admin_resolve_dispute(uint64,byte[])void", method "finalize_dispute(uint64,byte[])void", method "abort_early_resolution(byte[])void", method "cancel_dispute_and_market(byte[])void", method "finalize_resolution()void", method "claim(uint64,uint64)void", method "cancel()void", method "withdraw_protocol_fees()void", method "refund(uint64,uint64)void", method "withdraw_pending_payouts()void", method "reclaim_resolution_budget()void"
     txna ApplicationArgs 0
     match claim_lp_fees withdraw_lp_fees claim_lp_residual initialize post_comment bootstrap buy sell enter_lp_active trigger_resolution propose_resolution propose_early_resolution challenge_resolution register_dispute creator_resolve_dispute admin_resolve_dispute finalize_dispute abort_early_resolution cancel_dispute_and_market finalize_resolution claim cancel withdraw_protocol_fees refund withdraw_pending_payouts reclaim_resolution_budget
     err
@@ -43,7 +43,7 @@ main_opt_in@39:
     // smart_contracts/market_app/contract.py:160
     // bs = self.bootstrapper_lp_shares.value
     intc_0 // 0
-    bytec 47 // "bls"
+    bytec 45 // "bls"
     app_global_get_ex
     swap
     dup
@@ -79,7 +79,7 @@ main_opt_in@39:
     // smart_contracts/market_app/contract.py:164
     // self.lp_weighted_entry_sum[Txn.sender] = self.bootstrapper_lp_entry.value
     intc_0 // 0
-    bytec 66 // "ble"
+    bytec 63 // "ble"
     app_global_get_ex
     assert // check self.bootstrapper_lp_entry exists
     txn Sender
@@ -88,7 +88,7 @@ main_opt_in@39:
     app_local_put
     // smart_contracts/market_app/contract.py:165
     // self.bootstrapper_lp_shares.value = UInt64(0)
-    bytec 47 // "bls"
+    bytec 45 // "bls"
     intc_0 // 0
     app_global_put
 
@@ -1163,7 +1163,7 @@ lmsr_sell_return_after_if_else@6:
     // smart_contracts/lmsr_math_avm.py:321
     // if delta_exponent_fp > UInt64(MAX_TRADE_GROWTH_EXP_FP):
     frame_dig 9
-    intc 6 // 20000000
+    intc 5 // 20000000
     >
     bz lmsr_sell_return_after_if_else@8
     // smart_contracts/lmsr_math_avm.py:322
@@ -1558,33 +1558,22 @@ lmsr_gauge_alpha_from_prices_after_for@6:
 
 // smart_contracts.market_app.contract.QuestionMarket.claim_lp_fees[routing]() -> void:
 claim_lp_fees:
-    // smart_contracts/market_app/contract.py:764
-    // @arc4.abimethod()
-    txn GroupIndex
-    intc_1 // 1
-    -
-    dup
-    gtxns TypeEnum
-    intc_1 // pay
-    ==
-    assert // transaction type is pay
-    // smart_contracts/market_app/contract.py:766-768
-    // # _settle_lp_fees may create the uf: box on first call for this LP.
-    // # Required MBR is 0 for repeat callers (box already exists).
-    // self._verify_mbr_topup(mbr_payment, self._new_lp_box_mbr())
-    callsub _new_lp_box_mbr
-    callsub _verify_mbr_topup
-    // smart_contracts/market_app/contract.py:769
+    // smart_contracts/market_app/contract.py:698-703
+    // # LP uf: box MBR is absorbed by MARKET_APP_MIN_FUNDING's LP buffer
+    // # rather than charged per-call: LP attacks require real USDC
+    // # commitment (enter_lp_active deposits), so the marginal cost to an
+    // # attacker is far higher than the cost of draining the buffer. This
+    // # shrinks the approval program to fit the 4-page AVM cap.
     // self._settle_lp_fees()
     callsub _settle_lp_fees
-    // smart_contracts/market_app/contract.py:770
+    // smart_contracts/market_app/contract.py:704
     // claimable = self._get_claimable_fees()
     callsub _get_claimable_fees
     // smart_contracts/market_app/contract.py:258
     // assert condition
     dup
     assert
-    // smart_contracts/market_app/contract.py:772
+    // smart_contracts/market_app/contract.py:706
     // self._set_claimable_fees(UInt64(0))
     intc_0 // 0
     callsub _set_claimable_fees
@@ -1597,7 +1586,7 @@ claim_lp_fees:
     intc_0 // 0
     cover 2
     select
-    // smart_contracts/market_app/contract.py:773
+    // smart_contracts/market_app/contract.py:707
     // self._set_withdrawable_fee_surplus(self._get_withdrawable_fee_surplus() + claimable)
     dig 1
     +
@@ -1607,14 +1596,14 @@ claim_lp_fees:
     bytec 27 // "wfs"
     uncover 2
     app_local_put
-    // smart_contracts/market_app/contract.py:774
+    // smart_contracts/market_app/contract.py:708
     // arc4.emit("ClaimLpFees(uint64)", arc4.UInt64(claimable))
     itob
     pushbytes 0x53649ed2 // method "ClaimLpFees(uint64)"
     swap
     concat
     log
-    // smart_contracts/market_app/contract.py:764
+    // smart_contracts/market_app/contract.py:696
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -1622,7 +1611,7 @@ claim_lp_fees:
 
 // smart_contracts.market_app.contract.QuestionMarket.withdraw_lp_fees[routing]() -> void:
 withdraw_lp_fees:
-    // smart_contracts/market_app/contract.py:776
+    // smart_contracts/market_app/contract.py:710
     // @arc4.abimethod()
     txna ApplicationArgs 1
     dup
@@ -1630,22 +1619,10 @@ withdraw_lp_fees:
     intc_3 // 8
     ==
     assert // invalid number of bytes for arc4.uint64
-    txn GroupIndex
-    intc_1 // 1
-    -
-    dup
-    gtxns TypeEnum
-    intc_1 // pay
-    ==
-    assert // transaction type is pay
-    // smart_contracts/market_app/contract.py:780
-    // self._verify_mbr_topup(mbr_payment, self._new_lp_box_mbr())
-    callsub _new_lp_box_mbr
-    callsub _verify_mbr_topup
-    // smart_contracts/market_app/contract.py:781
+    // smart_contracts/market_app/contract.py:712
     // self._settle_lp_fees()
     callsub _settle_lp_fees
-    // smart_contracts/market_app/contract.py:782
+    // smart_contracts/market_app/contract.py:713
     // withdraw_amount = amount.as_uint64()
     dup
     btoi
@@ -1662,14 +1639,14 @@ withdraw_lp_fees:
     intc_0 // 0
     cover 2
     select
-    // smart_contracts/market_app/contract.py:784
+    // smart_contracts/market_app/contract.py:715
     // self._require(self._get_withdrawable_fee_surplus() >= withdraw_amount)
     dig 1
     >=
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:785
+    // smart_contracts/market_app/contract.py:716
     // self._require(self.lp_fee_balance.value >= withdraw_amount)
     intc_0 // 0
     bytec 28 // "lfbl"
@@ -1690,7 +1667,7 @@ withdraw_lp_fees:
     intc_0 // 0
     cover 2
     select
-    // smart_contracts/market_app/contract.py:786
+    // smart_contracts/market_app/contract.py:717
     // self._set_withdrawable_fee_surplus(self._get_withdrawable_fee_surplus() - withdraw_amount)
     dig 2
     -
@@ -1700,25 +1677,25 @@ withdraw_lp_fees:
     bytec 27 // "wfs"
     uncover 2
     app_local_put
-    // smart_contracts/market_app/contract.py:787
+    // smart_contracts/market_app/contract.py:718
     // self.lp_fee_balance.value = self.lp_fee_balance.value - withdraw_amount
     dig 1
     -
     bytec 28 // "lfbl"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:788
+    // smart_contracts/market_app/contract.py:719
     // self._send_currency(Txn.sender, withdraw_amount)
     txn Sender
     swap
     callsub _send_currency
-    // smart_contracts/market_app/contract.py:789
+    // smart_contracts/market_app/contract.py:720
     // arc4.emit("WithdrawLpFees(uint64)", amount)
     pushbytes 0x295900ff // method "WithdrawLpFees(uint64)"
     swap
     concat
     log
-    // smart_contracts/market_app/contract.py:776
+    // smart_contracts/market_app/contract.py:710
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -1728,7 +1705,7 @@ withdraw_lp_fees:
 claim_lp_residual:
     bytec_1 // ""
     dupn 10
-    // smart_contracts/market_app/contract.py:793
+    // smart_contracts/market_app/contract.py:724
     // self._require_status_any2(UInt64(STATUS_RESOLVED), UInt64(STATUS_CANCELLED))
     pushints 5 4
     callsub _require_status_any2
@@ -1757,10 +1734,10 @@ claim_lp_residual_after_inlined_smart_contracts.market_app.contract.QuestionMark
     // assert condition
     dup
     assert
-    // smart_contracts/market_app/contract.py:796
+    // smart_contracts/market_app/contract.py:727
     // reserve = self._current_reserve_requirement()
     callsub _current_reserve_requirement
-    // smart_contracts/market_app/contract.py:797
+    // smart_contracts/market_app/contract.py:728
     // self._require(self.pool_balance.value >= reserve + payout)
     intc_0 // 0
     bytec_2 // "pb"
@@ -1774,14 +1751,14 @@ claim_lp_residual_after_inlined_smart_contracts.market_app.contract.QuestionMark
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:798
+    // smart_contracts/market_app/contract.py:729
     // self.pool_balance.value = self.pool_balance.value - payout
     dig 1
     -
     bytec_2 // "pb"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:799
+    // smart_contracts/market_app/contract.py:730
     // self.total_residual_claimed.value = self.total_residual_claimed.value + payout
     intc_0 // 0
     bytec 29 // "rct"
@@ -1796,34 +1773,34 @@ claim_lp_residual_after_inlined_smart_contracts.market_app.contract.QuestionMark
     // return self.residual_claimed.get(Txn.sender, default=UInt64(0))
     txn Sender
     intc_0 // 0
-    bytec 48 // "rc"
+    bytec 46 // "rc"
     app_local_get_ex
     intc_0 // 0
     cover 2
     select
-    // smart_contracts/market_app/contract.py:800
+    // smart_contracts/market_app/contract.py:731
     // self._set_residual_claimed(self._get_residual_claimed() + payout)
     dig 1
     +
     // smart_contracts/market_app/contract.py:298
     // self.residual_claimed[Txn.sender] = value
     txn Sender
-    bytec 48 // "rc"
+    bytec 46 // "rc"
     uncover 2
     app_local_put
-    // smart_contracts/market_app/contract.py:801
+    // smart_contracts/market_app/contract.py:732
     // self._send_currency(Txn.sender, payout)
     txn Sender
     dig 1
     callsub _send_currency
-    // smart_contracts/market_app/contract.py:802
+    // smart_contracts/market_app/contract.py:733
     // arc4.emit("ClaimLpResidual(uint64)", arc4.UInt64(payout))
     itob
     pushbytes 0x1d0fd72b // method "ClaimLpResidual(uint64)"
     swap
     concat
     log
-    // smart_contracts/market_app/contract.py:791
+    // smart_contracts/market_app/contract.py:722
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -1855,7 +1832,7 @@ claim_lp_residual_after_inlined_smart_contracts.market_app.contract.QuestionMark
     // smart_contracts/market_app/contract.py:604
     // return UInt64(0)
     intc_0 // 0
-    // smart_contracts/market_app/contract.py:794
+    // smart_contracts/market_app/contract.py:725
     // payout = self._claimable_residual()
     b claim_lp_residual_after_inlined_smart_contracts.market_app.contract.QuestionMarket._claimable_residual@29
 
@@ -1921,7 +1898,7 @@ claim_lp_residual_after_inlined_smart_contracts.market_app.contract.QuestionMark
     // return self.residual_claimed.get(Txn.sender, default=UInt64(0))
     txn Sender
     intc_0 // 0
-    bytec 48 // "rc"
+    bytec 46 // "rc"
     app_local_get_ex
     intc_0 // 0
     cover 2
@@ -1935,7 +1912,7 @@ claim_lp_residual_after_inlined_smart_contracts.market_app.contract.QuestionMark
     // smart_contracts/market_app/contract.py:608
     // return UInt64(0)
     intc_0 // 0
-    // smart_contracts/market_app/contract.py:794
+    // smart_contracts/market_app/contract.py:725
     // payout = self._claimable_residual()
     b claim_lp_residual_after_inlined_smart_contracts.market_app.contract.QuestionMarket._claimable_residual@29
 
@@ -1945,7 +1922,7 @@ claim_lp_residual_after_if_else@28:
     dig 8
     dig 10
     -
-    // smart_contracts/market_app/contract.py:794
+    // smart_contracts/market_app/contract.py:725
     // payout = self._claimable_residual()
     b claim_lp_residual_after_inlined_smart_contracts.market_app.contract.QuestionMarket._claimable_residual@29
 
@@ -2192,7 +2169,7 @@ claim_lp_residual_after_if_else@10:
 
 // smart_contracts.market_app.contract.QuestionMarket.create[routing]() -> void:
 create:
-    // smart_contracts/market_app/contract.py:854
+    // smart_contracts/market_app/contract.py:785
     // @arc4.abimethod(create="require")
     txna ApplicationArgs 1
     dup
@@ -2292,22 +2269,22 @@ create:
     intc_3 // 8
     ==
     assert // invalid number of bytes for arc4.uint64
-    // smart_contracts/market_app/contract.py:873
+    // smart_contracts/market_app/contract.py:804
     // outcome_count = num_outcomes.as_uint64()
     uncover 12
     btoi
-    // smart_contracts/market_app/contract.py:874
+    // smart_contracts/market_app/contract.py:805
     // protocol_config = protocol_config_id.as_uint64()
     uncover 3
     btoi
-    // smart_contracts/market_app/contract.py:875
+    // smart_contracts/market_app/contract.py:806
     // lp_entry_cap = lp_entry_max_price_fp.as_uint64()
     uncover 2
     btoi
     // smart_contracts/market_app/contract.py:419
     // value, exists = op.AppGlobal.get_ex_uint64(app, key)
     dig 1
-    // smart_contracts/market_app/contract.py:878
+    // smart_contracts/market_app/contract.py:809
     // min_challenge_window_secs = self._config_uint64(config_app, Bytes(b"mcw"))
     pushbytes 0x6d6377
     // smart_contracts/market_app/contract.py:419
@@ -2319,9 +2296,9 @@ create:
     // smart_contracts/market_app/contract.py:419
     // value, exists = op.AppGlobal.get_ex_uint64(app, key)
     dig 2
-    // smart_contracts/market_app/contract.py:879
+    // smart_contracts/market_app/contract.py:810
     // challenge_bond_min = self._config_uint64(config_app, Bytes(b"cb"))
-    bytec 49 // 0x6362
+    bytec 47 // 0x6362
     // smart_contracts/market_app/contract.py:419
     // value, exists = op.AppGlobal.get_ex_uint64(app, key)
     app_global_get_ex
@@ -2331,7 +2308,7 @@ create:
     // smart_contracts/market_app/contract.py:419
     // value, exists = op.AppGlobal.get_ex_uint64(app, key)
     dig 3
-    // smart_contracts/market_app/contract.py:880
+    // smart_contracts/market_app/contract.py:811
     // proposal_bond_min = self._config_uint64(config_app, Bytes(b"pb"))
     bytec_2 // 0x7062
     // smart_contracts/market_app/contract.py:419
@@ -2343,9 +2320,9 @@ create:
     // smart_contracts/market_app/contract.py:419
     // value, exists = op.AppGlobal.get_ex_uint64(app, key)
     dig 4
-    // smart_contracts/market_app/contract.py:881
+    // smart_contracts/market_app/contract.py:812
     // challenge_bond_bps_val = self._config_uint64(config_app, Bytes(b"cbb"))
-    bytec 50 // 0x636262
+    bytec 48 // 0x636262
     // smart_contracts/market_app/contract.py:419
     // value, exists = op.AppGlobal.get_ex_uint64(app, key)
     app_global_get_ex
@@ -2355,9 +2332,9 @@ create:
     // smart_contracts/market_app/contract.py:419
     // value, exists = op.AppGlobal.get_ex_uint64(app, key)
     dig 5
-    // smart_contracts/market_app/contract.py:882
+    // smart_contracts/market_app/contract.py:813
     // proposal_bond_bps_val = self._config_uint64(config_app, Bytes(b"pbb"))
-    bytec 51 // 0x706262
+    bytec 49 // 0x706262
     // smart_contracts/market_app/contract.py:419
     // value, exists = op.AppGlobal.get_ex_uint64(app, key)
     app_global_get_ex
@@ -2367,9 +2344,9 @@ create:
     // smart_contracts/market_app/contract.py:419
     // value, exists = op.AppGlobal.get_ex_uint64(app, key)
     dig 6
-    // smart_contracts/market_app/contract.py:883
+    // smart_contracts/market_app/contract.py:814
     // challenge_bond_cap_val = self._config_uint64(config_app, Bytes(b"cbc"))
-    bytec 52 // 0x636263
+    bytec 50 // 0x636263
     // smart_contracts/market_app/contract.py:419
     // value, exists = op.AppGlobal.get_ex_uint64(app, key)
     app_global_get_ex
@@ -2379,7 +2356,7 @@ create:
     // smart_contracts/market_app/contract.py:419
     // value, exists = op.AppGlobal.get_ex_uint64(app, key)
     dig 7
-    // smart_contracts/market_app/contract.py:884
+    // smart_contracts/market_app/contract.py:815
     // proposal_bond_cap_val = self._config_uint64(config_app, Bytes(b"pbc"))
     bytec 32 // 0x706263
     // smart_contracts/market_app/contract.py:419
@@ -2391,9 +2368,9 @@ create:
     // smart_contracts/market_app/contract.py:419
     // value, exists = op.AppGlobal.get_ex_uint64(app, key)
     dig 8
-    // smart_contracts/market_app/contract.py:885
+    // smart_contracts/market_app/contract.py:816
     // proposer_fee_bps_val = self._config_uint64(config_app, Bytes(b"pfd"))
-    bytec 53 // 0x706664
+    bytec 51 // 0x706664
     // smart_contracts/market_app/contract.py:419
     // value, exists = op.AppGlobal.get_ex_uint64(app, key)
     app_global_get_ex
@@ -2403,9 +2380,9 @@ create:
     // smart_contracts/market_app/contract.py:419
     // value, exists = op.AppGlobal.get_ex_uint64(app, key)
     dig 9
-    // smart_contracts/market_app/contract.py:886
+    // smart_contracts/market_app/contract.py:817
     // proposer_fee_floor_bps_val = self._config_uint64(config_app, Bytes(b"pff"))
-    bytec 54 // 0x706666
+    bytec 52 // 0x706666
     // smart_contracts/market_app/contract.py:419
     // value, exists = op.AppGlobal.get_ex_uint64(app, key)
     app_global_get_ex
@@ -2415,7 +2392,7 @@ create:
     // smart_contracts/market_app/contract.py:419
     // value, exists = op.AppGlobal.get_ex_uint64(app, key)
     dig 10
-    // smart_contracts/market_app/contract.py:887
+    // smart_contracts/market_app/contract.py:818
     // protocol_fee_bps_val = self._config_uint64(config_app, Bytes(b"pfb"))
     bytec 33 // 0x706662
     // smart_contracts/market_app/contract.py:419
@@ -2427,7 +2404,7 @@ create:
     // smart_contracts/market_app/contract.py:419
     // value, exists = op.AppGlobal.get_ex_uint64(app, key)
     dig 11
-    // smart_contracts/market_app/contract.py:888
+    // smart_contracts/market_app/contract.py:819
     // linked_factory_id = self._config_uint64(config_app, Bytes(b"mfi"))
     pushbytes 0x6d6669
     // smart_contracts/market_app/contract.py:419
@@ -2439,9 +2416,9 @@ create:
     // smart_contracts/market_app/contract.py:425
     // value, exists = op.AppGlobal.get_ex_bytes(app, key)
     dig 12
-    // smart_contracts/market_app/contract.py:889
+    // smart_contracts/market_app/contract.py:820
     // protocol_treasury_val = self._config_bytes(config_app, Bytes(b"pt"))
-    bytec 55 // 0x7074
+    bytec 53 // 0x7074
     // smart_contracts/market_app/contract.py:425
     // value, exists = op.AppGlobal.get_ex_bytes(app, key)
     app_global_get_ex
@@ -2451,7 +2428,7 @@ create:
     // smart_contracts/market_app/contract.py:419
     // value, exists = op.AppGlobal.get_ex_uint64(app, key)
     dig 13
-    // smart_contracts/market_app/contract.py:890
+    // smart_contracts/market_app/contract.py:821
     // residual_linear_lambda_fp_val = self._config_uint64(config_app, Bytes(b"rlf"))
     bytec 31 // 0x726c66
     // smart_contracts/market_app/contract.py:419
@@ -2460,7 +2437,7 @@ create:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:891
+    // smart_contracts/market_app/contract.py:822
     // self._require(outcome_count >= UInt64(MIN_OUTCOMES))
     dig 15
     pushint 2
@@ -2468,7 +2445,7 @@ create:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:892
+    // smart_contracts/market_app/contract.py:823
     // self._require(outcome_count <= UInt64(MAX_OUTCOMES))
     dig 15
     intc_3 // 8
@@ -2476,7 +2453,7 @@ create:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:893
+    // smart_contracts/market_app/contract.py:824
     // self._require(initial_b.as_uint64() > UInt64(0))
     uncover 25
     btoi
@@ -2484,7 +2461,7 @@ create:
     // assert condition
     dup
     assert
-    // smart_contracts/market_app/contract.py:894
+    // smart_contracts/market_app/contract.py:825
     // self._require(challenge_window_secs.as_uint64() >= min_challenge_window_secs)
     uncover 21
     btoi
@@ -2494,7 +2471,7 @@ create:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:895
+    // smart_contracts/market_app/contract.py:826
     // self._require(lp_entry_cap <= UInt64(SCALE))
     dig 14
     intc_2 // 1000000
@@ -2504,7 +2481,7 @@ create:
     assert
     dig 4
     assert
-    // smart_contracts/market_app/contract.py:897
+    // smart_contracts/market_app/contract.py:828
     // self._require(Global.creator_address == Application(linked_factory_id).address)
     global CreatorAddress
     uncover 5
@@ -2514,114 +2491,114 @@ create:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:898
+    // smart_contracts/market_app/contract.py:829
     // self._require(creator.bytes != zero_address)
     dig 25
-    // smart_contracts/market_app/contract.py:877
+    // smart_contracts/market_app/contract.py:808
     // zero_address = Bytes(ZERO_ADDRESS_BYTES)
     bytec 7 // 0x0000000000000000000000000000000000000000000000000000000000000000
-    // smart_contracts/market_app/contract.py:898
+    // smart_contracts/market_app/contract.py:829
     // self._require(creator.bytes != zero_address)
     !=
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:899
+    // smart_contracts/market_app/contract.py:830
     // self._require(resolution_authority.bytes != zero_address)
     dig 19
-    // smart_contracts/market_app/contract.py:877
+    // smart_contracts/market_app/contract.py:808
     // zero_address = Bytes(ZERO_ADDRESS_BYTES)
     bytec 7 // 0x0000000000000000000000000000000000000000000000000000000000000000
-    // smart_contracts/market_app/contract.py:899
+    // smart_contracts/market_app/contract.py:830
     // self._require(resolution_authority.bytes != zero_address)
     !=
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:900
+    // smart_contracts/market_app/contract.py:831
     // self._require(market_admin.bytes != zero_address)
     dig 17
-    // smart_contracts/market_app/contract.py:877
+    // smart_contracts/market_app/contract.py:808
     // zero_address = Bytes(ZERO_ADDRESS_BYTES)
     bytec 7 // 0x0000000000000000000000000000000000000000000000000000000000000000
-    // smart_contracts/market_app/contract.py:900
+    // smart_contracts/market_app/contract.py:831
     // self._require(market_admin.bytes != zero_address)
     !=
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:901
+    // smart_contracts/market_app/contract.py:832
     // self._require(protocol_treasury_val != zero_address)
     dig 3
-    // smart_contracts/market_app/contract.py:877
+    // smart_contracts/market_app/contract.py:808
     // zero_address = Bytes(ZERO_ADDRESS_BYTES)
     bytec 7 // 0x0000000000000000000000000000000000000000000000000000000000000000
-    // smart_contracts/market_app/contract.py:901
+    // smart_contracts/market_app/contract.py:832
     // self._require(protocol_treasury_val != zero_address)
     !=
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:903
+    // smart_contracts/market_app/contract.py:834
     // self.creator.value = creator.bytes
     bytec 13 // "cr"
     uncover 26
     app_global_put
-    // smart_contracts/market_app/contract.py:904
+    // smart_contracts/market_app/contract.py:835
     // self.currency_asa.value = currency_asa.as_uint64()
     uncover 24
     btoi
     bytec 34 // "ca"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:905
+    // smart_contracts/market_app/contract.py:836
     // self.num_outcomes.value = outcome_count
     bytec_3 // "no"
     uncover 16
     app_global_put
-    // smart_contracts/market_app/contract.py:906
+    // smart_contracts/market_app/contract.py:837
     // self.b.value = initial_b.as_uint64()
     bytec 8 // "b"
     uncover 2
     app_global_put
-    // smart_contracts/market_app/contract.py:907
+    // smart_contracts/market_app/contract.py:838
     // self.pool_balance.value = UInt64(0)
     bytec_2 // "pb"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:908
+    // smart_contracts/market_app/contract.py:839
     // self.bootstrap_deposit.value = UInt64(0)
     bytec 35 // "bd"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:909
+    // smart_contracts/market_app/contract.py:840
     // self.lp_shares_total.value = UInt64(0)
     bytec 14 // "lst"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:910
+    // smart_contracts/market_app/contract.py:841
     // self.lp_fee_bps.value = lp_fee_bps.as_uint64()
     uncover 21
     btoi
-    bytec 56 // "lfb"
+    bytec 54 // "lfb"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:911
+    // smart_contracts/market_app/contract.py:842
     // self.protocol_fee_bps.value = protocol_fee_bps_val
     bytec 33 // "pfb"
     uncover 4
     app_global_put
-    // smart_contracts/market_app/contract.py:912
+    // smart_contracts/market_app/contract.py:843
     // self.cumulative_fee_per_share.value = UInt64(0)
     bytec 21 // "cfs"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:913
+    // smart_contracts/market_app/contract.py:844
     // self.status.value = UInt64(STATUS_CREATED)
     bytec_0 // "st"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:914
+    // smart_contracts/market_app/contract.py:845
     // self._require(deadline.as_uint64() > self._now())
     uncover 19
     btoi
@@ -2630,266 +2607,266 @@ create:
     // # The identity op ensures UInt64 type for both AVM and testing framework
     // return Global.latest_timestamp + UInt64(0)
     global LatestTimestamp
-    // smart_contracts/market_app/contract.py:914
+    // smart_contracts/market_app/contract.py:845
     // self._require(deadline.as_uint64() > self._now())
     >
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:915
+    // smart_contracts/market_app/contract.py:846
     // self.deadline.value = deadline.as_uint64()
     bytec 15 // "dl"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:916
+    // smart_contracts/market_app/contract.py:847
     // self.question_hash.value = question_hash.bytes
     pushbytes "qh"
     uncover 19
     app_global_put
-    // smart_contracts/market_app/contract.py:917
+    // smart_contracts/market_app/contract.py:848
     // self.blueprint_cid.value = blueprint_cid.native
     uncover 17
     extract 2 0
-    bytec 67 // "bcid"
+    bytec 64 // "bcid"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:918
+    // smart_contracts/market_app/contract.py:849
     // self.proposed_outcome.value = UInt64(0)
     bytec 22 // "po"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:919
+    // smart_contracts/market_app/contract.py:850
     // self.proposal_timestamp.value = UInt64(0)
     bytec 11 // "pts"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:920
+    // smart_contracts/market_app/contract.py:851
     // self.proposal_evidence_hash.value = Bytes()
     bytec 36 // "peh"
     bytec_1 // 0x
     app_global_put
-    // smart_contracts/market_app/contract.py:921
+    // smart_contracts/market_app/contract.py:852
     // self.challenge_window_secs.value = challenge_window_secs.as_uint64()
     bytec 37 // "cws"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:922
+    // smart_contracts/market_app/contract.py:853
     // self.challenger.value = Bytes(ZERO_ADDRESS_BYTES)
     bytec 16 // "ch"
     bytec 7 // 0x0000000000000000000000000000000000000000000000000000000000000000
     app_global_put
-    // smart_contracts/market_app/contract.py:923
+    // smart_contracts/market_app/contract.py:854
     // self.protocol_config_id.value = protocol_config
     pushbytes "pc"
     uncover 12
     app_global_put
-    // smart_contracts/market_app/contract.py:924
+    // smart_contracts/market_app/contract.py:855
     // self.protocol_treasury.value = protocol_treasury_val
-    bytec 55 // "pt"
+    bytec 53 // "pt"
     uncover 2
     app_global_put
-    // smart_contracts/market_app/contract.py:925
+    // smart_contracts/market_app/contract.py:856
     // self.residual_linear_lambda_fp.value = residual_linear_lambda_fp_val
     bytec 31 // "rlf"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:926
+    // smart_contracts/market_app/contract.py:857
     // self.lp_entry_max_price_fp.value = lp_entry_cap
-    bytec 68 // "lpm"
+    bytec 65 // "lpm"
     uncover 9
     app_global_put
-    // smart_contracts/market_app/contract.py:927
+    // smart_contracts/market_app/contract.py:858
     // self.activation_timestamp.value = UInt64(0)
     bytec 38 // "ats"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:928
+    // smart_contracts/market_app/contract.py:859
     // self.settlement_timestamp.value = UInt64(0)
     bytec 9 // "sts"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:929
+    // smart_contracts/market_app/contract.py:860
     // self.total_lp_weighted_entry_sum.value = UInt64(0)
     bytec 6 // "les"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:930
+    // smart_contracts/market_app/contract.py:861
     // self.total_residual_claimed.value = UInt64(0)
     bytec 29 // "rct"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:931
+    // smart_contracts/market_app/contract.py:862
     // self.resolution_authority.value = resolution_authority.bytes
     bytec 17 // "ra"
     uncover 12
     app_global_put
-    // smart_contracts/market_app/contract.py:932
+    // smart_contracts/market_app/contract.py:863
     // self.resolution_budget_balance.value = UInt64(0)
     bytec 23 // "rbb"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:933
+    // smart_contracts/market_app/contract.py:864
     // self.challenge_bond.value = challenge_bond_min
-    bytec 49 // "cb"
+    bytec 47 // "cb"
     uncover 8
     app_global_put
-    // smart_contracts/market_app/contract.py:934
+    // smart_contracts/market_app/contract.py:865
     // self.proposal_bond.value = proposal_bond_min
-    bytec 57 // "prb"
+    bytec 55 // "prb"
     uncover 7
     app_global_put
-    // smart_contracts/market_app/contract.py:935
+    // smart_contracts/market_app/contract.py:866
     // self.challenge_bond_bps.value = challenge_bond_bps_val
-    bytec 50 // "cbb"
+    bytec 48 // "cbb"
     uncover 6
     app_global_put
-    // smart_contracts/market_app/contract.py:936
+    // smart_contracts/market_app/contract.py:867
     // self.proposal_bond_bps.value = proposal_bond_bps_val
-    bytec 51 // "pbb"
+    bytec 49 // "pbb"
     uncover 5
     app_global_put
-    // smart_contracts/market_app/contract.py:937
+    // smart_contracts/market_app/contract.py:868
     // self.challenge_bond_cap.value = challenge_bond_cap_val
-    bytec 52 // "cbc"
+    bytec 50 // "cbc"
     uncover 4
     app_global_put
-    // smart_contracts/market_app/contract.py:938
+    // smart_contracts/market_app/contract.py:869
     // self.proposal_bond_cap.value = proposal_bond_cap_val
     bytec 32 // "pbc"
     uncover 3
     app_global_put
-    // smart_contracts/market_app/contract.py:939
+    // smart_contracts/market_app/contract.py:870
     // self.proposer_fee_bps.value = proposer_fee_bps_val
-    bytec 53 // "pfd"
+    bytec 51 // "pfd"
     uncover 2
     app_global_put
-    // smart_contracts/market_app/contract.py:940
+    // smart_contracts/market_app/contract.py:871
     // self.proposer_fee_floor_bps.value = proposer_fee_floor_bps_val
-    bytec 54 // "pff"
+    bytec 52 // "pff"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:941
+    // smart_contracts/market_app/contract.py:872
     // self.grace_period_secs.value = grace_period_secs.as_uint64()
     uncover 2
     btoi
-    bytec 69 // "gps"
+    bytec 66 // "gps"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:942
+    // smart_contracts/market_app/contract.py:873
     // self.market_admin.value = market_admin.bytes
-    bytec 70 // "ma"
+    bytec 67 // "ma"
     uncover 2
     app_global_put
-    // smart_contracts/market_app/contract.py:943
+    // smart_contracts/market_app/contract.py:874
     // if cancellable.native:
     intc_0 // 0
     getbit
     bz create_else_body@3
-    // smart_contracts/market_app/contract.py:944
+    // smart_contracts/market_app/contract.py:875
     // self.cancellable.value = UInt64(1)
-    bytec 58 // "cn"
+    bytec 56 // "cn"
     intc_1 // 1
     app_global_put
 
 create_after_if_else@4:
-    // smart_contracts/market_app/contract.py:947
+    // smart_contracts/market_app/contract.py:878
     // self.winning_outcome.value = UInt64(0)
     bytec 10 // "wo"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:948
+    // smart_contracts/market_app/contract.py:879
     // self.lp_fee_balance.value = UInt64(0)
     bytec 28 // "lfbl"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:949
+    // smart_contracts/market_app/contract.py:880
     // self.protocol_fee_balance.value = UInt64(0)
     bytec 18 // "pfbl"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:950
+    // smart_contracts/market_app/contract.py:881
     // self.total_outstanding_cost_basis.value = UInt64(0)
     bytec 4 // "tcb"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:951
+    // smart_contracts/market_app/contract.py:882
     // self.dispute_sink_balance.value = UInt64(0)
     bytec 19 // "dsb"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:952
+    // smart_contracts/market_app/contract.py:883
     // self.winner_share_bps.value = UInt64(DEFAULT_WINNER_SHARE_BPS)
     bytec 39 // "wsb"
     pushint 5000
     app_global_put
-    // smart_contracts/market_app/contract.py:953
+    // smart_contracts/market_app/contract.py:884
     // self.dispute_sink_share_bps.value = UInt64(DEFAULT_DISPUTE_SINK_SHARE_BPS)
-    bytec 71 // "ssb"
+    bytec 68 // "ssb"
     pushint 5000
     app_global_put
-    // smart_contracts/market_app/contract.py:955-956
+    // smart_contracts/market_app/contract.py:886-887
     // # Dispute metadata defaults
     // self.challenge_reason_code.value = UInt64(0)
-    bytec 59 // "crc"
+    bytec 57 // "crc"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:957
+    // smart_contracts/market_app/contract.py:888
     // self.challenge_evidence_hash.value = Bytes()
-    bytec 60 // "ceh"
+    bytec 58 // "ceh"
     bytec_1 // 0x
     app_global_put
-    // smart_contracts/market_app/contract.py:958
+    // smart_contracts/market_app/contract.py:889
     // self.dispute_ref_hash.value = Bytes()
-    bytec 61 // "drh"
+    bytec 59 // "drh"
     bytec_1 // 0x
     app_global_put
-    // smart_contracts/market_app/contract.py:959
+    // smart_contracts/market_app/contract.py:890
     // self.dispute_opened_at.value = UInt64(0)
     bytec 30 // "doa"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:960
+    // smart_contracts/market_app/contract.py:891
     // self.dispute_deadline.value = UInt64(0)
-    bytec 62 // "ddl"
+    bytec 60 // "ddl"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:961
+    // smart_contracts/market_app/contract.py:892
     // self.ruling_hash.value = Bytes()
     bytec 40 // "rh"
     bytec_1 // 0x
     app_global_put
-    // smart_contracts/market_app/contract.py:962
+    // smart_contracts/market_app/contract.py:893
     // self.resolution_path_used.value = UInt64(0)
     bytec 41 // "rpu"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:963
+    // smart_contracts/market_app/contract.py:894
     // self.dispute_backend_kind.value = UInt64(0)
-    bytec 63 // "dbk"
+    bytec 61 // "dbk"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:964
+    // smart_contracts/market_app/contract.py:895
     // self.pending_responder_role.value = UInt64(0)
     bytec 42 // "prr"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:966-967
+    // smart_contracts/market_app/contract.py:897-898
     // # Proposal bond defaults
     // self.proposer.value = Bytes(ZERO_ADDRESS_BYTES)
     bytec 24 // "pr"
     bytec 7 // 0x0000000000000000000000000000000000000000000000000000000000000000
     app_global_put
-    // smart_contracts/market_app/contract.py:968
+    // smart_contracts/market_app/contract.py:899
     // self.proposer_bond_held.value = UInt64(0)
     bytec 5 // "pbh"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:969
+    // smart_contracts/market_app/contract.py:900
     // self.challenger_bond_held.value = UInt64(0)
     bytec 12 // "cbh"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:971-972
+    // smart_contracts/market_app/contract.py:902-903
     // # Zero-init packed outcome quantities and total user shares
     // self.quantities_packed.value = op.bzero(UInt64(64))
     pushint 64
@@ -2897,20 +2874,20 @@ create_after_if_else@4:
     bytec 43 // "qp"
     dig 1
     app_global_put
-    // smart_contracts/market_app/contract.py:973
+    // smart_contracts/market_app/contract.py:904
     // self.total_shares_packed.value = op.bzero(UInt64(64))
     bytec 44 // "tp"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:854
+    // smart_contracts/market_app/contract.py:785
     // @arc4.abimethod(create="require")
     intc_1 // 1
     return
 
 create_else_body@3:
-    // smart_contracts/market_app/contract.py:946
+    // smart_contracts/market_app/contract.py:877
     // self.cancellable.value = UInt64(0)
-    bytec 58 // "cn"
+    bytec 56 // "cn"
     intc_0 // 0
     app_global_put
     b create_after_if_else@4
@@ -2918,15 +2895,15 @@ create_else_body@3:
 
 // smart_contracts.market_app.contract.QuestionMarket.initialize[routing]() -> void:
 initialize:
-    // smart_contracts/market_app/contract.py:978
+    // smart_contracts/market_app/contract.py:909
     // self._require_status(UInt64(STATUS_CREATED))
     intc_0 // 0
     callsub _require_status
-    // smart_contracts/market_app/contract.py:979
+    // smart_contracts/market_app/contract.py:910
     // sender = Txn.sender.bytes
     txn Sender
     dup
-    // smart_contracts/market_app/contract.py:980
+    // smart_contracts/market_app/contract.py:911
     // assert sender == self.creator.value or sender == Global.creator_address.bytes
     intc_0 // 0
     bytec 13 // "cr"
@@ -2943,10 +2920,10 @@ initialize_bool_true@3:
     intc_1 // 1
 
 initialize_bool_merge@5:
-    // smart_contracts/market_app/contract.py:980
+    // smart_contracts/market_app/contract.py:911
     // assert sender == self.creator.value or sender == Global.creator_address.bytes
     assert
-    // smart_contracts/market_app/contract.py:981-986
+    // smart_contracts/market_app/contract.py:912-917
     // itxn.AssetTransfer(
     //     xfer_asset=Asset(self.currency_asa.value),
     //     asset_receiver=Global.current_application_address,
@@ -2954,30 +2931,30 @@ initialize_bool_merge@5:
     //     fee=0,
     // ).submit()
     itxn_begin
-    // smart_contracts/market_app/contract.py:982
+    // smart_contracts/market_app/contract.py:913
     // xfer_asset=Asset(self.currency_asa.value),
     intc_0 // 0
     bytec 34 // "ca"
     app_global_get_ex
     assert // check self.currency_asa exists
-    // smart_contracts/market_app/contract.py:983
+    // smart_contracts/market_app/contract.py:914
     // asset_receiver=Global.current_application_address,
     global CurrentApplicationAddress
-    // smart_contracts/market_app/contract.py:984
+    // smart_contracts/market_app/contract.py:915
     // asset_amount=0,
     intc_0 // 0
     itxn_field AssetAmount
     itxn_field AssetReceiver
     itxn_field XferAsset
-    // smart_contracts/market_app/contract.py:981
+    // smart_contracts/market_app/contract.py:912
     // itxn.AssetTransfer(
     pushint 4 // axfer
     itxn_field TypeEnum
-    // smart_contracts/market_app/contract.py:985
+    // smart_contracts/market_app/contract.py:916
     // fee=0,
     intc_0 // 0
     itxn_field Fee
-    // smart_contracts/market_app/contract.py:981-986
+    // smart_contracts/market_app/contract.py:912-917
     // itxn.AssetTransfer(
     //     xfer_asset=Asset(self.currency_asa.value),
     //     asset_receiver=Global.current_application_address,
@@ -2985,7 +2962,7 @@ initialize_bool_merge@5:
     //     fee=0,
     // ).submit()
     itxn_submit
-    // smart_contracts/market_app/contract.py:975
+    // smart_contracts/market_app/contract.py:906
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -2997,7 +2974,7 @@ initialize_bool_false@4:
 
 // smart_contracts.market_app.contract.QuestionMarket.post_comment[routing]() -> void:
 post_comment:
-    // smart_contracts/market_app/contract.py:988
+    // smart_contracts/market_app/contract.py:919
     // @arc4.abimethod()
     txna ApplicationArgs 1
     dupn 2
@@ -3009,17 +2986,17 @@ post_comment:
     len
     ==
     assert // invalid number of bytes for arc4.dynamic_array<arc4.uint8>
-    // smart_contracts/market_app/contract.py:990
+    // smart_contracts/market_app/contract.py:921
     // raw = message.native.bytes
     extract 2 0
-    // smart_contracts/market_app/contract.py:991
+    // smart_contracts/market_app/contract.py:922
     // self._require(raw.length > UInt64(0))
     len
     // smart_contracts/market_app/contract.py:258
     // assert condition
     dup
     assert
-    // smart_contracts/market_app/contract.py:992
+    // smart_contracts/market_app/contract.py:923
     // self._require(raw.length <= UInt64(MAX_COMMENT_BYTES))
     pushint 512
     <=
@@ -3054,13 +3031,13 @@ post_comment_after_inlined_smart_contracts.market_app.contract.QuestionMarket._s
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:994
+    // smart_contracts/market_app/contract.py:925
     // arc4.emit("CommentPosted(string)", message)
     pushbytes 0xdd44bb500002
     dig 3
     concat
     log
-    // smart_contracts/market_app/contract.py:988
+    // smart_contracts/market_app/contract.py:919
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -3090,7 +3067,7 @@ post_comment_after_for@10:
     // smart_contracts/market_app/contract.py:516
     // return True
     intc_1 // 1
-    // smart_contracts/market_app/contract.py:993
+    // smart_contracts/market_app/contract.py:924
     // self._require(self._sender_can_comment())
     b post_comment_after_inlined_smart_contracts.market_app.contract.QuestionMarket._sender_can_comment@13
 
@@ -3098,7 +3075,7 @@ post_comment_after_if_else@12:
     // smart_contracts/market_app/contract.py:517
     // return False
     intc_0 // 0
-    // smart_contracts/market_app/contract.py:993
+    // smart_contracts/market_app/contract.py:924
     // self._require(self._sender_can_comment())
     b post_comment_after_inlined_smart_contracts.market_app.contract.QuestionMarket._sender_can_comment@13
 
@@ -3107,7 +3084,7 @@ post_comment_after_if_else@12:
 bootstrap:
     bytec_1 // ""
     dupn 5
-    // smart_contracts/market_app/contract.py:996
+    // smart_contracts/market_app/contract.py:927
     // @arc4.abimethod()
     txna ApplicationArgs 1
     dup
@@ -3123,16 +3100,16 @@ bootstrap:
     pushint 4 // axfer
     ==
     assert // transaction type is axfer
-    // smart_contracts/market_app/contract.py:1002
+    // smart_contracts/market_app/contract.py:933
     // self._require_status(UInt64(STATUS_CREATED))
     intc_0 // 0
     callsub _require_status
-    // smart_contracts/market_app/contract.py:1003-1004
+    // smart_contracts/market_app/contract.py:934-935
     // # Accept calls from the market creator OR the app creator (factory)
     // sender = Txn.sender.bytes
     txn Sender
     dup
-    // smart_contracts/market_app/contract.py:1005
+    // smart_contracts/market_app/contract.py:936
     // assert sender == self.creator.value or sender == Global.creator_address.bytes
     intc_0 // 0
     bytec 13 // "cr"
@@ -3149,10 +3126,10 @@ bootstrap_bool_true@3:
     intc_1 // 1
 
 bootstrap_bool_merge@5:
-    // smart_contracts/market_app/contract.py:1005
+    // smart_contracts/market_app/contract.py:936
     // assert sender == self.creator.value or sender == Global.creator_address.bytes
     assert
-    // smart_contracts/market_app/contract.py:1006
+    // smart_contracts/market_app/contract.py:937
     // deposit = deposit_amount.as_uint64()
     dig 2
     btoi
@@ -3167,7 +3144,7 @@ bootstrap_bool_merge@5:
     callsub _proposer_fee_for_bond
     dup
     bury 11
-    // smart_contracts/market_app/contract.py:1008
+    // smart_contracts/market_app/contract.py:939
     // funding_required = deposit + budget_required
     dig 1
     +
@@ -3217,7 +3194,7 @@ bootstrap_after_inlined_smart_contracts.market_app.contract.QuestionMarket._lmsr
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1011
+    // smart_contracts/market_app/contract.py:942
     // self._verify_payment(payment, funding_required)
     dig 2
     dup
@@ -3226,17 +3203,17 @@ bootstrap_after_inlined_smart_contracts.market_app.contract.QuestionMarket._lmsr
     dup
     cover 4
     callsub _verify_payment
-    // smart_contracts/market_app/contract.py:1013
+    // smart_contracts/market_app/contract.py:944
     // self._require(self.blueprint_cid.value.length > UInt64(0))
     intc_0 // 0
-    bytec 67 // "bcid"
+    bytec 64 // "bcid"
     app_global_get_ex
     assert // check self.blueprint_cid exists
     len
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1015
+    // smart_contracts/market_app/contract.py:946
     // initial_lp_units = self.b.value
     intc_0 // 0
     bytec 8 // "b"
@@ -3263,74 +3240,74 @@ bootstrap_after_inlined_smart_contracts.market_app.contract.QuestionMarket._lmsr
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1018
+    // smart_contracts/market_app/contract.py:949
     // self.pool_balance.value = deposit
     bytec_2 // "pb"
     dig 3
     app_global_put
-    // smart_contracts/market_app/contract.py:1019
+    // smart_contracts/market_app/contract.py:950
     // self.bootstrap_deposit.value = deposit
     bytec 35 // "bd"
     uncover 3
     app_global_put
-    // smart_contracts/market_app/contract.py:1020
+    // smart_contracts/market_app/contract.py:951
     // self.resolution_budget_balance.value = budget_required
     bytec 23 // "rbb"
     dig 13
     app_global_put
-    // smart_contracts/market_app/contract.py:1021
+    // smart_contracts/market_app/contract.py:952
     // self.lp_shares_total.value = initial_lp_units
     bytec 14 // "lst"
     dig 2
     app_global_put
-    // smart_contracts/market_app/contract.py:1022
+    // smart_contracts/market_app/contract.py:953
     // self.activation_timestamp.value = self._now()
     bytec 38 // "ats"
     // smart_contracts/market_app/contract.py:671-672
     // # The identity op ensures UInt64 type for both AVM and testing framework
     // return Global.latest_timestamp + UInt64(0)
     global LatestTimestamp
-    // smart_contracts/market_app/contract.py:1022
+    // smart_contracts/market_app/contract.py:953
     // self.activation_timestamp.value = self._now()
     app_global_put
-    // smart_contracts/market_app/contract.py:1023
+    // smart_contracts/market_app/contract.py:954
     // self.total_lp_weighted_entry_sum.value = weighted_entry_sum
     bytec 6 // "les"
     dig 1
     app_global_put
-    // smart_contracts/market_app/contract.py:1024
+    // smart_contracts/market_app/contract.py:955
     // self.total_residual_claimed.value = UInt64(0)
     bytec 29 // "rct"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:1025
+    // smart_contracts/market_app/contract.py:956
     // self.settlement_timestamp.value = UInt64(0)
     bytec 9 // "sts"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:1026
+    // smart_contracts/market_app/contract.py:957
     // self.bootstrapper_lp_shares.value = initial_lp_units
-    bytec 47 // "bls"
+    bytec 45 // "bls"
     uncover 2
     app_global_put
-    // smart_contracts/market_app/contract.py:1027
+    // smart_contracts/market_app/contract.py:958
     // self.bootstrapper_lp_entry.value = weighted_entry_sum
-    bytec 66 // "ble"
+    bytec 63 // "ble"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:1028
+    // smart_contracts/market_app/contract.py:959
     // self.status.value = UInt64(STATUS_ACTIVE)
     bytec_0 // "st"
     intc_1 // 1
     app_global_put
-    // smart_contracts/market_app/contract.py:1030
+    // smart_contracts/market_app/contract.py:961
     // if payment.asset_amount > funding_required:
     gtxns AssetAmount
     dup
     bury 6
     <
     bz bootstrap_after_if_else@7
-    // smart_contracts/market_app/contract.py:1031
+    // smart_contracts/market_app/contract.py:962
     // self._send_currency(Txn.sender, payment.asset_amount - funding_required)
     txn Sender
     dig 4
@@ -3339,7 +3316,7 @@ bootstrap_after_inlined_smart_contracts.market_app.contract.QuestionMarket._lmsr
     callsub _send_currency
 
 bootstrap_after_if_else@7:
-    // smart_contracts/market_app/contract.py:1033
+    // smart_contracts/market_app/contract.py:964
     // arc4.emit("Bootstrap(uint64,uint64)", deposit_amount, arc4.UInt64(initial_lp_units))
     dig 5
     itob
@@ -3350,10 +3327,10 @@ bootstrap_after_if_else@7:
     swap
     concat
     log
-    // smart_contracts/market_app/contract.py:1034
+    // smart_contracts/market_app/contract.py:965
     // self._assert_invariants()
     callsub _assert_invariants
-    // smart_contracts/market_app/contract.py:996
+    // smart_contracts/market_app/contract.py:927
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -3391,10 +3368,9 @@ bootstrap_bool_false@4:
 // smart_contracts.market_app.contract.QuestionMarket.buy[routing]() -> void:
 buy:
     intc_0 // 0
-    dupn 2
     bytec_1 // ""
-    dupn 21
-    // smart_contracts/market_app/contract.py:1036
+    dupn 17
+    // smart_contracts/market_app/contract.py:967
     // @arc4.abimethod()
     txna ApplicationArgs 1
     dupn 2
@@ -3427,103 +3403,73 @@ buy:
     intc_1 // 1
     -
     dup
-    cover 4
     gtxns TypeEnum
     intc_1 // pay
     ==
     assert // transaction type is pay
-    // smart_contracts/market_app/contract.py:1045
+    // smart_contracts/market_app/contract.py:976
     // self._active_before_deadline()
     callsub _active_before_deadline
-    // smart_contracts/market_app/contract.py:1046
+    // smart_contracts/market_app/contract.py:977
     // outcome = outcome_index.as_uint64()
-    uncover 2
+    uncover 3
     btoi
     dup
-    cover 3
-    // smart_contracts/market_app/contract.py:1047
+    cover 4
+    // smart_contracts/market_app/contract.py:978
     // self._assert_valid_outcome(outcome)
     dup
     callsub _assert_valid_outcome
-    // smart_contracts/market_app/contract.py:1048
+    // smart_contracts/market_app/contract.py:979
     // shares_val = shares.as_uint64()
-    uncover 2
+    uncover 3
     btoi
     dup
-    cover 3
+    cover 4
     // smart_contracts/market_app/contract.py:258
     // assert condition
     dup
     assert
-    // smart_contracts/market_app/contract.py:1050
+    // smart_contracts/market_app/contract.py:981
     // self._require_share_granularity(shares_val)
+    dup
     callsub _require_share_granularity
-    // smart_contracts/market_app/contract.py:1051
+    // smart_contracts/market_app/contract.py:982
     // max_total = max_cost.as_uint64()
-    swap
+    uncover 3
     btoi
     dup
-    cover 2
+    cover 4
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:716
-    // required = UInt64(0)
-    intc_0 // 0
-    swap
-    // smart_contracts/market_app/contract.py:717
-    // outcome_key = op.concat(Txn.sender.bytes, op.itob(outcome))
-    txn Sender
-    swap
-    itob
-    concat
-    dup
-    // smart_contracts/market_app/contract.py:718
-    // _s, shares_exists = self.user_outcome_shares_box.maybe(outcome_key)
-    bytec 45 // 0x75733a
-    swap
-    concat
-    box_len
-    bury 1
-    // smart_contracts/market_app/contract.py:719
-    // if not shares_exists:
-    bnz buy_after_if_else@10
-    // smart_contracts/market_app/contract.py:720
-    // required = required + UInt64(SHARE_BOX_MBR)
-    intc 5 // 22900
-    bury 2
-
-buy_after_if_else@10:
-    // smart_contracts/market_app/contract.py:721
-    // _c, cost_exists = self.user_cost_basis_box.maybe(outcome_key)
-    bytec 46 // 0x75633a
-    dig 1
-    concat
-    box_len
-    bury 1
-    // smart_contracts/market_app/contract.py:722
-    // if not cost_exists:
-    bnz buy_after_if_else@12
-    // smart_contracts/market_app/contract.py:723
-    // required = required + UInt64(COST_BOX_MBR)
-    dig 1
-    intc 5 // 22900
-    +
-    bury 2
-
-buy_after_if_else@12:
-    // smart_contracts/market_app/contract.py:1054-1057
-    // # Trader funds the MBR for any us:/uc: box this buy will create.
-    // # Strict equality — refund on full exit (delete-on-zero) returns the
-    // # same amount. Returns 0 for repeat buys of (sender, outcome).
-    // self._verify_mbr_topup(mbr_payment, self._new_buy_box_mbr(outcome))
-    dig 5
+    // smart_contracts/market_app/contract.py:985-994
+    // # Trader funds MBR for the us:/uc: pair on every buy. The us:/uc:
+    // # existence check that would let repeat buyers pay 0 costs ~8 bytes
+    // # we can't afford at the 4-page program cap, so repeat buys also pay
+    // # SHARE+COST. Excess accumulates as app-account slack rather than
+    // # being refunded — one-time ~0.05 ALGO fee per (trader, outcome,
+    // # buy-call) instead of per (trader, outcome) first-touch.
+    // # Receiver/rekey/close checks are defense-in-depth and omitted for
+    // # the same cap reason; pay to a different receiver simply causes
+    // # subsequent box creation to revert on insufficient MBR.
+    // assert mbr_payment.sender.bytes == Txn.sender.bytes
     dig 2
-    callsub _verify_mbr_topup
-    // smart_contracts/market_app/contract.py:1059
+    gtxns Sender
+    txn Sender
+    ==
+    assert
+    // smart_contracts/market_app/contract.py:995
+    // assert mbr_payment.amount == UInt64(SHARE_BOX_MBR + COST_BOX_MBR)
+    uncover 2
+    gtxns Amount
+    pushint 45800
+    ==
+    assert
+    // smart_contracts/market_app/contract.py:997
     // q = self._get_q()
     callsub _get_q
-    // smart_contracts/market_app/contract.py:1060
+    // smart_contracts/market_app/contract.py:998
     // cost = lmsr_cost_delta(q, self.b.value, outcome, shares_val)
     intc_0 // 0
     bytec 8 // "b"
@@ -3531,7 +3477,7 @@ buy_after_if_else@12:
     swap
     dup
     cover 2
-    bury 31
+    cover 5
     assert // check self.b exists
     // smart_contracts/lmsr_math_avm.py:261
     // _validate_state(q, b)
@@ -3539,50 +3485,47 @@ buy_after_if_else@12:
     dig 1
     callsub _validate_state
     dup
-    bury 35
+    cover 4
     // smart_contracts/lmsr_math_avm.py:262
     // _require(outcome < q.length)
     dup
     intc_0 // 0
     extract_uint16 // on error: invalid array length header
-    dig 7
-    dup
-    uncover 2
-    <
+    dig 4
+    >
     // smart_contracts/lmsr_math_avm.py:22
     // assert condition
     assert
     // smart_contracts/lmsr_math_avm.py:265
     // q_after[outcome] = q_after[outcome] + shares
-    dig 1
+    dup
     extract 2 0
-    swap
+    uncover 4
     intc_3 // 8
     *
     dup
-    bury 34
+    cover 5
     swap
     dig 1
     extract_uint64
-    dig 7
-    dup
-    cover 3
+    dig 4
     +
     itob
     swap
     pushint 2
     +
     dup
-    bury 34
-    uncover 3
+    cover 5
     swap
-    uncover 2
     replace3 // on error: index access is out of bounds
-    bury 33
+    cover 2
     // smart_contracts/lmsr_math_avm.py:22
     // assert condition
-    dig 1
+    dup
     assert
+    // smart_contracts/lmsr_math_avm.py:51
+    // product_high, product_low = op.mulw(a, b)
+    swap
     // smart_contracts/lmsr_math_avm.py:256
     // return _mul_div_floor(shares, UInt64(SCALE), b)
     intc_2 // 1000000
@@ -3594,16 +3537,15 @@ buy_after_if_else@12:
     uncover 2
     divw
     dup
-    bury 25
     // smart_contracts/lmsr_math_avm.py:267
     // if delta_exponent_fp > UInt64(MAX_TRADE_GROWTH_EXP_FP):
-    intc 6 // 20000000
+    intc 5 // 20000000
     >
-    bz buy_after_if_else@16
+    bz buy_after_if_else@10
     // smart_contracts/lmsr_math_avm.py:225
     // max_exponent = _max_exponent_fp(q, b)
-    dig 32
-    dig 28
+    dig 4
+    dig 6
     dup
     cover 2
     callsub _max_exponent_fp
@@ -3612,7 +3554,7 @@ buy_after_if_else@12:
     dig 2
     dig 2
     callsub _sum_shifted_exp_fp
-    bury 36
+    bury 8
     // smart_contracts/lmsr_math_avm.py:227
     // return max_exponent + ln_fp(sum_exp)
     callsub ln_fp
@@ -3629,7 +3571,7 @@ buy_after_if_else@12:
     divw
     // smart_contracts/lmsr_math_avm.py:225
     // max_exponent = _max_exponent_fp(q, b)
-    dig 32
+    dig 3
     dig 2
     callsub _max_exponent_fp
     // smart_contracts/lmsr_math_avm.py:226
@@ -3653,11 +3595,11 @@ buy_after_if_else@12:
     swap
     -
 
-buy_after_inlined_smart_contracts.lmsr_math_avm.lmsr_cost_delta@33:
-    // smart_contracts/market_app/contract.py:1061
+buy_after_inlined_smart_contracts.lmsr_math_avm.lmsr_cost_delta@27:
+    // smart_contracts/market_app/contract.py:999
     // lp_fee = self._calc_fee_up(cost, self.lp_fee_bps.value)
     intc_0 // 0
-    bytec 56 // "lfb"
+    bytec 54 // "lfb"
     app_global_get_ex
     assert // check self.lp_fee_bps exists
     // smart_contracts/market_app/contract.py:415
@@ -3666,7 +3608,7 @@ buy_after_inlined_smart_contracts.lmsr_math_avm.lmsr_cost_delta@33:
     swap
     intc 4 // 10000
     callsub _mul_div_ceil
-    // smart_contracts/market_app/contract.py:1062
+    // smart_contracts/market_app/contract.py:1000
     // protocol_fee = self._calc_fee_up(cost, self.protocol_fee_bps.value)
     intc_0 // 0
     bytec 33 // "pfb"
@@ -3678,7 +3620,7 @@ buy_after_inlined_smart_contracts.lmsr_math_avm.lmsr_cost_delta@33:
     swap
     intc 4 // 10000
     callsub _mul_div_ceil
-    // smart_contracts/market_app/contract.py:1063
+    // smart_contracts/market_app/contract.py:1001
     // total_cost = cost + lp_fee + protocol_fee
     dig 2
     dig 2
@@ -3686,45 +3628,45 @@ buy_after_inlined_smart_contracts.lmsr_math_avm.lmsr_cost_delta@33:
     dig 1
     +
     dup
-    bury 14
-    // smart_contracts/market_app/contract.py:1064
+    bury 17
+    // smart_contracts/market_app/contract.py:1002
     // self._require(total_cost <= max_total)
     dup
-    dig 7
+    dig 11
     <=
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1065
+    // smart_contracts/market_app/contract.py:1003
     // self._verify_payment(payment, total_cost)
-    dig 10
+    dig 13
     dup
     cover 4
     dig 1
     callsub _verify_payment
-    // smart_contracts/market_app/contract.py:1067-1068
+    // smart_contracts/market_app/contract.py:1005-1006
     // # State updates first (P9)
     // q[outcome] = q[outcome] + shares_val
-    dig 37
+    dig 9
     dup
     extract 2 0
-    dig 36
-    extract_uint64
     dig 10
+    extract_uint64
+    dig 14
     dup
     cover 3
     +
     itob
-    dig 36
+    dig 10
     swap
     replace3 // on error: index access is out of bounds
-    // smart_contracts/market_app/contract.py:1069
+    // smart_contracts/market_app/contract.py:1007
     // self._set_q(q)
     callsub _set_q
     pop
-    // smart_contracts/market_app/contract.py:1070
+    // smart_contracts/market_app/contract.py:1008
     // self._set_user_outcome_shares(outcome, self._get_user_outcome_shares(outcome) + shares_val)
-    dig 10
+    dig 14
     dup
     callsub _get_user_outcome_shares
     dig 2
@@ -3732,7 +3674,7 @@ buy_after_inlined_smart_contracts.lmsr_math_avm.lmsr_cost_delta@33:
     dig 1
     swap
     callsub _set_user_outcome_shares
-    // smart_contracts/market_app/contract.py:1071
+    // smart_contracts/market_app/contract.py:1009
     // self._set_user_cost_basis(outcome, self._get_user_cost_basis(outcome) + cost)
     dup
     callsub _get_user_cost_basis
@@ -3748,7 +3690,7 @@ buy_after_inlined_smart_contracts.lmsr_math_avm.lmsr_cost_delta@33:
     uncover 2
     +
     callsub _set_total_user_shares
-    // smart_contracts/market_app/contract.py:1073
+    // smart_contracts/market_app/contract.py:1011
     // self.total_outstanding_cost_basis.value = self.total_outstanding_cost_basis.value + cost
     intc_0 // 0
     bytec 4 // "tcb"
@@ -3759,7 +3701,7 @@ buy_after_inlined_smart_contracts.lmsr_math_avm.lmsr_cost_delta@33:
     bytec 4 // "tcb"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:1074
+    // smart_contracts/market_app/contract.py:1012
     // self.pool_balance.value = self.pool_balance.value + cost
     intc_0 // 0
     bytec_2 // "pb"
@@ -3770,11 +3712,11 @@ buy_after_inlined_smart_contracts.lmsr_math_avm.lmsr_cost_delta@33:
     bytec_2 // "pb"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:1075
+    // smart_contracts/market_app/contract.py:1013
     // self._distribute_lp_fee(lp_fee)
     uncover 2
     callsub _distribute_lp_fee
-    // smart_contracts/market_app/contract.py:1076
+    // smart_contracts/market_app/contract.py:1014
     // self.protocol_fee_balance.value = self.protocol_fee_balance.value + protocol_fee
     intc_0 // 0
     bytec 18 // "pfbl"
@@ -3785,42 +3727,42 @@ buy_after_inlined_smart_contracts.lmsr_math_avm.lmsr_cost_delta@33:
     bytec 18 // "pfbl"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:1078
+    // smart_contracts/market_app/contract.py:1016
     // if payment.asset_amount > total_cost:
     swap
     gtxns AssetAmount
     dup
-    bury 13
+    bury 16
     <
     bz buy_after_if_else@3
-    // smart_contracts/market_app/contract.py:1079
+    // smart_contracts/market_app/contract.py:1017
     // self._send_currency(Txn.sender, payment.asset_amount - total_cost)
     txn Sender
-    dig 11
-    dig 11
+    dig 14
+    dig 14
     -
     callsub _send_currency
 
 buy_after_if_else@3:
-    // smart_contracts/market_app/contract.py:1081
+    // smart_contracts/market_app/contract.py:1019
     // arc4.emit("Buy(uint64)", outcome_index)
     pushbytes 0xb8ab876b // method "Buy(uint64)"
-    dig 8
+    dig 11
     concat
     log
-    // smart_contracts/market_app/contract.py:1082
+    // smart_contracts/market_app/contract.py:1020
     // self._assert_invariants()
     callsub _assert_invariants
-    // smart_contracts/market_app/contract.py:1036
+    // smart_contracts/market_app/contract.py:967
     // @arc4.abimethod()
     intc_1 // 1
     return
 
-buy_after_if_else@16:
+buy_after_if_else@10:
     // smart_contracts/lmsr_math_avm.py:272
     // shared_max_before = _max_exponent_fp(q, b)
-    dig 32
-    dig 28
+    dig 4
+    dig 6
     dup
     cover 2
     callsub _max_exponent_fp
@@ -3832,27 +3774,27 @@ buy_after_if_else@16:
     swap
     dup
     cover 4
-    bury 16
+    bury 19
     // smart_contracts/lmsr_math_avm.py:274
     // weight_before = _outcome_weight(q, b, outcome, shared_max_before)
     dig 2
-    dig 9
+    dig 13
     dup
     cover 6
     uncover 3
     callsub _outcome_weight
-    bury 37
+    bury 9
     dup
-    bury 13
+    bury 16
     // smart_contracts/lmsr_math_avm.py:275
     // price_before_ceil = _mul_div_ceil(weight_before, UInt64(SCALE), sum_before)
     intc_2 // 1000000
     uncover 3
     callsub _mul_div_ceil
-    bury 18
+    bury 21
     // smart_contracts/lmsr_math_avm.py:248
     // shared_max = _max_exponent_fp(q, b)
-    dig 32
+    dig 3
     dig 1
     callsub _max_exponent_fp
     // smart_contracts/lmsr_math_avm.py:249
@@ -3866,83 +3808,83 @@ buy_after_if_else@16:
     uncover 4
     uncover 4
     callsub _outcome_weight
-    bury 34
+    bury 32
     // smart_contracts/lmsr_math_avm.py:251
     // return _mul_div_ceil(weight, UInt64(SCALE), sum_exp)
     intc_2 // 1000000
     uncover 2
     callsub _mul_div_ceil
-    bury 17
+    bury 20
     // smart_contracts/lmsr_math_avm.py:277
     // growth_fp = exp_pos_fp(delta_exponent_fp)
-    dig 23
+    dup
     callsub exp_pos_fp
     dup
-    bury 22
+    bury 25
     // smart_contracts/lmsr_math_avm.py:278
     // growth_minus = UInt64(0)
     intc_0 // 0
-    bury 21
+    bury 24
     // smart_contracts/lmsr_math_avm.py:279
     // if growth_fp > UInt64(SCALE):
     intc_2 // 1000000
     >
-    bz buy_after_if_else@18
+    bz buy_after_if_else@12
     // smart_contracts/lmsr_math_avm.py:280
     // growth_minus = growth_fp - UInt64(SCALE)
-    dig 20
+    dig 23
     intc_2 // 1000000
     -
-    bury 20
+    bury 23
 
-buy_after_if_else@18:
+buy_after_if_else@12:
     // smart_contracts/lmsr_math_avm.py:282
     // increment_fp = _mul_div_ceil(weight_before, growth_minus, sum_before)
-    dig 8
-    dig 20
-    dig 13
+    dig 11
+    dig 23
+    dig 16
     callsub _mul_div_ceil
     dup
-    bury 20
+    bury 23
     // smart_contracts/lmsr_math_avm.py:283
     // linear_quote = _mul_div_ceil(price_after_ceil, shares, UInt64(SCALE))
-    dig 17
-    dig 5
+    dig 20
+    dig 9
     intc_2 // 1000000
     callsub _mul_div_ceil
-    bury 19
+    bury 22
     // smart_contracts/lmsr_math_avm.py:286
     // if increment_fp > UInt64(1):
     intc_1 // 1
     >
-    bnz buy_if_body@19
-    dig 17
-    bury 27
+    bnz buy_if_body@13
+    dig 20
+    bury 29
 
-buy_after_if_else@23:
+buy_after_if_else@17:
     // smart_contracts/lmsr_math_avm.py:291
     // sell_floor = lmsr_sell_return(q_after, b, outcome, shares)
-    dig 31
-    dig 28
+    dig 29
     dig 6
-    dig 6
+    dig 10
+    dig 10
     callsub lmsr_sell_return
-    bury 32
+    bury 3
     dup
-    bury 14
+    bury 17
     // smart_contracts/lmsr_math_avm.py:27
     // if a >= b:
-    dig 27
+    dig 29
     <=
-    bz buy_after_if_else@40
-    dig 26
-    bury 14
+    bz buy_after_if_else@34
+    dig 28
+    bury 17
 
-buy_after_inlined_smart_contracts.lmsr_math_avm._max_u64@41:
+buy_after_inlined_smart_contracts.lmsr_math_avm._max_u64@35:
     // smart_contracts/lmsr_math_avm.py:225
     // max_exponent = _max_exponent_fp(q, b)
-    dig 32
-    dig 28
+    dig 4
+    dig 6
     dup
     cover 2
     callsub _max_exponent_fp
@@ -3951,7 +3893,7 @@ buy_after_inlined_smart_contracts.lmsr_math_avm._max_u64@41:
     dig 2
     dig 2
     callsub _sum_shifted_exp_fp
-    bury 36
+    bury 8
     // smart_contracts/lmsr_math_avm.py:227
     // return max_exponent + ln_fp(sum_exp)
     callsub ln_fp
@@ -3968,10 +3910,10 @@ buy_after_inlined_smart_contracts.lmsr_math_avm._max_u64@41:
     divw
     dup
     cover 2
-    bury 27
+    bury 29
     // smart_contracts/lmsr_math_avm.py:225
     // max_exponent = _max_exponent_fp(q, b)
-    dig 32
+    dig 3
     dig 1
     callsub _max_exponent_fp
     // smart_contracts/lmsr_math_avm.py:226
@@ -3989,124 +3931,124 @@ buy_after_inlined_smart_contracts.lmsr_math_avm._max_u64@41:
     intc_2 // 1000000
     callsub _mul_div_ceil
     dup
-    bury 28
+    bury 30
     // smart_contracts/lmsr_math_avm.py:295
     // if cost_after_ceil > cost_before_floor:
     <
-    bz buy_after_if_else@32
+    bz buy_after_if_else@26
     // smart_contracts/lmsr_math_avm.py:296
     // direct_upper = cost_after_ceil - cost_before_floor
-    dig 25
-    dig 25
+    dig 27
+    dig 27
     -
-    bury 22
+    bury 25
     // smart_contracts/lmsr_math_avm.py:297
     // direct_margin = result // UInt64(50)
-    dig 13
+    dig 16
     pushint 50
     /
     dup
-    bury 24
+    bury 27
     // smart_contracts/lmsr_math_avm.py:298
     // if direct_margin < UInt64(16):
     pushint 16
     <
-    bz buy_after_if_else@26
+    bz buy_after_if_else@20
     // smart_contracts/lmsr_math_avm.py:299
     // direct_margin = UInt64(16)
     pushint 16
-    bury 23
+    bury 26
 
-buy_after_if_else@26:
+buy_after_if_else@20:
     // smart_contracts/lmsr_math_avm.py:300
     // if price_before_ceil <= UInt64(64) and direct_upper > result:
-    dig 15
+    dig 18
     pushint 64
     <=
-    bz buy_after_if_else@29
-    dig 21
-    dig 14
+    bz buy_after_if_else@23
+    dig 24
+    dig 17
     >
-    bz buy_after_if_else@29
-    dig 21
-    // smart_contracts/market_app/contract.py:1060
+    bz buy_after_if_else@23
+    dig 24
+    // smart_contracts/market_app/contract.py:998
     // cost = lmsr_cost_delta(q, self.b.value, outcome, shares_val)
-    b buy_after_inlined_smart_contracts.lmsr_math_avm.lmsr_cost_delta@33
+    b buy_after_inlined_smart_contracts.lmsr_math_avm.lmsr_cost_delta@27
 
-buy_after_if_else@29:
+buy_after_if_else@23:
     // smart_contracts/lmsr_math_avm.py:302
     // if direct_upper > result and (direct_upper - result) <= direct_margin:
-    dig 21
-    dig 14
+    dig 24
+    dig 17
     >
-    bz buy_after_if_else@32
-    dig 21
-    dig 14
+    bz buy_after_if_else@26
+    dig 24
+    dig 17
     -
-    dig 23
+    dig 26
     <=
-    bz buy_after_if_else@32
-    dig 21
-    // smart_contracts/market_app/contract.py:1060
+    bz buy_after_if_else@26
+    dig 24
+    // smart_contracts/market_app/contract.py:998
     // cost = lmsr_cost_delta(q, self.b.value, outcome, shares_val)
-    b buy_after_inlined_smart_contracts.lmsr_math_avm.lmsr_cost_delta@33
+    b buy_after_inlined_smart_contracts.lmsr_math_avm.lmsr_cost_delta@27
 
-buy_after_if_else@32:
-    dig 13
-    // smart_contracts/market_app/contract.py:1060
+buy_after_if_else@26:
+    dig 16
+    // smart_contracts/market_app/contract.py:998
     // cost = lmsr_cost_delta(q, self.b.value, outcome, shares_val)
-    b buy_after_inlined_smart_contracts.lmsr_math_avm.lmsr_cost_delta@33
+    b buy_after_inlined_smart_contracts.lmsr_math_avm.lmsr_cost_delta@27
 
-buy_after_if_else@40:
-    dig 12
-    bury 14
+buy_after_if_else@34:
+    dig 15
+    bury 17
     // smart_contracts/lmsr_math_avm.py:292
     // result = _max_u64(core_quote, sell_floor)
-    b buy_after_inlined_smart_contracts.lmsr_math_avm._max_u64@41
+    b buy_after_inlined_smart_contracts.lmsr_math_avm._max_u64@35
 
-buy_if_body@19:
+buy_if_body@13:
     // smart_contracts/lmsr_math_avm.py:287
     // ratio_fp = UInt64(SCALE) + increment_fp
     intc_2 // 1000000
-    dig 19
+    dig 22
     +
     dup
-    bury 16
+    bury 19
     // smart_contracts/lmsr_math_avm.py:178
     // result = ln_fp(x_fp)
     callsub ln_fp
-    bury 14
+    bury 17
 
-buy_while_top@20:
+buy_while_top@14:
     // smart_contracts/lmsr_math_avm.py:179
     // while exp_pos_fp(result) < x_fp:
-    dig 13
+    dig 16
     callsub exp_pos_fp
-    dig 15
+    dig 18
     <
-    bz buy_after_while@22
+    bz buy_after_while@16
     // smart_contracts/lmsr_math_avm.py:180
     // result = result + UInt64(1)
-    dig 13
+    dig 16
     intc_1 // 1
     +
-    bury 14
-    b buy_while_top@20
+    bury 17
+    b buy_while_top@14
 
-buy_after_while@22:
+buy_after_while@16:
     // smart_contracts/lmsr_math_avm.py:289
     // core_quote = _mul_div_ceil(b, delta_ln_fp, UInt64(SCALE))
-    dig 27
-    dig 14
+    dig 5
+    dig 17
     intc_2 // 1000000
     callsub _mul_div_ceil
-    bury 27
-    b buy_after_if_else@23
+    bury 29
+    b buy_after_if_else@17
 
 
 // smart_contracts.market_app.contract.QuestionMarket.sell[routing]() -> void:
 sell:
-    // smart_contracts/market_app/contract.py:1084
+    // smart_contracts/market_app/contract.py:1022
     // @arc4.abimethod()
     txna ApplicationArgs 1
     dup
@@ -4126,18 +4068,18 @@ sell:
     intc_3 // 8
     ==
     assert // invalid number of bytes for arc4.uint64
-    // smart_contracts/market_app/contract.py:1091
+    // smart_contracts/market_app/contract.py:1029
     // self._active_before_deadline()
     callsub _active_before_deadline
-    // smart_contracts/market_app/contract.py:1092
+    // smart_contracts/market_app/contract.py:1030
     // outcome = outcome_index.as_uint64()
     dig 2
     btoi
-    // smart_contracts/market_app/contract.py:1093
+    // smart_contracts/market_app/contract.py:1031
     // self._assert_valid_outcome(outcome)
     dup
     callsub _assert_valid_outcome
-    // smart_contracts/market_app/contract.py:1094
+    // smart_contracts/market_app/contract.py:1032
     // shares_val = shares.as_uint64()
     uncover 2
     btoi
@@ -4145,11 +4087,11 @@ sell:
     // assert condition
     dup
     assert
-    // smart_contracts/market_app/contract.py:1096
+    // smart_contracts/market_app/contract.py:1034
     // self._require_share_granularity(shares_val)
     dup
     callsub _require_share_granularity
-    // smart_contracts/market_app/contract.py:1097
+    // smart_contracts/market_app/contract.py:1035
     // self._require(self._get_user_outcome_shares(outcome) >= shares_val)
     dig 1
     callsub _get_user_outcome_shares
@@ -4158,10 +4100,10 @@ sell:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1099
+    // smart_contracts/market_app/contract.py:1037
     // q = self._get_q()
     callsub _get_q
-    // smart_contracts/market_app/contract.py:1100
+    // smart_contracts/market_app/contract.py:1038
     // gross_return = lmsr_sell_return(q, self.b.value, outcome, shares_val)
     intc_0 // 0
     bytec 8 // "b"
@@ -4170,10 +4112,10 @@ sell:
     dig 3
     dig 3
     callsub lmsr_sell_return
-    // smart_contracts/market_app/contract.py:1101
+    // smart_contracts/market_app/contract.py:1039
     // lp_fee = self._calc_fee_up(gross_return, self.lp_fee_bps.value)
     intc_0 // 0
-    bytec 56 // "lfb"
+    bytec 54 // "lfb"
     app_global_get_ex
     assert // check self.lp_fee_bps exists
     // smart_contracts/market_app/contract.py:415
@@ -4182,7 +4124,7 @@ sell:
     swap
     intc 4 // 10000
     callsub _mul_div_ceil
-    // smart_contracts/market_app/contract.py:1102
+    // smart_contracts/market_app/contract.py:1040
     // protocol_fee = self._calc_fee_up(gross_return, self.protocol_fee_bps.value)
     intc_0 // 0
     bytec 33 // "pfb"
@@ -4194,7 +4136,7 @@ sell:
     swap
     intc 4 // 10000
     callsub _mul_div_ceil
-    // smart_contracts/market_app/contract.py:1103
+    // smart_contracts/market_app/contract.py:1041
     // self._require(gross_return >= lp_fee + protocol_fee)
     dup2
     +
@@ -4203,14 +4145,14 @@ sell:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1104
+    // smart_contracts/market_app/contract.py:1042
     // net_return = gross_return - lp_fee - protocol_fee
     dig 3
     dig 2
     -
     dig 1
     -
-    // smart_contracts/market_app/contract.py:1105
+    // smart_contracts/market_app/contract.py:1043
     // self._require(net_return >= min_return.as_uint64())
     uncover 7
     btoi
@@ -4219,13 +4161,13 @@ sell:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1107-1108
+    // smart_contracts/market_app/contract.py:1045-1046
     // # State updates first (P9)
     // basis_reduction = self._basis_reduction(outcome, shares_val)
     dig 6
     dig 6
     callsub _basis_reduction
-    // smart_contracts/market_app/contract.py:1109
+    // smart_contracts/market_app/contract.py:1047
     // q[outcome] = q[outcome] - shares_val
     dig 4
     extract 2 0
@@ -4245,11 +4187,11 @@ sell:
     swap
     uncover 2
     replace3 // on error: index access is out of bounds
-    // smart_contracts/market_app/contract.py:1110
+    // smart_contracts/market_app/contract.py:1048
     // self._set_q(q)
     callsub _set_q
     pop
-    // smart_contracts/market_app/contract.py:1111
+    // smart_contracts/market_app/contract.py:1049
     // self._set_user_outcome_shares(outcome, self._get_user_outcome_shares(outcome) - shares_val)
     dig 6
     callsub _get_user_outcome_shares
@@ -4258,7 +4200,7 @@ sell:
     dig 7
     swap
     callsub _set_user_outcome_shares
-    // smart_contracts/market_app/contract.py:1112
+    // smart_contracts/market_app/contract.py:1050
     // self._set_user_cost_basis(outcome, self._get_user_cost_basis(outcome) - basis_reduction)
     dig 6
     callsub _get_user_cost_basis
@@ -4267,12 +4209,12 @@ sell:
     dig 7
     swap
     callsub _set_user_cost_basis
-    // smart_contracts/market_app/contract.py:1113
+    // smart_contracts/market_app/contract.py:1051
     // self._decrement_total_user_shares(outcome, shares_val)
-    dig 6
+    uncover 6
     uncover 6
     callsub _decrement_total_user_shares
-    // smart_contracts/market_app/contract.py:1114
+    // smart_contracts/market_app/contract.py:1052
     // self.total_outstanding_cost_basis.value = self.total_outstanding_cost_basis.value - basis_reduction
     intc_0 // 0
     bytec 4 // "tcb"
@@ -4283,7 +4225,7 @@ sell:
     bytec 4 // "tcb"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:1115
+    // smart_contracts/market_app/contract.py:1053
     // self.pool_balance.value = self.pool_balance.value - gross_return
     intc_0 // 0
     bytec_2 // "pb"
@@ -4294,11 +4236,11 @@ sell:
     bytec_2 // "pb"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:1116
+    // smart_contracts/market_app/contract.py:1054
     // self._distribute_lp_fee(lp_fee)
     uncover 2
     callsub _distribute_lp_fee
-    // smart_contracts/market_app/contract.py:1117
+    // smart_contracts/market_app/contract.py:1055
     // self.protocol_fee_balance.value = self.protocol_fee_balance.value + protocol_fee
     intc_0 // 0
     bytec 18 // "pfbl"
@@ -4309,26 +4251,22 @@ sell:
     bytec 18 // "pfbl"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:1119-1120
+    // smart_contracts/market_app/contract.py:1057-1058
     // # Send USDC to seller
     // self._send_currency(Txn.sender, net_return)
     txn Sender
     swap
     callsub _send_currency
-    // smart_contracts/market_app/contract.py:1122-1123
-    // # Full exit from this outcome deletes us:/uc: boxes and refunds MBR.
-    // self._maybe_delete_zero_position(outcome)
-    callsub _maybe_delete_zero_position
-    // smart_contracts/market_app/contract.py:1125
+    // smart_contracts/market_app/contract.py:1068
     // arc4.emit("Sell(uint64)", outcome_index)
     pushbytes 0xb6d8757b // method "Sell(uint64)"
     swap
     concat
     log
-    // smart_contracts/market_app/contract.py:1126
+    // smart_contracts/market_app/contract.py:1069
     // self._assert_invariants()
     callsub _assert_invariants
-    // smart_contracts/market_app/contract.py:1084
+    // smart_contracts/market_app/contract.py:1022
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -4340,7 +4278,7 @@ enter_lp_active:
     dupn 2
     bytec_1 // ""
     dupn 14
-    // smart_contracts/market_app/contract.py:1128
+    // smart_contracts/market_app/contract.py:1071
     // @arc4.abimethod()
     txna ApplicationArgs 1
     dupn 2
@@ -4376,7 +4314,7 @@ enter_lp_active:
     ==
     assert // invalid number of bytes for arc4.uint64
     txn GroupIndex
-    pushint 2
+    intc_1 // 1
     -
     dup
     cover 5
@@ -4384,57 +4322,42 @@ enter_lp_active:
     pushint 4 // axfer
     ==
     assert // transaction type is axfer
-    txn GroupIndex
-    intc_1 // 1
-    -
-    dup
-    gtxns TypeEnum
-    intc_1 // pay
-    ==
-    assert // transaction type is pay
-    // smart_contracts/market_app/contract.py:1138
+    // smart_contracts/market_app/contract.py:1080
     // self._active_before_deadline()
     callsub _active_before_deadline
-    // smart_contracts/market_app/contract.py:1139
+    // smart_contracts/market_app/contract.py:1081
     // delta_b = target_delta_b.as_uint64()
-    uncover 4
-    btoi
-    dup
-    cover 5
-    // smart_contracts/market_app/contract.py:1140
-    // max_deposit_val = max_deposit.as_uint64()
-    uncover 4
-    btoi
-    dup
-    cover 5
-    // smart_contracts/market_app/contract.py:1141
-    // tolerance = price_tolerance.as_uint64()
     uncover 3
     btoi
+    dup
     cover 4
+    // smart_contracts/market_app/contract.py:1082
+    // max_deposit_val = max_deposit.as_uint64()
+    uncover 3
+    btoi
+    dup
+    cover 4
+    // smart_contracts/market_app/contract.py:1083
+    // tolerance = price_tolerance.as_uint64()
+    uncover 2
+    btoi
+    cover 3
     // smart_contracts/market_app/contract.py:258
     // assert condition
     swap
     assert
     assert
-    // smart_contracts/market_app/contract.py:1144
+    // smart_contracts/market_app/contract.py:1086
     // self._require(expected_prices.length == self.num_outcomes.value)
     intc_0 // 0
     bytec_3 // "no"
     app_global_get_ex
     assert // check self.num_outcomes exists
-    uncover 2
     ==
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1146-1148
-    // # LP may trigger _settle_lp_fees below which creates the uf: box on
-    // # first call. MBR is 0 on repeat entries.
-    // self._verify_mbr_topup(mbr_payment, self._new_lp_box_mbr())
-    callsub _new_lp_box_mbr
-    callsub _verify_mbr_topup
-    // smart_contracts/market_app/contract.py:1150
+    // smart_contracts/market_app/contract.py:1090
     // current_prices = lmsr_prices(self._get_q(), self.b.value)
     callsub _get_q
     intc_0 // 0
@@ -4444,24 +4367,24 @@ enter_lp_active:
     callsub lmsr_prices
     pop
     dup
-    // smart_contracts/market_app/contract.py:1151
+    // smart_contracts/market_app/contract.py:1091
     // max_price = UInt64(0)
     intc_0 // 0
     swap
-    // smart_contracts/market_app/contract.py:1152
+    // smart_contracts/market_app/contract.py:1092
     // for idx in urange(current_prices.length):
     intc_0 // 0
     extract_uint16 // on error: invalid array length header
     intc_0 // 0
 
 enter_lp_active_for_header@2:
-    // smart_contracts/market_app/contract.py:1152
+    // smart_contracts/market_app/contract.py:1092
     // for idx in urange(current_prices.length):
     dup
     dig 2
     <
     bz enter_lp_active_after_for@7
-    // smart_contracts/market_app/contract.py:1153
+    // smart_contracts/market_app/contract.py:1093
     // price = current_prices[idx]
     dig 3
     extract 2 0
@@ -4474,7 +4397,7 @@ enter_lp_active_for_header@2:
     dup
     cover 2
     bury 17
-    // smart_contracts/market_app/contract.py:1154
+    // smart_contracts/market_app/contract.py:1094
     // self._require(self._abs_diff(price, expected_prices[idx].as_uint64()) <= tolerance)
     dig 10
     extract 2 0
@@ -4488,7 +4411,7 @@ enter_lp_active_for_header@2:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1155
+    // smart_contracts/market_app/contract.py:1095
     // if price > max_price:
     dig 3
     >
@@ -4497,7 +4420,7 @@ enter_lp_active_for_header@2:
     bury 3
 
 enter_lp_active_after_if_else@5:
-    // smart_contracts/market_app/contract.py:1152
+    // smart_contracts/market_app/contract.py:1092
     // for idx in urange(current_prices.length):
     dup
     intc_1 // 1
@@ -4506,10 +4429,10 @@ enter_lp_active_after_if_else@5:
     b enter_lp_active_for_header@2
 
 enter_lp_active_after_for@7:
-    // smart_contracts/market_app/contract.py:1157
+    // smart_contracts/market_app/contract.py:1097
     // self._require(max_price <= self.lp_entry_max_price_fp.value)
     intc_0 // 0
-    bytec 68 // "lpm"
+    bytec 65 // "lpm"
     app_global_get_ex
     assert // check self.lp_entry_max_price_fp exists
     dig 3
@@ -4531,7 +4454,7 @@ enter_lp_active_after_for@7:
     callsub _mul_div_ceil
     dup
     bury 21
-    // smart_contracts/market_app/contract.py:1160
+    // smart_contracts/market_app/contract.py:1100
     // self._require(deposit_required <= max_deposit_val)
     dup
     dig 8
@@ -4539,15 +4462,15 @@ enter_lp_active_after_for@7:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1161
+    // smart_contracts/market_app/contract.py:1101
     // self._verify_payment(payment, deposit_required)
     dig 9
     swap
     callsub _verify_payment
-    // smart_contracts/market_app/contract.py:1163
+    // smart_contracts/market_app/contract.py:1103
     // self._settle_lp_fees()
     callsub _settle_lp_fees
-    // smart_contracts/market_app/contract.py:1165
+    // smart_contracts/market_app/contract.py:1105
     // next_b = self.b.value + delta_b
     intc_0 // 0
     bytec 8 // "b"
@@ -4555,16 +4478,16 @@ enter_lp_active_after_for@7:
     assert // check self.b exists
     +
     bury 16
-    // smart_contracts/market_app/contract.py:1166
+    // smart_contracts/market_app/contract.py:1106
     // floor_q = Array[UInt64]((self._get_total_user_shares(UInt64(0)),))
     intc_0 // 0
     callsub _get_total_user_shares
     itob
-    bytec 72 // 0x0001
+    bytec 69 // 0x0001
     swap
     concat
     bury 28
-    // smart_contracts/market_app/contract.py:1167
+    // smart_contracts/market_app/contract.py:1107
     // for _off in urange(self.num_outcomes.value - UInt64(1)):
     intc_0 // 0
     bytec_3 // "no"
@@ -4577,13 +4500,13 @@ enter_lp_active_after_for@7:
     bury 25
 
 enter_lp_active_for_header@8:
-    // smart_contracts/market_app/contract.py:1167
+    // smart_contracts/market_app/contract.py:1107
     // for _off in urange(self.num_outcomes.value - UInt64(1)):
     dig 24
     dig 14
     <
     bz enter_lp_active_after_for@11
-    // smart_contracts/market_app/contract.py:1168
+    // smart_contracts/market_app/contract.py:1108
     // floor_q.append(self._get_total_user_shares(_off + UInt64(1)))
     dig 24
     intc_1 // 1
@@ -4818,17 +4741,17 @@ enter_lp_active_for_header@26:
     b enter_lp_active_for_header@26
 
 enter_lp_active_after_if_else@29:
-    // smart_contracts/market_app/contract.py:1169
+    // smart_contracts/market_app/contract.py:1109
     // self._set_q(lmsr_q_from_prices_with_floor(current_prices, next_b, floor_q))
     dig 25
     callsub _set_q
     pop
-    // smart_contracts/market_app/contract.py:1170
+    // smart_contracts/market_app/contract.py:1110
     // self.b.value = next_b
     bytec 8 // "b"
     dig 16
     app_global_put
-    // smart_contracts/market_app/contract.py:1171
+    // smart_contracts/market_app/contract.py:1111
     // self.pool_balance.value = self.pool_balance.value + deposit_required
     intc_0 // 0
     bytec_2 // "pb"
@@ -4841,7 +4764,7 @@ enter_lp_active_after_if_else@29:
     bytec_2 // "pb"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:1172
+    // smart_contracts/market_app/contract.py:1112
     // self.lp_shares_total.value = self.lp_shares_total.value + delta_b
     intc_0 // 0
     bytec 14 // "lst"
@@ -4854,7 +4777,7 @@ enter_lp_active_after_if_else@29:
     bytec 14 // "lst"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:1174
+    // smart_contracts/market_app/contract.py:1114
     // self.total_lp_weighted_entry_sum.value + self._entry_weighted_sum_checked(delta_b, self._now())
     intc_0 // 0
     bytec 6 // "les"
@@ -4877,13 +4800,13 @@ enter_lp_active_after_if_else@29:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1174
+    // smart_contracts/market_app/contract.py:1114
     // self.total_lp_weighted_entry_sum.value + self._entry_weighted_sum_checked(delta_b, self._now())
     +
-    // smart_contracts/market_app/contract.py:1173
+    // smart_contracts/market_app/contract.py:1113
     // self.total_lp_weighted_entry_sum.value = (
     bytec 6 // "les"
-    // smart_contracts/market_app/contract.py:1173-1175
+    // smart_contracts/market_app/contract.py:1113-1115
     // self.total_lp_weighted_entry_sum.value = (
     //     self.total_lp_weighted_entry_sum.value + self._entry_weighted_sum_checked(delta_b, self._now())
     // )
@@ -4898,7 +4821,7 @@ enter_lp_active_after_if_else@29:
     intc_0 // 0
     cover 2
     select
-    // smart_contracts/market_app/contract.py:1176
+    // smart_contracts/market_app/contract.py:1116
     // self._set_lp_shares(self._get_lp_shares() + delta_b)
     dig 1
     +
@@ -4932,7 +4855,7 @@ enter_lp_active_after_if_else@29:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1178
+    // smart_contracts/market_app/contract.py:1118
     // self._get_lp_weighted_entry_sum() + self._entry_weighted_sum_checked(delta_b, self._now())
     +
     // smart_contracts/market_app/contract.py:292
@@ -4941,7 +4864,7 @@ enter_lp_active_after_if_else@29:
     bytec 6 // "les"
     uncover 2
     app_local_put
-    // smart_contracts/market_app/contract.py:1180
+    // smart_contracts/market_app/contract.py:1120
     // self._set_fee_snapshot(self.cumulative_fee_per_share.value)
     intc_0 // 0
     bytec 21 // "cfs"
@@ -4953,7 +4876,7 @@ enter_lp_active_after_if_else@29:
     bytec 26 // "fs"
     uncover 2
     app_local_put
-    // smart_contracts/market_app/contract.py:1182
+    // smart_contracts/market_app/contract.py:1122
     // if payment.asset_amount > deposit_required:
     dig 8
     gtxns AssetAmount
@@ -4961,7 +4884,7 @@ enter_lp_active_after_if_else@29:
     bury 15
     <
     bz enter_lp_active_after_if_else@13
-    // smart_contracts/market_app/contract.py:1183
+    // smart_contracts/market_app/contract.py:1123
     // self._send_currency(Txn.sender, payment.asset_amount - deposit_required)
     txn Sender
     dig 13
@@ -4970,7 +4893,7 @@ enter_lp_active_after_if_else@29:
     callsub _send_currency
 
 enter_lp_active_after_if_else@13:
-    // smart_contracts/market_app/contract.py:1185
+    // smart_contracts/market_app/contract.py:1125
     // arc4.emit("EnterLpActive(uint64,uint64)", target_delta_b, arc4.UInt64(deposit_required))
     dig 18
     itob
@@ -4981,10 +4904,10 @@ enter_lp_active_after_if_else@13:
     swap
     concat
     log
-    // smart_contracts/market_app/contract.py:1186
+    // smart_contracts/market_app/contract.py:1126
     // self._assert_invariants()
     callsub _assert_invariants
-    // smart_contracts/market_app/contract.py:1128
+    // smart_contracts/market_app/contract.py:1071
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -4992,7 +4915,7 @@ enter_lp_active_after_if_else@13:
 
 // smart_contracts.market_app.contract.QuestionMarket.trigger_resolution[routing]() -> void:
 trigger_resolution:
-    // smart_contracts/market_app/contract.py:1190
+    // smart_contracts/market_app/contract.py:1130
     // self._require_status(UInt64(STATUS_ACTIVE))
     intc_1 // 1
     callsub _require_status
@@ -5000,7 +4923,7 @@ trigger_resolution:
     // # The identity op ensures UInt64 type for both AVM and testing framework
     // return Global.latest_timestamp + UInt64(0)
     global LatestTimestamp
-    // smart_contracts/market_app/contract.py:1191
+    // smart_contracts/market_app/contract.py:1131
     // self._require(self._now() >= self.deadline.value)
     intc_0 // 0
     bytec 15 // "dl"
@@ -5010,19 +4933,19 @@ trigger_resolution:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1192
+    // smart_contracts/market_app/contract.py:1132
     // self.status.value = UInt64(STATUS_RESOLUTION_PENDING)
     bytec_0 // "st"
     pushint 2
     app_global_put
-    // smart_contracts/market_app/contract.py:1193
+    // smart_contracts/market_app/contract.py:1133
     // arc4.emit("TriggerResolution(uint64)", arc4.UInt64(self.status.value))
     pushbytes 0x3543a42b0000000000000002
     log
-    // smart_contracts/market_app/contract.py:1194
+    // smart_contracts/market_app/contract.py:1134
     // self._assert_invariants()
     callsub _assert_invariants
-    // smart_contracts/market_app/contract.py:1188
+    // smart_contracts/market_app/contract.py:1128
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -5031,7 +4954,7 @@ trigger_resolution:
 // smart_contracts.market_app.contract.QuestionMarket.propose_resolution[routing]() -> void:
 propose_resolution:
     bytec_1 // ""
-    // smart_contracts/market_app/contract.py:1196
+    // smart_contracts/market_app/contract.py:1136
     // @arc4.abimethod()
     txna ApplicationArgs 1
     dupn 2
@@ -5060,18 +4983,18 @@ propose_resolution:
     pushint 4 // axfer
     ==
     assert // transaction type is axfer
-    // smart_contracts/market_app/contract.py:1203
+    // smart_contracts/market_app/contract.py:1143
     // self._require_status(UInt64(STATUS_RESOLUTION_PENDING))
     pushint 2
     callsub _require_status
-    // smart_contracts/market_app/contract.py:1204
+    // smart_contracts/market_app/contract.py:1144
     // outcome = outcome_index.as_uint64()
     btoi
     dup
-    // smart_contracts/market_app/contract.py:1205
+    // smart_contracts/market_app/contract.py:1145
     // self._assert_valid_outcome(outcome)
     callsub _assert_valid_outcome
-    // smart_contracts/market_app/contract.py:1207
+    // smart_contracts/market_app/contract.py:1147
     // is_authority = Txn.sender.bytes == self.resolution_authority.value
     txn Sender
     intc_0 // 0
@@ -5084,20 +5007,20 @@ propose_resolution:
     // # The identity op ensures UInt64 type for both AVM and testing framework
     // return Global.latest_timestamp + UInt64(0)
     global LatestTimestamp
-    // smart_contracts/market_app/contract.py:1208
+    // smart_contracts/market_app/contract.py:1148
     // grace_expired = self._now() >= self.deadline.value + self.grace_period_secs.value
     intc_0 // 0
     bytec 15 // "dl"
     app_global_get_ex
     assert // check self.deadline exists
     intc_0 // 0
-    bytec 69 // "gps"
+    bytec 66 // "gps"
     app_global_get_ex
     assert // check self.grace_period_secs exists
     +
     >=
     swap
-    // smart_contracts/market_app/contract.py:1210
+    // smart_contracts/market_app/contract.py:1150
     // if not is_authority:
     bnz propose_resolution_after_if_else@3
     // smart_contracts/market_app/contract.py:258
@@ -5106,66 +5029,66 @@ propose_resolution:
     assert
 
 propose_resolution_after_if_else@3:
-    // smart_contracts/market_app/contract.py:1214
+    // smart_contracts/market_app/contract.py:1154
     // required_bond = UInt64(0)
     intc_0 // 0
     bury 7
-    // smart_contracts/market_app/contract.py:1215
+    // smart_contracts/market_app/contract.py:1155
     // if not is_authority:
     dig 1
     bnz propose_resolution_after_if_else@5
-    // smart_contracts/market_app/contract.py:1216
+    // smart_contracts/market_app/contract.py:1156
     // required_bond = self._required_proposal_bond()
     callsub _required_proposal_bond
     bury 7
 
 propose_resolution_after_if_else@5:
-    // smart_contracts/market_app/contract.py:1217
+    // smart_contracts/market_app/contract.py:1157
     // self._verify_payment(payment, required_bond)
     dig 3
     dup
     dig 8
     callsub _verify_payment
-    // smart_contracts/market_app/contract.py:1219-1220
+    // smart_contracts/market_app/contract.py:1159-1160
     // # State updates (P9)
     // self.proposer.value = Txn.sender.bytes
     bytec 24 // "pr"
     txn Sender
     app_global_put
-    // smart_contracts/market_app/contract.py:1221
+    // smart_contracts/market_app/contract.py:1161
     // self.proposer_bond_held.value = payment.asset_amount
     gtxns AssetAmount
     bytec 5 // "pbh"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:1222
+    // smart_contracts/market_app/contract.py:1162
     // self.proposed_outcome.value = outcome
     bytec 22 // "po"
     dig 3
     app_global_put
-    // smart_contracts/market_app/contract.py:1223
+    // smart_contracts/market_app/contract.py:1163
     // self.proposal_timestamp.value = self._now()
     bytec 11 // "pts"
     // smart_contracts/market_app/contract.py:671-672
     // # The identity op ensures UInt64 type for both AVM and testing framework
     // return Global.latest_timestamp + UInt64(0)
     global LatestTimestamp
-    // smart_contracts/market_app/contract.py:1223
+    // smart_contracts/market_app/contract.py:1163
     // self.proposal_timestamp.value = self._now()
     app_global_put
-    // smart_contracts/market_app/contract.py:1224
+    // smart_contracts/market_app/contract.py:1164
     // self.proposal_evidence_hash.value = evidence_hash.bytes
     bytec 36 // "peh"
     dig 5
     dup
     cover 2
     app_global_put
-    // smart_contracts/market_app/contract.py:1225
+    // smart_contracts/market_app/contract.py:1165
     // self.status.value = UInt64(STATUS_RESOLUTION_PROPOSED)
     bytec_0 // "st"
     pushint 3
     app_global_put
-    // smart_contracts/market_app/contract.py:1226
+    // smart_contracts/market_app/contract.py:1166
     // arc4.emit("ProposeResolution(uint64,byte[])", outcome_index, evidence_hash)
     dig 6
     bytec 25 // 0x000a
@@ -5176,10 +5099,10 @@ propose_resolution_after_if_else@5:
     swap
     concat
     log
-    // smart_contracts/market_app/contract.py:1227
+    // smart_contracts/market_app/contract.py:1167
     // self._assert_invariants()
     callsub _assert_invariants
-    // smart_contracts/market_app/contract.py:1196
+    // smart_contracts/market_app/contract.py:1136
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -5187,7 +5110,7 @@ propose_resolution_after_if_else@5:
 
 // smart_contracts.market_app.contract.QuestionMarket.propose_early_resolution[routing]() -> void:
 propose_early_resolution:
-    // smart_contracts/market_app/contract.py:1229
+    // smart_contracts/market_app/contract.py:1169
     // @arc4.abimethod()
     txna ApplicationArgs 1
     dup
@@ -5213,10 +5136,10 @@ propose_early_resolution:
     pushint 4 // axfer
     ==
     assert // transaction type is axfer
-    // smart_contracts/market_app/contract.py:1236
+    // smart_contracts/market_app/contract.py:1176
     // self._active_before_deadline()
     callsub _active_before_deadline
-    // smart_contracts/market_app/contract.py:1237
+    // smart_contracts/market_app/contract.py:1177
     // self._require_authorized(self.resolution_authority.value)
     intc_0 // 0
     bytec 17 // "ra"
@@ -5229,57 +5152,57 @@ propose_early_resolution:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1238
+    // smart_contracts/market_app/contract.py:1178
     // outcome = outcome_index.as_uint64()
     dig 2
     btoi
-    // smart_contracts/market_app/contract.py:1239
+    // smart_contracts/market_app/contract.py:1179
     // self._assert_valid_outcome(outcome)
     dup
     callsub _assert_valid_outcome
-    // smart_contracts/market_app/contract.py:1240
+    // smart_contracts/market_app/contract.py:1180
     // self._verify_payment(payment, UInt64(0))
     dig 1
     intc_0 // 0
     callsub _verify_payment
-    // smart_contracts/market_app/contract.py:1242
+    // smart_contracts/market_app/contract.py:1182
     // self.proposer.value = Txn.sender.bytes
     bytec 24 // "pr"
     txn Sender
     app_global_put
-    // smart_contracts/market_app/contract.py:1243
+    // smart_contracts/market_app/contract.py:1183
     // self.proposer_bond_held.value = payment.asset_amount
     swap
     gtxns AssetAmount
     bytec 5 // "pbh"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:1244
+    // smart_contracts/market_app/contract.py:1184
     // self.proposed_outcome.value = outcome
     bytec 22 // "po"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:1245
+    // smart_contracts/market_app/contract.py:1185
     // self.proposal_timestamp.value = self._now()
     bytec 11 // "pts"
     // smart_contracts/market_app/contract.py:671-672
     // # The identity op ensures UInt64 type for both AVM and testing framework
     // return Global.latest_timestamp + UInt64(0)
     global LatestTimestamp
-    // smart_contracts/market_app/contract.py:1245
+    // smart_contracts/market_app/contract.py:1185
     // self.proposal_timestamp.value = self._now()
     app_global_put
-    // smart_contracts/market_app/contract.py:1246
+    // smart_contracts/market_app/contract.py:1186
     // self.proposal_evidence_hash.value = evidence_hash.bytes
     bytec 36 // "peh"
     dig 1
     app_global_put
-    // smart_contracts/market_app/contract.py:1247
+    // smart_contracts/market_app/contract.py:1187
     // self.status.value = UInt64(STATUS_RESOLUTION_PROPOSED)
     bytec_0 // "st"
     pushint 3
     app_global_put
-    // smart_contracts/market_app/contract.py:1248
+    // smart_contracts/market_app/contract.py:1188
     // arc4.emit("ProposeEarlyResolution(uint64,byte[])", outcome_index, evidence_hash)
     swap
     bytec 25 // 0x000a
@@ -5290,10 +5213,10 @@ propose_early_resolution:
     swap
     concat
     log
-    // smart_contracts/market_app/contract.py:1249
+    // smart_contracts/market_app/contract.py:1189
     // self._assert_invariants()
     callsub _assert_invariants
-    // smart_contracts/market_app/contract.py:1229
+    // smart_contracts/market_app/contract.py:1169
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -5301,7 +5224,7 @@ propose_early_resolution:
 
 // smart_contracts.market_app.contract.QuestionMarket.challenge_resolution[routing]() -> void:
 challenge_resolution:
-    // smart_contracts/market_app/contract.py:1251
+    // smart_contracts/market_app/contract.py:1191
     // @arc4.abimethod()
     txn GroupIndex
     intc_1 // 1
@@ -5327,7 +5250,7 @@ challenge_resolution:
     len
     ==
     assert // invalid number of bytes for arc4.dynamic_array<arc4.uint8>
-    // smart_contracts/market_app/contract.py:1258
+    // smart_contracts/market_app/contract.py:1198
     // self._require_status(UInt64(STATUS_RESOLUTION_PROPOSED))
     pushint 3
     callsub _require_status
@@ -5335,7 +5258,7 @@ challenge_resolution:
     // # The identity op ensures UInt64 type for both AVM and testing framework
     // return Global.latest_timestamp + UInt64(0)
     global LatestTimestamp
-    // smart_contracts/market_app/contract.py:1259
+    // smart_contracts/market_app/contract.py:1199
     // self._require(self._now() < self.proposal_timestamp.value + self.challenge_window_secs.value)
     intc_0 // 0
     bytec 11 // "pts"
@@ -5353,19 +5276,19 @@ challenge_resolution:
     // smart_contracts/market_app/contract.py:456
     // self.challenge_bond.value,
     intc_0 // 0
-    bytec 49 // "cb"
+    bytec 47 // "cb"
     app_global_get_ex
     assert // check self.challenge_bond exists
     // smart_contracts/market_app/contract.py:457
     // self.challenge_bond_bps.value,
     intc_0 // 0
-    bytec 50 // "cbb"
+    bytec 48 // "cbb"
     app_global_get_ex
     assert // check self.challenge_bond_bps exists
     // smart_contracts/market_app/contract.py:458
     // self.challenge_bond_cap.value,
     intc_0 // 0
-    bytec 52 // "cbc"
+    bytec 50 // "cbc"
     app_global_get_ex
     assert // check self.challenge_bond_cap exists
     // smart_contracts/market_app/contract.py:455-459
@@ -5375,57 +5298,57 @@ challenge_resolution:
     //     self.challenge_bond_cap.value,
     // )
     callsub _required_bond
-    // smart_contracts/market_app/contract.py:1260
+    // smart_contracts/market_app/contract.py:1200
     // self._verify_payment(payment, self._required_challenge_bond())
     dig 3
     swap
     callsub _verify_payment
-    // smart_contracts/market_app/contract.py:1262-1263
+    // smart_contracts/market_app/contract.py:1202-1203
     // # State updates first (P9). Bond retained by contract until dispute resolves.
     // self.challenger.value = Txn.sender.bytes
     bytec 16 // "ch"
     txn Sender
     app_global_put
-    // smart_contracts/market_app/contract.py:1264
+    // smart_contracts/market_app/contract.py:1204
     // self.challenger_bond_held.value = payment.asset_amount
     uncover 2
     gtxns AssetAmount
     bytec 12 // "cbh"
     dig 1
     app_global_put
-    // smart_contracts/market_app/contract.py:1265
+    // smart_contracts/market_app/contract.py:1205
     // self.challenge_reason_code.value = reason_code.as_uint64()
     dig 2
     btoi
-    bytec 59 // "crc"
+    bytec 57 // "crc"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:1266
+    // smart_contracts/market_app/contract.py:1206
     // self.challenge_evidence_hash.value = evidence_hash.bytes
-    bytec 60 // "ceh"
+    bytec 58 // "ceh"
     dig 2
     app_global_put
-    // smart_contracts/market_app/contract.py:1267
+    // smart_contracts/market_app/contract.py:1207
     // self.dispute_opened_at.value = self._now()
     bytec 30 // "doa"
     // smart_contracts/market_app/contract.py:671-672
     // # The identity op ensures UInt64 type for both AVM and testing framework
     // return Global.latest_timestamp + UInt64(0)
     global LatestTimestamp
-    // smart_contracts/market_app/contract.py:1267
+    // smart_contracts/market_app/contract.py:1207
     // self.dispute_opened_at.value = self._now()
     app_global_put
-    // smart_contracts/market_app/contract.py:1268
+    // smart_contracts/market_app/contract.py:1208
     // self.status.value = UInt64(STATUS_DISPUTED)
     bytec_0 // "st"
     pushint 6
     app_global_put
-    // smart_contracts/market_app/contract.py:1270
+    // smart_contracts/market_app/contract.py:1210
     // arc4.emit("ChallengeResolution(uint64,uint64,byte[])", arc4.UInt64(payment.asset_amount), reason_code, evidence_hash)
     itob
     uncover 2
     concat
-    bytec 73 // 0x0012
+    bytec 70 // 0x0012
     concat
     swap
     concat
@@ -5433,10 +5356,10 @@ challenge_resolution:
     swap
     concat
     log
-    // smart_contracts/market_app/contract.py:1271
+    // smart_contracts/market_app/contract.py:1211
     // self._assert_invariants()
     callsub _assert_invariants
-    // smart_contracts/market_app/contract.py:1251
+    // smart_contracts/market_app/contract.py:1191
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -5444,7 +5367,7 @@ challenge_resolution:
 
 // smart_contracts.market_app.contract.QuestionMarket.register_dispute[routing]() -> void:
 register_dispute:
-    // smart_contracts/market_app/contract.py:1273
+    // smart_contracts/market_app/contract.py:1213
     // @arc4.abimethod()
     txna ApplicationArgs 1
     dup
@@ -5468,11 +5391,11 @@ register_dispute:
     intc_3 // 8
     ==
     assert // invalid number of bytes for arc4.uint64
-    // smart_contracts/market_app/contract.py:1281
+    // smart_contracts/market_app/contract.py:1221
     // self._require_status(UInt64(STATUS_DISPUTED))
     pushint 6
     callsub _require_status
-    // smart_contracts/market_app/contract.py:1282
+    // smart_contracts/market_app/contract.py:1222
     // self._require_authorized(self.resolution_authority.value)
     intc_0 // 0
     bytec 17 // "ra"
@@ -5485,28 +5408,28 @@ register_dispute:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1283
+    // smart_contracts/market_app/contract.py:1223
     // self.dispute_ref_hash.value = dispute_ref_hash.bytes
-    bytec 61 // "drh"
+    bytec 59 // "drh"
     dig 3
     app_global_put
-    // smart_contracts/market_app/contract.py:1284
+    // smart_contracts/market_app/contract.py:1224
     // self.dispute_backend_kind.value = backend_kind.as_uint64()
     dig 1
     btoi
-    bytec 63 // "dbk"
+    bytec 61 // "dbk"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:1285
+    // smart_contracts/market_app/contract.py:1225
     // self.dispute_deadline.value = deadline.as_uint64()
     dup
     btoi
-    bytec 62 // "ddl"
+    bytec 60 // "ddl"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:1286
+    // smart_contracts/market_app/contract.py:1226
     // arc4.emit("RegisterDispute(byte[],uint64,uint64)", dispute_ref_hash, backend_kind, deadline)
-    bytec 73 // 0x0012
+    bytec 70 // 0x0012
     uncover 2
     concat
     swap
@@ -5517,10 +5440,10 @@ register_dispute:
     swap
     concat
     log
-    // smart_contracts/market_app/contract.py:1287
+    // smart_contracts/market_app/contract.py:1227
     // self._assert_invariants()
     callsub _assert_invariants
-    // smart_contracts/market_app/contract.py:1273
+    // smart_contracts/market_app/contract.py:1213
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -5528,7 +5451,7 @@ register_dispute:
 
 // smart_contracts.market_app.contract.QuestionMarket.creator_resolve_dispute[routing]() -> void:
 creator_resolve_dispute:
-    // smart_contracts/market_app/contract.py:1301
+    // smart_contracts/market_app/contract.py:1241
     // @arc4.abimethod()
     txna ApplicationArgs 1
     dup
@@ -5546,11 +5469,11 @@ creator_resolve_dispute:
     len
     ==
     assert // invalid number of bytes for arc4.dynamic_array<arc4.uint8>
-    // smart_contracts/market_app/contract.py:1307
+    // smart_contracts/market_app/contract.py:1247
     // self._require_status(UInt64(STATUS_DISPUTED))
     pushint 6
     callsub _require_status
-    // smart_contracts/market_app/contract.py:1308
+    // smart_contracts/market_app/contract.py:1248
     // self._require_authorized(self.creator.value)
     intc_0 // 0
     bytec 13 // "cr"
@@ -5563,20 +5486,20 @@ creator_resolve_dispute:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1309
+    // smart_contracts/market_app/contract.py:1249
     // outcome = outcome_index.as_uint64()
     dig 1
     btoi
-    // smart_contracts/market_app/contract.py:1310
+    // smart_contracts/market_app/contract.py:1250
     // self._assert_valid_outcome(outcome)
     dup
     callsub _assert_valid_outcome
-    // smart_contracts/market_app/contract.py:1311
+    // smart_contracts/market_app/contract.py:1251
     // self._resolve_dispute_core(outcome, ruling_hash.bytes, UInt64(1))
     dig 1
     intc_1 // 1
     callsub _resolve_dispute_core
-    // smart_contracts/market_app/contract.py:1312
+    // smart_contracts/market_app/contract.py:1252
     // arc4.emit("CreatorResolveDispute(uint64,byte[])", outcome_index, ruling_hash)
     swap
     bytec 25 // 0x000a
@@ -5587,7 +5510,7 @@ creator_resolve_dispute:
     swap
     concat
     log
-    // smart_contracts/market_app/contract.py:1301
+    // smart_contracts/market_app/contract.py:1241
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -5595,7 +5518,7 @@ creator_resolve_dispute:
 
 // smart_contracts.market_app.contract.QuestionMarket.admin_resolve_dispute[routing]() -> void:
 admin_resolve_dispute:
-    // smart_contracts/market_app/contract.py:1314
+    // smart_contracts/market_app/contract.py:1254
     // @arc4.abimethod()
     txna ApplicationArgs 1
     dup
@@ -5613,14 +5536,14 @@ admin_resolve_dispute:
     len
     ==
     assert // invalid number of bytes for arc4.dynamic_array<arc4.uint8>
-    // smart_contracts/market_app/contract.py:1320
+    // smart_contracts/market_app/contract.py:1260
     // self._require_status(UInt64(STATUS_DISPUTED))
     pushint 6
     callsub _require_status
-    // smart_contracts/market_app/contract.py:1321
+    // smart_contracts/market_app/contract.py:1261
     // self._require_authorized(self.market_admin.value)
     intc_0 // 0
-    bytec 70 // "ma"
+    bytec 67 // "ma"
     app_global_get_ex
     assert // check self.market_admin exists
     // smart_contracts/market_app/contract.py:506
@@ -5630,20 +5553,20 @@ admin_resolve_dispute:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1322
+    // smart_contracts/market_app/contract.py:1262
     // outcome = outcome_index.as_uint64()
     dig 1
     btoi
-    // smart_contracts/market_app/contract.py:1323
+    // smart_contracts/market_app/contract.py:1263
     // self._assert_valid_outcome(outcome)
     dup
     callsub _assert_valid_outcome
-    // smart_contracts/market_app/contract.py:1324
+    // smart_contracts/market_app/contract.py:1264
     // self._resolve_dispute_core(outcome, ruling_hash.bytes, UInt64(2))
     dig 1
     pushint 2
     callsub _resolve_dispute_core
-    // smart_contracts/market_app/contract.py:1325
+    // smart_contracts/market_app/contract.py:1265
     // arc4.emit("AdminResolveDispute(uint64,byte[])", outcome_index, ruling_hash)
     swap
     bytec 25 // 0x000a
@@ -5654,7 +5577,7 @@ admin_resolve_dispute:
     swap
     concat
     log
-    // smart_contracts/market_app/contract.py:1314
+    // smart_contracts/market_app/contract.py:1254
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -5662,7 +5585,7 @@ admin_resolve_dispute:
 
 // smart_contracts.market_app.contract.QuestionMarket.finalize_dispute[routing]() -> void:
 finalize_dispute:
-    // smart_contracts/market_app/contract.py:1327
+    // smart_contracts/market_app/contract.py:1267
     // @arc4.abimethod()
     txna ApplicationArgs 1
     dup
@@ -5680,11 +5603,11 @@ finalize_dispute:
     len
     ==
     assert // invalid number of bytes for arc4.dynamic_array<arc4.uint8>
-    // smart_contracts/market_app/contract.py:1333
+    // smart_contracts/market_app/contract.py:1273
     // self._require_status(UInt64(STATUS_DISPUTED))
     pushint 6
     callsub _require_status
-    // smart_contracts/market_app/contract.py:1334
+    // smart_contracts/market_app/contract.py:1274
     // self._require_authorized(self.resolution_authority.value)
     intc_0 // 0
     bytec 17 // "ra"
@@ -5697,20 +5620,20 @@ finalize_dispute:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1335
+    // smart_contracts/market_app/contract.py:1275
     // outcome = outcome_index.as_uint64()
     dig 1
     btoi
-    // smart_contracts/market_app/contract.py:1336
+    // smart_contracts/market_app/contract.py:1276
     // self._assert_valid_outcome(outcome)
     dup
     callsub _assert_valid_outcome
-    // smart_contracts/market_app/contract.py:1337
+    // smart_contracts/market_app/contract.py:1277
     // self._resolve_dispute_core(outcome, ruling_hash.bytes, UInt64(1))
     dig 1
     intc_1 // 1
     callsub _resolve_dispute_core
-    // smart_contracts/market_app/contract.py:1338
+    // smart_contracts/market_app/contract.py:1278
     // arc4.emit("FinalizeDispute(uint64,byte[])", outcome_index, ruling_hash)
     swap
     bytec 25 // 0x000a
@@ -5721,7 +5644,7 @@ finalize_dispute:
     swap
     concat
     log
-    // smart_contracts/market_app/contract.py:1327
+    // smart_contracts/market_app/contract.py:1267
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -5729,7 +5652,7 @@ finalize_dispute:
 
 // smart_contracts.market_app.contract.QuestionMarket.abort_early_resolution[routing]() -> void:
 abort_early_resolution:
-    // smart_contracts/market_app/contract.py:1340
+    // smart_contracts/market_app/contract.py:1280
     // @arc4.abimethod()
     txna ApplicationArgs 1
     dupn 2
@@ -5741,11 +5664,11 @@ abort_early_resolution:
     len
     ==
     assert // invalid number of bytes for arc4.dynamic_array<arc4.uint8>
-    // smart_contracts/market_app/contract.py:1342
+    // smart_contracts/market_app/contract.py:1282
     // self._require_status(UInt64(STATUS_DISPUTED))
     pushint 6
     callsub _require_status
-    // smart_contracts/market_app/contract.py:1343
+    // smart_contracts/market_app/contract.py:1283
     // self._require_authorized(self.resolution_authority.value)
     intc_0 // 0
     bytec 17 // "ra"
@@ -5758,7 +5681,7 @@ abort_early_resolution:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1344
+    // smart_contracts/market_app/contract.py:1284
     // self._require(self.proposal_timestamp.value > UInt64(0))
     intc_0 // 0
     bytec 11 // "pts"
@@ -5768,7 +5691,7 @@ abort_early_resolution:
     // assert condition
     dup
     assert
-    // smart_contracts/market_app/contract.py:1345
+    // smart_contracts/market_app/contract.py:1285
     // self._require(self.proposal_timestamp.value < self.deadline.value)
     intc_0 // 0
     bytec 15 // "dl"
@@ -5778,7 +5701,7 @@ abort_early_resolution:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1347
+    // smart_contracts/market_app/contract.py:1287
     // challenger_account = Account(self.challenger.value)
     intc_0 // 0
     bytec 16 // "ch"
@@ -5791,75 +5714,75 @@ abort_early_resolution:
     pushint 32
     ==
     assert // Address length is 32 bytes
-    // smart_contracts/market_app/contract.py:1348
+    // smart_contracts/market_app/contract.py:1288
     // challenger_payout = self._settle_overturned_dispute()
     callsub _settle_overturned_dispute
-    // smart_contracts/market_app/contract.py:839
+    // smart_contracts/market_app/contract.py:770
     // self.proposed_outcome.value = UInt64(0)
     bytec 22 // "po"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:840
+    // smart_contracts/market_app/contract.py:771
     // self.proposal_timestamp.value = UInt64(0)
     bytec 11 // "pts"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:841
+    // smart_contracts/market_app/contract.py:772
     // self.proposal_evidence_hash.value = Bytes()
     bytec 36 // "peh"
     bytec_1 // 0x
     app_global_put
-    // smart_contracts/market_app/contract.py:842
+    // smart_contracts/market_app/contract.py:773
     // self.proposer.value = Bytes(ZERO_ADDRESS_BYTES)
     bytec 24 // "pr"
     bytec 7 // 0x0000000000000000000000000000000000000000000000000000000000000000
     app_global_put
-    // smart_contracts/market_app/contract.py:843
+    // smart_contracts/market_app/contract.py:774
     // self.challenger.value = Bytes(ZERO_ADDRESS_BYTES)
     bytec 16 // "ch"
     bytec 7 // 0x0000000000000000000000000000000000000000000000000000000000000000
     app_global_put
-    // smart_contracts/market_app/contract.py:844
+    // smart_contracts/market_app/contract.py:775
     // self.challenge_reason_code.value = UInt64(0)
-    bytec 59 // "crc"
+    bytec 57 // "crc"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:845
+    // smart_contracts/market_app/contract.py:776
     // self.challenge_evidence_hash.value = Bytes()
-    bytec 60 // "ceh"
+    bytec 58 // "ceh"
     bytec_1 // 0x
     app_global_put
-    // smart_contracts/market_app/contract.py:846
+    // smart_contracts/market_app/contract.py:777
     // self.dispute_ref_hash.value = Bytes()
-    bytec 61 // "drh"
+    bytec 59 // "drh"
     bytec_1 // 0x
     app_global_put
-    // smart_contracts/market_app/contract.py:847
+    // smart_contracts/market_app/contract.py:778
     // self.dispute_opened_at.value = UInt64(0)
     bytec 30 // "doa"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:848
+    // smart_contracts/market_app/contract.py:779
     // self.dispute_deadline.value = UInt64(0)
-    bytec 62 // "ddl"
+    bytec 60 // "ddl"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:849
+    // smart_contracts/market_app/contract.py:780
     // self.ruling_hash.value = Bytes()
     bytec 40 // "rh"
     bytec_1 // 0x
     app_global_put
-    // smart_contracts/market_app/contract.py:850
+    // smart_contracts/market_app/contract.py:781
     // self.resolution_path_used.value = UInt64(0)
     bytec 41 // "rpu"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:851
+    // smart_contracts/market_app/contract.py:782
     // self.dispute_backend_kind.value = UInt64(0)
-    bytec 63 // "dbk"
+    bytec 61 // "dbk"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:852
+    // smart_contracts/market_app/contract.py:783
     // self.pending_responder_role.value = UInt64(0)
     bytec 42 // "prr"
     intc_0 // 0
@@ -5868,7 +5791,7 @@ abort_early_resolution:
     // # The identity op ensures UInt64 type for both AVM and testing framework
     // return Global.latest_timestamp + UInt64(0)
     global LatestTimestamp
-    // smart_contracts/market_app/contract.py:1351
+    // smart_contracts/market_app/contract.py:1291
     // if self._now() < self.deadline.value:
     intc_0 // 0
     bytec 15 // "dl"
@@ -5876,14 +5799,14 @@ abort_early_resolution:
     assert // check self.deadline exists
     <
     bz abort_early_resolution_else_body@3
-    // smart_contracts/market_app/contract.py:1352
+    // smart_contracts/market_app/contract.py:1292
     // self.status.value = UInt64(STATUS_ACTIVE)
     bytec_0 // "st"
     intc_1 // 1
     app_global_put
 
 abort_early_resolution_after_if_else@4:
-    // smart_contracts/market_app/contract.py:1355
+    // smart_contracts/market_app/contract.py:1295
     // arc4.emit("AbortEarlyResolution(byte[],uint64)", ruling_hash, arc4.UInt64(self.status.value))
     intc_0 // 0
     bytec_0 // "st"
@@ -5899,20 +5822,20 @@ abort_early_resolution_after_if_else@4:
     swap
     concat
     log
-    // smart_contracts/market_app/contract.py:1356
+    // smart_contracts/market_app/contract.py:1296
     // self._assert_invariants()
     callsub _assert_invariants
-    // smart_contracts/market_app/contract.py:1358
+    // smart_contracts/market_app/contract.py:1298
     // self._credit_pending_payout(challenger_account.bytes, challenger_payout)
     dup2
     callsub _credit_pending_payout
-    // smart_contracts/market_app/contract.py:1340
+    // smart_contracts/market_app/contract.py:1280
     // @arc4.abimethod()
     intc_1 // 1
     return
 
 abort_early_resolution_else_body@3:
-    // smart_contracts/market_app/contract.py:1354
+    // smart_contracts/market_app/contract.py:1294
     // self.status.value = UInt64(STATUS_RESOLUTION_PENDING)
     bytec_0 // "st"
     pushint 2
@@ -5922,7 +5845,7 @@ abort_early_resolution_else_body@3:
 
 // smart_contracts.market_app.contract.QuestionMarket.cancel_dispute_and_market[routing]() -> void:
 cancel_dispute_and_market:
-    // smart_contracts/market_app/contract.py:1360
+    // smart_contracts/market_app/contract.py:1300
     // @arc4.abimethod()
     txna ApplicationArgs 1
     dup
@@ -5934,11 +5857,11 @@ cancel_dispute_and_market:
     len
     ==
     assert // invalid number of bytes for arc4.dynamic_array<arc4.uint8>
-    // smart_contracts/market_app/contract.py:1363
+    // smart_contracts/market_app/contract.py:1303
     // self._require_status(UInt64(STATUS_DISPUTED))
     pushint 6
     callsub _require_status
-    // smart_contracts/market_app/contract.py:1364
+    // smart_contracts/market_app/contract.py:1304
     // self._require_authorized(self.resolution_authority.value)
     intc_0 // 0
     bytec 17 // "ra"
@@ -5951,13 +5874,13 @@ cancel_dispute_and_market:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:831
+    // smart_contracts/market_app/contract.py:762
     // challenger_payout = self.challenger_bond_held.value
     intc_0 // 0
     bytec 12 // "cbh"
     app_global_get_ex
     assert // check self.challenger_bond_held exists
-    // smart_contracts/market_app/contract.py:832
+    // smart_contracts/market_app/contract.py:763
     // self.dispute_sink_balance.value = self.dispute_sink_balance.value + self.proposer_bond_held.value
     intc_0 // 0
     bytec 19 // "dsb"
@@ -5971,49 +5894,49 @@ cancel_dispute_and_market:
     bytec 19 // "dsb"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:833
+    // smart_contracts/market_app/contract.py:764
     // self.proposer_bond_held.value = UInt64(0)
     bytec 5 // "pbh"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:834
+    // smart_contracts/market_app/contract.py:765
     // self.challenger_bond_held.value = UInt64(0)
     bytec 12 // "cbh"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:1368
+    // smart_contracts/market_app/contract.py:1308
     // self.ruling_hash.value = ruling_hash.bytes
     bytec 40 // "rh"
     dig 2
     app_global_put
-    // smart_contracts/market_app/contract.py:1369
+    // smart_contracts/market_app/contract.py:1309
     // self.resolution_path_used.value = UInt64(1)
     bytec 41 // "rpu"
     intc_1 // 1
     app_global_put
-    // smart_contracts/market_app/contract.py:1370
+    // smart_contracts/market_app/contract.py:1310
     // self.pending_responder_role.value = UInt64(0)
     bytec 42 // "prr"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:1371
+    // smart_contracts/market_app/contract.py:1311
     // self.status.value = UInt64(STATUS_CANCELLED)
     bytec_0 // "st"
     pushint 4
     app_global_put
-    // smart_contracts/market_app/contract.py:1372
+    // smart_contracts/market_app/contract.py:1312
     // self._record_settlement_timestamp_dispute()
     callsub _record_settlement_timestamp_dispute
-    // smart_contracts/market_app/contract.py:1373
+    // smart_contracts/market_app/contract.py:1313
     // arc4.emit("CancelDisputeAndMarket(byte[])", ruling_hash)
     pushbytes 0x2b841dee0002
     uncover 2
     concat
     log
-    // smart_contracts/market_app/contract.py:1374
+    // smart_contracts/market_app/contract.py:1314
     // self._assert_invariants()
     callsub _assert_invariants
-    // smart_contracts/market_app/contract.py:1375
+    // smart_contracts/market_app/contract.py:1315
     // self._credit_pending_payout(self.challenger.value, challenger_payout)
     intc_0 // 0
     bytec 16 // "ch"
@@ -6021,7 +5944,7 @@ cancel_dispute_and_market:
     assert // check self.challenger exists
     swap
     callsub _credit_pending_payout
-    // smart_contracts/market_app/contract.py:1360
+    // smart_contracts/market_app/contract.py:1300
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -6029,7 +5952,7 @@ cancel_dispute_and_market:
 
 // smart_contracts.market_app.contract.QuestionMarket.finalize_resolution[routing]() -> void:
 finalize_resolution:
-    // smart_contracts/market_app/contract.py:1379
+    // smart_contracts/market_app/contract.py:1319
     // self._require_status(UInt64(STATUS_RESOLUTION_PROPOSED))
     pushint 3
     callsub _require_status
@@ -6037,7 +5960,7 @@ finalize_resolution:
     // # The identity op ensures UInt64 type for both AVM and testing framework
     // return Global.latest_timestamp + UInt64(0)
     global LatestTimestamp
-    // smart_contracts/market_app/contract.py:1380
+    // smart_contracts/market_app/contract.py:1320
     // self._require(self._now() >= self.proposal_timestamp.value + self.challenge_window_secs.value)
     intc_0 // 0
     bytec 11 // "pts"
@@ -6052,7 +5975,7 @@ finalize_resolution:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1381
+    // smart_contracts/market_app/contract.py:1321
     // self._require(self.challenger.value == Bytes(ZERO_ADDRESS_BYTES))
     intc_0 // 0
     bytec 16 // "ch"
@@ -6063,7 +5986,7 @@ finalize_resolution:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1383-1384
+    // smart_contracts/market_app/contract.py:1323-1324
     // # Return proposer bond (unchallenged proposal accepted)
     // proposer_payout = self.proposer_bond_held.value + self._consume_proposer_fee()
     intc_0 // 0
@@ -6072,17 +5995,17 @@ finalize_resolution:
     assert // check self.proposer_bond_held exists
     callsub _consume_proposer_fee
     +
-    // smart_contracts/market_app/contract.py:1385
+    // smart_contracts/market_app/contract.py:1325
     // self.proposer_bond_held.value = UInt64(0)
     bytec 5 // "pbh"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:1387
+    // smart_contracts/market_app/contract.py:1327
     // self.status.value = UInt64(STATUS_RESOLVED)
     bytec_0 // "st"
     pushint 5
     app_global_put
-    // smart_contracts/market_app/contract.py:1388
+    // smart_contracts/market_app/contract.py:1328
     // self.winning_outcome.value = self.proposed_outcome.value
     intc_0 // 0
     bytec 22 // "po"
@@ -6101,7 +6024,7 @@ finalize_resolution:
     // smart_contracts/market_app/contract.py:619
     // self.settlement_timestamp.value = self._now()
     app_global_put
-    // smart_contracts/market_app/contract.py:1390
+    // smart_contracts/market_app/contract.py:1330
     // arc4.emit("FinalizeResolution(uint64)", arc4.UInt64(self.winning_outcome.value))
     intc_0 // 0
     bytec 10 // "wo"
@@ -6112,10 +6035,10 @@ finalize_resolution:
     swap
     concat
     log
-    // smart_contracts/market_app/contract.py:1391
+    // smart_contracts/market_app/contract.py:1331
     // self._assert_invariants()
     callsub _assert_invariants
-    // smart_contracts/market_app/contract.py:1393
+    // smart_contracts/market_app/contract.py:1333
     // self._credit_pending_payout(self.proposer.value, proposer_payout)
     intc_0 // 0
     bytec 24 // "pr"
@@ -6123,7 +6046,7 @@ finalize_resolution:
     assert // check self.proposer exists
     swap
     callsub _credit_pending_payout
-    // smart_contracts/market_app/contract.py:1377
+    // smart_contracts/market_app/contract.py:1317
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -6131,7 +6054,7 @@ finalize_resolution:
 
 // smart_contracts.market_app.contract.QuestionMarket.claim[routing]() -> void:
 claim:
-    // smart_contracts/market_app/contract.py:1395
+    // smart_contracts/market_app/contract.py:1335
     // @arc4.abimethod()
     txna ApplicationArgs 1
     dup
@@ -6145,19 +6068,19 @@ claim:
     intc_3 // 8
     ==
     assert // invalid number of bytes for arc4.uint64
-    // smart_contracts/market_app/contract.py:1397
+    // smart_contracts/market_app/contract.py:1337
     // self._require_status(UInt64(STATUS_RESOLVED))
     pushint 5
     callsub _require_status
-    // smart_contracts/market_app/contract.py:1398
+    // smart_contracts/market_app/contract.py:1338
     // outcome = outcome_index.as_uint64()
     dig 1
     btoi
-    // smart_contracts/market_app/contract.py:1399
+    // smart_contracts/market_app/contract.py:1339
     // self._assert_valid_outcome(outcome)
     dup
     callsub _assert_valid_outcome
-    // smart_contracts/market_app/contract.py:1400
+    // smart_contracts/market_app/contract.py:1340
     // self._require(outcome == self.winning_outcome.value)
     intc_0 // 0
     bytec 10 // "wo"
@@ -6168,7 +6091,7 @@ claim:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1401
+    // smart_contracts/market_app/contract.py:1341
     // shares_val = shares.as_uint64()
     swap
     btoi
@@ -6176,11 +6099,11 @@ claim:
     // assert condition
     dup
     assert
-    // smart_contracts/market_app/contract.py:1403
+    // smart_contracts/market_app/contract.py:1343
     // self._require_share_granularity(shares_val)
     dup
     callsub _require_share_granularity
-    // smart_contracts/market_app/contract.py:1404
+    // smart_contracts/market_app/contract.py:1344
     // self._require(self._get_user_outcome_shares(outcome) >= shares_val)
     dig 1
     callsub _get_user_outcome_shares
@@ -6189,7 +6112,7 @@ claim:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1405
+    // smart_contracts/market_app/contract.py:1345
     // self._require(self.pool_balance.value >= shares_val)
     intc_0 // 0
     bytec_2 // "pb"
@@ -6200,16 +6123,16 @@ claim:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1406
+    // smart_contracts/market_app/contract.py:1346
     // q = self._get_q()
     callsub _get_q
-    // smart_contracts/market_app/contract.py:1409-1410
+    // smart_contracts/market_app/contract.py:1349-1350
     // # State updates first (P9)
     // basis_reduction = self._basis_reduction(outcome, shares_val)
     dig 2
     dig 2
     callsub _basis_reduction
-    // smart_contracts/market_app/contract.py:1411
+    // smart_contracts/market_app/contract.py:1351
     // self._set_user_outcome_shares(outcome, self._get_user_outcome_shares(outcome) - shares_val)
     dig 3
     callsub _get_user_outcome_shares
@@ -6218,7 +6141,7 @@ claim:
     dig 4
     swap
     callsub _set_user_outcome_shares
-    // smart_contracts/market_app/contract.py:1412
+    // smart_contracts/market_app/contract.py:1352
     // self._set_user_cost_basis(outcome, self._get_user_cost_basis(outcome) - basis_reduction)
     dig 3
     callsub _get_user_cost_basis
@@ -6227,12 +6150,12 @@ claim:
     dig 4
     swap
     callsub _set_user_cost_basis
-    // smart_contracts/market_app/contract.py:1413
+    // smart_contracts/market_app/contract.py:1353
     // self._decrement_total_user_shares(outcome, shares_val)
     dig 3
     dig 3
     callsub _decrement_total_user_shares
-    // smart_contracts/market_app/contract.py:1414
+    // smart_contracts/market_app/contract.py:1354
     // self.total_outstanding_cost_basis.value = self.total_outstanding_cost_basis.value - basis_reduction
     intc_0 // 0
     bytec 4 // "tcb"
@@ -6243,11 +6166,11 @@ claim:
     bytec 4 // "tcb"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:1415
+    // smart_contracts/market_app/contract.py:1355
     // q[outcome] = q[outcome] - shares_val
     dup
     extract 2 0
-    dig 3
+    uncover 3
     intc_3 // 8
     *
     swap
@@ -6261,11 +6184,11 @@ claim:
     +
     swap
     replace3 // on error: index access is out of bounds
-    // smart_contracts/market_app/contract.py:1416
+    // smart_contracts/market_app/contract.py:1356
     // self._set_q(q)
     callsub _set_q
     pop
-    // smart_contracts/market_app/contract.py:1417
+    // smart_contracts/market_app/contract.py:1357
     // self.pool_balance.value = self.pool_balance.value - payout
     intc_0 // 0
     bytec_2 // "pb"
@@ -6276,26 +6199,22 @@ claim:
     bytec_2 // "pb"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:1419-1420
+    // smart_contracts/market_app/contract.py:1359-1360
     // # Send payout to claimer
     // self._send_currency(Txn.sender, payout)
     txn Sender
     swap
     callsub _send_currency
-    // smart_contracts/market_app/contract.py:1422-1423
-    // # Full exit deletes us:/uc: boxes and refunds MBR.
-    // self._maybe_delete_zero_position(outcome)
-    callsub _maybe_delete_zero_position
-    // smart_contracts/market_app/contract.py:1425
+    // smart_contracts/market_app/contract.py:1368
     // arc4.emit("Claim(uint64)", outcome_index)
     pushbytes 0x2bf16ff6 // method "Claim(uint64)"
     swap
     concat
     log
-    // smart_contracts/market_app/contract.py:1426
+    // smart_contracts/market_app/contract.py:1369
     // self._assert_solvency()
     callsub _assert_solvency
-    // smart_contracts/market_app/contract.py:1395
+    // smart_contracts/market_app/contract.py:1335
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -6303,14 +6222,14 @@ claim:
 
 // smart_contracts.market_app.contract.QuestionMarket.cancel[routing]() -> void:
 cancel:
-    // smart_contracts/market_app/contract.py:1430
+    // smart_contracts/market_app/contract.py:1373
     // self._require_status(UInt64(STATUS_ACTIVE))
     intc_1 // 1
     callsub _require_status
-    // smart_contracts/market_app/contract.py:1431
+    // smart_contracts/market_app/contract.py:1374
     // self._require(self.cancellable.value == UInt64(1))
     intc_0 // 0
-    bytec 58 // "cn"
+    bytec 56 // "cn"
     app_global_get_ex
     assert // check self.cancellable exists
     intc_1 // 1
@@ -6318,7 +6237,7 @@ cancel:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1432
+    // smart_contracts/market_app/contract.py:1375
     // self._require_authorized(self.creator.value)
     intc_0 // 0
     bytec 13 // "cr"
@@ -6331,12 +6250,12 @@ cancel:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1433
+    // smart_contracts/market_app/contract.py:1376
     // self.status.value = UInt64(STATUS_CANCELLED)
     bytec_0 // "st"
     pushint 4
     app_global_put
-    // smart_contracts/market_app/contract.py:1434
+    // smart_contracts/market_app/contract.py:1377
     // self.settlement_timestamp.value = self.deadline.value
     intc_0 // 0
     bytec 15 // "dl"
@@ -6345,7 +6264,7 @@ cancel:
     bytec 9 // "sts"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:1435
+    // smart_contracts/market_app/contract.py:1378
     // arc4.emit("Cancel(uint64)", arc4.UInt64(self.status.value))
     intc_0 // 0
     bytec_0 // "st"
@@ -6356,10 +6275,10 @@ cancel:
     swap
     concat
     log
-    // smart_contracts/market_app/contract.py:1436
+    // smart_contracts/market_app/contract.py:1379
     // self._assert_invariants()
     callsub _assert_invariants
-    // smart_contracts/market_app/contract.py:1428
+    // smart_contracts/market_app/contract.py:1371
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -6367,7 +6286,7 @@ cancel:
 
 // smart_contracts.market_app.contract.QuestionMarket.withdraw_protocol_fees[routing]() -> void:
 withdraw_protocol_fees:
-    // smart_contracts/market_app/contract.py:1441
+    // smart_contracts/market_app/contract.py:1384
     // amount = self.protocol_fee_balance.value
     intc_0 // 0
     bytec 18 // "pfbl"
@@ -6377,15 +6296,15 @@ withdraw_protocol_fees:
     // assert condition
     dup
     assert
-    // smart_contracts/market_app/contract.py:1443
+    // smart_contracts/market_app/contract.py:1386
     // self.protocol_fee_balance.value = UInt64(0)
     bytec 18 // "pfbl"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:1444
+    // smart_contracts/market_app/contract.py:1387
     // self._send_currency(Account(self.protocol_treasury.value), amount)
     intc_0 // 0
-    bytec 55 // "pt"
+    bytec 53 // "pt"
     app_global_get_ex
     assert // check self.protocol_treasury exists
     dup
@@ -6395,14 +6314,14 @@ withdraw_protocol_fees:
     assert // Address length is 32 bytes
     dig 1
     callsub _send_currency
-    // smart_contracts/market_app/contract.py:1445
+    // smart_contracts/market_app/contract.py:1388
     // arc4.emit("WithdrawFees(uint64)", arc4.UInt64(amount))
     itob
     pushbytes 0x4e51e9da // method "WithdrawFees(uint64)"
     swap
     concat
     log
-    // smart_contracts/market_app/contract.py:1438
+    // smart_contracts/market_app/contract.py:1381
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -6410,7 +6329,7 @@ withdraw_protocol_fees:
 
 // smart_contracts.market_app.contract.QuestionMarket.refund[routing]() -> void:
 refund:
-    // smart_contracts/market_app/contract.py:1447
+    // smart_contracts/market_app/contract.py:1390
     // @arc4.abimethod()
     txna ApplicationArgs 1
     dup
@@ -6424,19 +6343,19 @@ refund:
     intc_3 // 8
     ==
     assert // invalid number of bytes for arc4.uint64
-    // smart_contracts/market_app/contract.py:1449
+    // smart_contracts/market_app/contract.py:1392
     // self._require_status(UInt64(STATUS_CANCELLED))
     pushint 4
     callsub _require_status
-    // smart_contracts/market_app/contract.py:1450
+    // smart_contracts/market_app/contract.py:1393
     // outcome = outcome_index.as_uint64()
     dig 1
     btoi
-    // smart_contracts/market_app/contract.py:1451
+    // smart_contracts/market_app/contract.py:1394
     // self._assert_valid_outcome(outcome)
     dup
     callsub _assert_valid_outcome
-    // smart_contracts/market_app/contract.py:1452
+    // smart_contracts/market_app/contract.py:1395
     // shares_val = shares.as_uint64()
     swap
     btoi
@@ -6444,11 +6363,11 @@ refund:
     // assert condition
     dup
     assert
-    // smart_contracts/market_app/contract.py:1454
+    // smart_contracts/market_app/contract.py:1397
     // self._require_share_granularity(shares_val)
     dup
     callsub _require_share_granularity
-    // smart_contracts/market_app/contract.py:1455
+    // smart_contracts/market_app/contract.py:1398
     // self._require(self._get_user_outcome_shares(outcome) >= shares_val)
     dig 1
     callsub _get_user_outcome_shares
@@ -6457,15 +6376,15 @@ refund:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1457
+    // smart_contracts/market_app/contract.py:1400
     // q = self._get_q()
     callsub _get_q
-    // smart_contracts/market_app/contract.py:1458
+    // smart_contracts/market_app/contract.py:1401
     // basis_reduction = self._basis_reduction(outcome, shares_val)
     dig 2
     dig 2
     callsub _basis_reduction
-    // smart_contracts/market_app/contract.py:1460-1461
+    // smart_contracts/market_app/contract.py:1403-1404
     // # State updates first (P9)
     // self._set_user_outcome_shares(outcome, self._get_user_outcome_shares(outcome) - shares_val)
     dig 3
@@ -6475,7 +6394,7 @@ refund:
     dig 4
     swap
     callsub _set_user_outcome_shares
-    // smart_contracts/market_app/contract.py:1462
+    // smart_contracts/market_app/contract.py:1405
     // self._set_user_cost_basis(outcome, self._get_user_cost_basis(outcome) - basis_reduction)
     dig 3
     callsub _get_user_cost_basis
@@ -6484,12 +6403,12 @@ refund:
     dig 4
     swap
     callsub _set_user_cost_basis
-    // smart_contracts/market_app/contract.py:1463
+    // smart_contracts/market_app/contract.py:1406
     // self._decrement_total_user_shares(outcome, shares_val)
     dig 3
     dig 3
     callsub _decrement_total_user_shares
-    // smart_contracts/market_app/contract.py:1464
+    // smart_contracts/market_app/contract.py:1407
     // self.total_outstanding_cost_basis.value = self.total_outstanding_cost_basis.value - basis_reduction
     intc_0 // 0
     bytec 4 // "tcb"
@@ -6500,11 +6419,11 @@ refund:
     bytec 4 // "tcb"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:1465
+    // smart_contracts/market_app/contract.py:1408
     // q[outcome] = q[outcome] - shares_val
     dig 1
     extract 2 0
-    dig 4
+    uncover 4
     intc_3 // 8
     *
     swap
@@ -6520,11 +6439,11 @@ refund:
     swap
     uncover 2
     replace3 // on error: index access is out of bounds
-    // smart_contracts/market_app/contract.py:1466
+    // smart_contracts/market_app/contract.py:1409
     // self._set_q(q)
     callsub _set_q
     pop
-    // smart_contracts/market_app/contract.py:1467
+    // smart_contracts/market_app/contract.py:1410
     // self.pool_balance.value = self.pool_balance.value - basis_reduction
     intc_0 // 0
     bytec_2 // "pb"
@@ -6535,26 +6454,22 @@ refund:
     bytec_2 // "pb"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:1469-1470
+    // smart_contracts/market_app/contract.py:1412-1413
     // # Send refund to user
     // self._send_currency(Txn.sender, basis_reduction)
     txn Sender
     swap
     callsub _send_currency
-    // smart_contracts/market_app/contract.py:1472-1473
-    // # Full exit deletes us:/uc: boxes and refunds MBR.
-    // self._maybe_delete_zero_position(outcome)
-    callsub _maybe_delete_zero_position
-    // smart_contracts/market_app/contract.py:1475
+    // smart_contracts/market_app/contract.py:1418
     // arc4.emit("Refund(uint64)", outcome_index)
     pushbytes 0xa8acd80e // method "Refund(uint64)"
     swap
     concat
     log
-    // smart_contracts/market_app/contract.py:1476
+    // smart_contracts/market_app/contract.py:1419
     // self._assert_solvency()
     callsub _assert_solvency
-    // smart_contracts/market_app/contract.py:1447
+    // smart_contracts/market_app/contract.py:1390
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -6562,7 +6477,7 @@ refund:
 
 // smart_contracts.market_app.contract.QuestionMarket.withdraw_pending_payouts[routing]() -> void:
 withdraw_pending_payouts:
-    // smart_contracts/market_app/contract.py:1480
+    // smart_contracts/market_app/contract.py:1423
     // amount = self._get_pending_payout(Txn.sender.bytes)
     txn Sender
     callsub _get_pending_payout
@@ -6572,33 +6487,33 @@ withdraw_pending_payouts:
     assert
     // smart_contracts/market_app/contract.py:322
     // self.pending_payouts_box[account] = value
-    bytec 64 // 0x70703a
-    // smart_contracts/market_app/contract.py:1482
+    bytec 62 // 0x70703a
+    // smart_contracts/market_app/contract.py:1425
     // self._set_pending_payout(Txn.sender.bytes, UInt64(0))
     txn Sender
     // smart_contracts/market_app/contract.py:322
     // self.pending_payouts_box[account] = value
     concat
-    // smart_contracts/market_app/contract.py:1482
+    // smart_contracts/market_app/contract.py:1425
     // self._set_pending_payout(Txn.sender.bytes, UInt64(0))
     intc_0 // 0
     // smart_contracts/market_app/contract.py:322
     // self.pending_payouts_box[account] = value
     itob
     box_put
-    // smart_contracts/market_app/contract.py:1483
+    // smart_contracts/market_app/contract.py:1426
     // self._send_currency(Txn.sender, amount)
     txn Sender
     dig 1
     callsub _send_currency
-    // smart_contracts/market_app/contract.py:1484
+    // smart_contracts/market_app/contract.py:1427
     // arc4.emit("WithdrawPayouts(uint64)", arc4.UInt64(amount))
     itob
     pushbytes 0x31e2887e // method "WithdrawPayouts(uint64)"
     swap
     concat
     log
-    // smart_contracts/market_app/contract.py:1478
+    // smart_contracts/market_app/contract.py:1421
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -6606,11 +6521,11 @@ withdraw_pending_payouts:
 
 // smart_contracts.market_app.contract.QuestionMarket.reclaim_resolution_budget[routing]() -> void:
 reclaim_resolution_budget:
-    // smart_contracts/market_app/contract.py:1488
+    // smart_contracts/market_app/contract.py:1431
     // self._require_status_any2(UInt64(STATUS_RESOLVED), UInt64(STATUS_CANCELLED))
     pushints 5 4
     callsub _require_status_any2
-    // smart_contracts/market_app/contract.py:1489
+    // smart_contracts/market_app/contract.py:1432
     // self._require_authorized(self.creator.value)
     intc_0 // 0
     bytec 13 // "cr"
@@ -6623,7 +6538,7 @@ reclaim_resolution_budget:
     // smart_contracts/market_app/contract.py:258
     // assert condition
     assert
-    // smart_contracts/market_app/contract.py:1490
+    // smart_contracts/market_app/contract.py:1433
     // amount = self.resolution_budget_balance.value
     intc_0 // 0
     bytec 23 // "rbb"
@@ -6633,24 +6548,24 @@ reclaim_resolution_budget:
     // assert condition
     dup
     assert
-    // smart_contracts/market_app/contract.py:1492
+    // smart_contracts/market_app/contract.py:1435
     // self.resolution_budget_balance.value = UInt64(0)
     bytec 23 // "rbb"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:1493
+    // smart_contracts/market_app/contract.py:1436
     // self._send_currency(Txn.sender, amount)
     txn Sender
     dig 1
     callsub _send_currency
-    // smart_contracts/market_app/contract.py:1494
+    // smart_contracts/market_app/contract.py:1437
     // arc4.emit("ReclaimBudget(uint64)", arc4.UInt64(amount))
     itob
     pushbytes 0x420610e5 // method "ReclaimBudget(uint64)"
     swap
     concat
     log
-    // smart_contracts/market_app/contract.py:1486
+    // smart_contracts/market_app/contract.py:1429
     // @arc4.abimethod()
     intc_1 // 1
     return
@@ -6685,7 +6600,7 @@ _require_share_granularity:
 _get_claimable_fees:
     // smart_contracts/market_app/contract.py:301
     // return self.user_claimable_fees_box.get(self._sender_fee_key(), default=UInt64(0))
-    bytec 65 // 0x75663a
+    bytec 71 // 0x75663a
     // smart_contracts/market_app/contract.py:265
     // return Txn.sender.bytes
     txn Sender
@@ -6709,7 +6624,7 @@ _set_claimable_fees:
     proto 1 0
     // smart_contracts/market_app/contract.py:304
     // self.user_claimable_fees_box[self._sender_fee_key()] = value
-    bytec 65 // 0x75663a
+    bytec 71 // 0x75663a
     // smart_contracts/market_app/contract.py:265
     // return Txn.sender.bytes
     txn Sender
@@ -6735,7 +6650,7 @@ _get_user_outcome_shares:
     concat
     // smart_contracts/market_app/contract.py:307
     // return self.user_outcome_shares_box.get(self._sender_outcome_key(outcome_index), default=UInt64(0))
-    bytec 45 // 0x75733a
+    bytec 72 // 0x75733a
     swap
     concat
     box_get
@@ -6761,7 +6676,7 @@ _set_user_outcome_shares:
     concat
     // smart_contracts/market_app/contract.py:310
     // self.user_outcome_shares_box[self._sender_outcome_key(outcome_index)] = value
-    bytec 45 // 0x75733a
+    bytec 72 // 0x75733a
     swap
     concat
     frame_dig -1
@@ -6783,7 +6698,7 @@ _get_user_cost_basis:
     concat
     // smart_contracts/market_app/contract.py:313
     // return self.user_cost_basis_box.get(self._sender_outcome_key(outcome_index), default=UInt64(0))
-    bytec 46 // 0x75633a
+    bytec 73 // 0x75633a
     swap
     concat
     box_get
@@ -6809,7 +6724,7 @@ _set_user_cost_basis:
     concat
     // smart_contracts/market_app/contract.py:316
     // self.user_cost_basis_box[self._sender_outcome_key(outcome_index)] = value
-    bytec 46 // 0x75633a
+    bytec 73 // 0x75633a
     swap
     concat
     frame_dig -1
@@ -6825,7 +6740,7 @@ _get_pending_payout:
     proto 1 1
     // smart_contracts/market_app/contract.py:319
     // return self.pending_payouts_box.get(account, default=UInt64(0))
-    bytec 64 // 0x70703a
+    bytec 62 // 0x70703a
     frame_dig -1
     concat
     box_get
@@ -6962,7 +6877,7 @@ _credit_pending_payout_after_if_else@2:
     +
     // smart_contracts/market_app/contract.py:322
     // self.pending_payouts_box[account] = value
-    bytec 64 // 0x70703a
+    bytec 62 // 0x70703a
     frame_dig -2
     concat
     swap
@@ -7046,7 +6961,7 @@ _get_q:
     intc_0 // 0
     callsub _get_quantity
     itob
-    bytec 72 // 0x0001
+    bytec 69 // 0x0001
     swap
     concat
     // smart_contracts/market_app/contract.py:373
@@ -7262,13 +7177,13 @@ _required_proposal_bond:
     // smart_contracts/market_app/contract.py:448
     // self.proposal_bond.value,
     intc_0 // 0
-    bytec 57 // "prb"
+    bytec 55 // "prb"
     app_global_get_ex
     assert // check self.proposal_bond exists
     // smart_contracts/market_app/contract.py:449
     // self.proposal_bond_bps.value,
     intc_0 // 0
-    bytec 51 // "pbb"
+    bytec 49 // "pbb"
     app_global_get_ex
     assert // check self.proposal_bond_bps exists
     // smart_contracts/market_app/contract.py:450
@@ -7296,11 +7211,11 @@ _proposer_fee_for_bond:
     // smart_contracts/market_app/contract.py:463
     // floor_fee = self._calc_fee_up(self.proposal_bond.value, self.proposer_fee_floor_bps.value)
     intc_0 // 0
-    bytec 57 // "prb"
+    bytec 55 // "prb"
     app_global_get_ex
     assert // check self.proposal_bond exists
     intc_0 // 0
-    bytec 54 // "pff"
+    bytec 52 // "pff"
     app_global_get_ex
     assert // check self.proposer_fee_floor_bps exists
     // smart_contracts/market_app/contract.py:415
@@ -7311,7 +7226,7 @@ _proposer_fee_for_bond:
     // smart_contracts/market_app/contract.py:464
     // daily_fee = self._calc_fee_up(required_bond, self.proposer_fee_bps.value)
     intc_0 // 0
-    bytec 53 // "pfd"
+    bytec 51 // "pfd"
     app_global_get_ex
     assert // check self.proposer_fee_bps exists
     // smart_contracts/market_app/contract.py:415
@@ -7822,7 +7737,7 @@ _assert_invariants:
     app_global_get_ex
     assert // check self.winner_share_bps exists
     intc_0 // 0
-    bytec 71 // "ssb"
+    bytec 68 // "ssb"
     app_global_get_ex
     assert // check self.dispute_sink_share_bps exists
     +
@@ -8089,215 +8004,15 @@ _send_currency:
     retsub
 
 
-// smart_contracts.market_app.contract.QuestionMarket._verify_mbr_topup(mbr_payment: uint64, required: uint64) -> void:
-_verify_mbr_topup:
-    // smart_contracts/market_app/contract.py:695-698
-    // @subroutine
-    // def _verify_mbr_topup(
-    //     self, mbr_payment: gtxn.PaymentTransaction, required: UInt64
-    // ) -> None:
-    proto 2 0
-    // smart_contracts/market_app/contract.py:702
-    // self._require(mbr_payment.sender.bytes == Txn.sender.bytes)
-    frame_dig -2
-    gtxns Sender
-    txn Sender
-    ==
-    // smart_contracts/market_app/contract.py:258
-    // assert condition
-    assert
-    // smart_contracts/market_app/contract.py:704
-    // mbr_payment.receiver.bytes == Global.current_application_address.bytes
-    frame_dig -2
-    gtxns Receiver
-    global CurrentApplicationAddress
-    ==
-    // smart_contracts/market_app/contract.py:258
-    // assert condition
-    assert
-    // smart_contracts/market_app/contract.py:706
-    // self._require(mbr_payment.amount == required)
-    frame_dig -2
-    gtxns Amount
-    frame_dig -1
-    ==
-    // smart_contracts/market_app/contract.py:258
-    // assert condition
-    assert
-    // smart_contracts/market_app/contract.py:707
-    // self._require(mbr_payment.rekey_to.bytes == Global.zero_address.bytes)
-    frame_dig -2
-    gtxns RekeyTo
-    global ZeroAddress
-    ==
-    // smart_contracts/market_app/contract.py:258
-    // assert condition
-    assert
-    // smart_contracts/market_app/contract.py:709
-    // mbr_payment.close_remainder_to.bytes == Global.zero_address.bytes
-    frame_dig -2
-    gtxns CloseRemainderTo
-    global ZeroAddress
-    ==
-    // smart_contracts/market_app/contract.py:258
-    // assert condition
-    assert
-    retsub
-
-
-// smart_contracts.market_app.contract.QuestionMarket._new_lp_box_mbr() -> uint64:
-_new_lp_box_mbr:
-    // smart_contracts/market_app/contract.py:730
-    // _v, fee_exists = self.user_claimable_fees_box.maybe(self._sender_fee_key())
-    bytec 65 // 0x75663a
-    // smart_contracts/market_app/contract.py:265
-    // return Txn.sender.bytes
-    txn Sender
-    // smart_contracts/market_app/contract.py:730
-    // _v, fee_exists = self.user_claimable_fees_box.maybe(self._sender_fee_key())
-    concat
-    box_len
-    bury 1
-    // smart_contracts/market_app/contract.py:731
-    // if fee_exists:
-    bz _new_lp_box_mbr_after_if_else@2
-    // smart_contracts/market_app/contract.py:732
-    // return UInt64(0)
-    intc_0 // 0
-    retsub
-
-_new_lp_box_mbr_after_if_else@2:
-    // smart_contracts/market_app/contract.py:733
-    // return UInt64(FEE_BOX_MBR)
-    pushint 19700
-    retsub
-
-
-// smart_contracts.market_app.contract.QuestionMarket._maybe_delete_zero_position(outcome: uint64) -> void:
-_maybe_delete_zero_position:
-    // smart_contracts/market_app/contract.py:746-747
-    // @subroutine
-    // def _maybe_delete_zero_position(self, outcome: UInt64) -> None:
-    proto 1 0
-    intc_0 // 0
-    dupn 2
-    bytec_1 // ""
-    // smart_contracts/market_app/contract.py:750
-    // if self._get_user_outcome_shares(outcome) != UInt64(0):
-    frame_dig -1
-    callsub _get_user_outcome_shares
-    bz _maybe_delete_zero_position_after_if_else@2
-    // smart_contracts/market_app/contract.py:751
-    // return
-    retsub
-
-_maybe_delete_zero_position_after_if_else@2:
-    // smart_contracts/market_app/contract.py:752
-    // outcome_key = op.concat(Txn.sender.bytes, op.itob(outcome))
-    txn Sender
-    frame_dig -1
-    itob
-    concat
-    dup
-    frame_bury 2
-    // smart_contracts/market_app/contract.py:753
-    // refund = UInt64(0)
-    intc_0 // 0
-    frame_bury 3
-    // smart_contracts/market_app/contract.py:754
-    // _s, shares_exists = self.user_outcome_shares_box.maybe(outcome_key)
-    bytec 45 // 0x75733a
-    swap
-    concat
-    dup
-    frame_bury 0
-    box_len
-    bury 1
-    // smart_contracts/market_app/contract.py:755
-    // if shares_exists:
-    bz _maybe_delete_zero_position_after_if_else@4
-    // smart_contracts/market_app/contract.py:756
-    // del self.user_outcome_shares_box[outcome_key]
-    frame_dig 0
-    box_del
-    pop
-    // smart_contracts/market_app/contract.py:757
-    // refund = refund + UInt64(SHARE_BOX_MBR)
-    intc 5 // 22900
-    frame_bury 3
-
-_maybe_delete_zero_position_after_if_else@4:
-    // smart_contracts/market_app/contract.py:758
-    // _c, cost_exists = self.user_cost_basis_box.maybe(outcome_key)
-    bytec 46 // 0x75633a
-    frame_dig 2
-    concat
-    dup
-    frame_bury 1
-    box_len
-    bury 1
-    // smart_contracts/market_app/contract.py:759
-    // if cost_exists:
-    bz _maybe_delete_zero_position_after_if_else@6
-    // smart_contracts/market_app/contract.py:760
-    // del self.user_cost_basis_box[outcome_key]
-    frame_dig 1
-    box_del
-    pop
-    // smart_contracts/market_app/contract.py:761
-    // refund = refund + UInt64(COST_BOX_MBR)
-    frame_dig 3
-    intc 5 // 22900
-    +
-    frame_bury 3
-
-_maybe_delete_zero_position_after_if_else@6:
-    // smart_contracts/market_app/contract.py:739
-    // if amount > UInt64(0):
-    frame_dig 3
-    bz _maybe_delete_zero_position_after_if_else@9
-    // smart_contracts/market_app/contract.py:740-744
-    // itxn.Payment(
-    //     receiver=Txn.sender,
-    //     amount=amount,
-    //     fee=0,
-    // ).submit()
-    itxn_begin
-    // smart_contracts/market_app/contract.py:741
-    // receiver=Txn.sender,
-    txn Sender
-    frame_dig 3
-    itxn_field Amount
-    itxn_field Receiver
-    // smart_contracts/market_app/contract.py:740
-    // itxn.Payment(
-    intc_1 // pay
-    itxn_field TypeEnum
-    // smart_contracts/market_app/contract.py:743
-    // fee=0,
-    intc_0 // 0
-    itxn_field Fee
-    // smart_contracts/market_app/contract.py:740-744
-    // itxn.Payment(
-    //     receiver=Txn.sender,
-    //     amount=amount,
-    //     fee=0,
-    // ).submit()
-    itxn_submit
-
-_maybe_delete_zero_position_after_if_else@9:
-    retsub
-
-
 // smart_contracts.market_app.contract.QuestionMarket._settle_overturned_dispute() -> uint64:
 _settle_overturned_dispute:
-    // smart_contracts/market_app/contract.py:821
+    // smart_contracts/market_app/contract.py:752
     // losing_bond = self.proposer_bond_held.value
     intc_0 // 0
     bytec 5 // "pbh"
     app_global_get_ex
     assert // check self.proposer_bond_held exists
-    // smart_contracts/market_app/contract.py:806
+    // smart_contracts/market_app/contract.py:737
     // return lmsr_mul_div_floor(losing_bond, self.winner_share_bps.value, UInt64(BPS_DENOMINATOR))
     intc_0 // 0
     bytec 39 // "wsb"
@@ -8307,13 +8022,13 @@ _settle_overturned_dispute:
     // product_high, product_low = op.mulw(a, b)
     dig 1
     mulw
-    // smart_contracts/market_app/contract.py:806
+    // smart_contracts/market_app/contract.py:737
     // return lmsr_mul_div_floor(losing_bond, self.winner_share_bps.value, UInt64(BPS_DENOMINATOR))
     intc 4 // 10000
     // smart_contracts/lmsr_math_avm.py:52
     // return op.divw(product_high, product_low, denominator)
     divw
-    // smart_contracts/market_app/contract.py:823
+    // smart_contracts/market_app/contract.py:754
     // self.dispute_sink_balance.value = self.dispute_sink_balance.value + (losing_bond - winner_bonus)
     intc_0 // 0
     bytec 19 // "dsb"
@@ -8326,69 +8041,69 @@ _settle_overturned_dispute:
     bytec 19 // "dsb"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:824
+    // smart_contracts/market_app/contract.py:755
     // challenger_payout = self.challenger_bond_held.value + winner_bonus
     intc_0 // 0
     bytec 12 // "cbh"
     app_global_get_ex
     assert // check self.challenger_bond_held exists
     +
-    // smart_contracts/market_app/contract.py:825
+    // smart_contracts/market_app/contract.py:756
     // self.proposer_bond_held.value = UInt64(0)
     bytec 5 // "pbh"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:826
+    // smart_contracts/market_app/contract.py:757
     // self.challenger_bond_held.value = UInt64(0)
     bytec 12 // "cbh"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:827
+    // smart_contracts/market_app/contract.py:758
     // return challenger_payout
     retsub
 
 
 // smart_contracts.market_app.contract.QuestionMarket._resolve_dispute_core(outcome: uint64, ruling_hash_bytes: bytes, resolution_path: uint64) -> void:
 _resolve_dispute_core:
-    // smart_contracts/market_app/contract.py:1289-1290
+    // smart_contracts/market_app/contract.py:1229-1230
     // @subroutine
     // def _resolve_dispute_core(self, outcome: UInt64, ruling_hash_bytes: Bytes, resolution_path: UInt64) -> None:
     proto 3 0
-    // smart_contracts/market_app/contract.py:1291
+    // smart_contracts/market_app/contract.py:1231
     // original_proposal = self.proposed_outcome.value
     intc_0 // 0
     bytec 22 // "po"
     app_global_get_ex
     assert // check self.proposed_outcome exists
-    // smart_contracts/market_app/contract.py:1292
+    // smart_contracts/market_app/contract.py:1232
     // self.ruling_hash.value = ruling_hash_bytes
     bytec 40 // "rh"
     frame_dig -2
     app_global_put
-    // smart_contracts/market_app/contract.py:1293
+    // smart_contracts/market_app/contract.py:1233
     // self.resolution_path_used.value = resolution_path
     bytec 41 // "rpu"
     frame_dig -1
     app_global_put
-    // smart_contracts/market_app/contract.py:1294
+    // smart_contracts/market_app/contract.py:1234
     // self.pending_responder_role.value = UInt64(0)
     bytec 42 // "prr"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:1295
+    // smart_contracts/market_app/contract.py:1235
     // self.status.value = UInt64(STATUS_RESOLVED)
     bytec_0 // "st"
     pushint 5
     app_global_put
-    // smart_contracts/market_app/contract.py:1296
+    // smart_contracts/market_app/contract.py:1236
     // self.winning_outcome.value = outcome
     bytec 10 // "wo"
     frame_dig -3
     app_global_put
-    // smart_contracts/market_app/contract.py:1297
+    // smart_contracts/market_app/contract.py:1237
     // self._record_settlement_timestamp_dispute()
     callsub _record_settlement_timestamp_dispute
-    // smart_contracts/market_app/contract.py:1298
+    // smart_contracts/market_app/contract.py:1238
     // self._assert_invariants()
     callsub _assert_invariants
     // smart_contracts/market_app/contract.py:353
@@ -8396,13 +8111,13 @@ _resolve_dispute_core:
     frame_dig -3
     ==
     bz _resolve_dispute_core_else_body@3
-    // smart_contracts/market_app/contract.py:810
+    // smart_contracts/market_app/contract.py:741
     // losing_bond = self.challenger_bond_held.value
     intc_0 // 0
     bytec 12 // "cbh"
     app_global_get_ex
     assert // check self.challenger_bond_held exists
-    // smart_contracts/market_app/contract.py:806
+    // smart_contracts/market_app/contract.py:737
     // return lmsr_mul_div_floor(losing_bond, self.winner_share_bps.value, UInt64(BPS_DENOMINATOR))
     intc_0 // 0
     bytec 39 // "wsb"
@@ -8412,16 +8127,16 @@ _resolve_dispute_core:
     // product_high, product_low = op.mulw(a, b)
     dig 1
     mulw
-    // smart_contracts/market_app/contract.py:806
+    // smart_contracts/market_app/contract.py:737
     // return lmsr_mul_div_floor(losing_bond, self.winner_share_bps.value, UInt64(BPS_DENOMINATOR))
     intc 4 // 10000
     // smart_contracts/lmsr_math_avm.py:52
     // return op.divw(product_high, product_low, denominator)
     divw
-    // smart_contracts/market_app/contract.py:812
+    // smart_contracts/market_app/contract.py:743
     // proposer_fee = self._consume_proposer_fee()
     callsub _consume_proposer_fee
-    // smart_contracts/market_app/contract.py:813
+    // smart_contracts/market_app/contract.py:744
     // self.dispute_sink_balance.value = self.dispute_sink_balance.value + (losing_bond - winner_bonus)
     intc_0 // 0
     bytec 19 // "dsb"
@@ -8434,7 +8149,7 @@ _resolve_dispute_core:
     bytec 19 // "dsb"
     swap
     app_global_put
-    // smart_contracts/market_app/contract.py:814
+    // smart_contracts/market_app/contract.py:745
     // proposer_payout = self.proposer_bond_held.value + winner_bonus + proposer_fee
     intc_0 // 0
     bytec 5 // "pbh"
@@ -8443,12 +8158,12 @@ _resolve_dispute_core:
     uncover 2
     +
     +
-    // smart_contracts/market_app/contract.py:815
+    // smart_contracts/market_app/contract.py:746
     // self.proposer_bond_held.value = UInt64(0)
     bytec 5 // "pbh"
     intc_0 // 0
     app_global_put
-    // smart_contracts/market_app/contract.py:816
+    // smart_contracts/market_app/contract.py:747
     // self.challenger_bond_held.value = UInt64(0)
     bytec 12 // "cbh"
     intc_0 // 0
