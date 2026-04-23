@@ -21,7 +21,9 @@ poetry run pytest -q \
   tests/test_c4_payment_verification.py \
   tests/test_c6_launch_adversarial.py \
   tests/test_c6_redteam_extended.py \
+  tests/test_mbr_topup_and_delete_on_zero.py \
   tests/contracts/test_protocol_config_factory.py \
   tests/contracts/test_market_factory_integration.py \
   tests/test_market_app_contract_runtime.py \
+  tests/test_market_app_contract_v4_runtime.py \
   tests/contracts/test_v4_artifact_surface.py

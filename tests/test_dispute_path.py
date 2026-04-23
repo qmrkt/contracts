@@ -128,27 +128,27 @@ class TestChallengeEntersDisputed:
 
 
 class TestCreatorResolveDispute:
-    def test_creator_resolves_to_resolved(self) -> None:
+    def test_resolution_authority_resolves_via_creator_path(self) -> None:
         m = market_to_disputed()
-        m.creator_resolve_dispute(sender="creator", outcome_index=1, ruling_hash=b"r" * 32)
+        m.creator_resolve_dispute(sender="resolver", outcome_index=1, ruling_hash=b"r" * 32)
         assert m.status == STATUS_RESOLVED
         assert m.winning_outcome == 1
         assert m.ruling_hash == b"r" * 32
         assert m.resolution_path_used == 1  # dispute
 
-    def test_non_creator_cannot_resolve(self) -> None:
+    def test_creator_cannot_resolve_without_authority(self) -> None:
         m = market_to_disputed()
-        with pytest.raises(MarketAppError, match="only creator"):
-            m.creator_resolve_dispute(sender="attacker", outcome_index=0, ruling_hash=b"r" * 32)
+        with pytest.raises(MarketAppError, match="only resolution authority"):
+            m.creator_resolve_dispute(sender="creator", outcome_index=0, ruling_hash=b"r" * 32)
 
     def test_invalid_outcome_rejected(self) -> None:
         m = market_to_disputed()
         with pytest.raises(MarketAppError, match="outcome_index"):
-            m.creator_resolve_dispute(sender="creator", outcome_index=99, ruling_hash=b"r" * 32)
+            m.creator_resolve_dispute(sender="resolver", outcome_index=99, ruling_hash=b"r" * 32)
 
     def test_claim_after_creator_resolve(self) -> None:
         m = market_to_disputed()
-        m.creator_resolve_dispute(sender="creator", outcome_index=0, ruling_hash=b"r" * 32)
+        m.creator_resolve_dispute(sender="resolver", outcome_index=0, ruling_hash=b"r" * 32)
         claim_result = m.claim(sender="trader", outcome_index=0)
         assert claim_result["payout"] > 0
 
@@ -159,22 +159,22 @@ class TestCreatorResolveDispute:
 
 
 class TestAdminResolveDispute:
-    def test_admin_resolves_to_resolved(self) -> None:
+    def test_resolution_authority_resolves_via_admin_path(self) -> None:
         m = market_to_disputed()
-        m.admin_resolve_dispute(sender="admin", outcome_index=2, ruling_hash=b"a" * 32)
+        m.admin_resolve_dispute(sender="resolver", outcome_index=2, ruling_hash=b"a" * 32)
         assert m.status == STATUS_RESOLVED
         assert m.winning_outcome == 2
         assert m.ruling_hash == b"a" * 32
         assert m.resolution_path_used == 2  # admin_fallback
 
-    def test_non_admin_cannot_resolve(self) -> None:
+    def test_admin_cannot_resolve_without_authority(self) -> None:
         m = market_to_disputed()
-        with pytest.raises(MarketAppError, match="only market admin"):
-            m.admin_resolve_dispute(sender="attacker", outcome_index=0, ruling_hash=b"a" * 32)
+        with pytest.raises(MarketAppError, match="only resolution authority"):
+            m.admin_resolve_dispute(sender="admin", outcome_index=0, ruling_hash=b"a" * 32)
 
     def test_creator_cannot_use_admin_resolve(self) -> None:
         m = market_to_disputed()
-        with pytest.raises(MarketAppError, match="only market admin"):
+        with pytest.raises(MarketAppError, match="only resolution authority"):
             m.admin_resolve_dispute(sender="creator", outcome_index=0, ruling_hash=b"a" * 32)
 
 

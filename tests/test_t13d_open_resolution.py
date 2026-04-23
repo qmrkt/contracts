@@ -252,7 +252,7 @@ class TestChallengerBondSlashed:
         dispute_sink_before = m.dispute_sink_balance
 
         m.creator_resolve_dispute(
-            sender="creator", outcome_index=1,
+            sender="resolver", outcome_index=1,
             ruling_hash=b"r" * 32,
         )
 
@@ -326,7 +326,7 @@ class TestProposerBondSlashed:
         dispute_sink_before = m.dispute_sink_balance
 
         m.admin_resolve_dispute(
-            sender="admin", outcome_index=1,
+            sender="resolver", outcome_index=1,
             ruling_hash=b"a" * 32,
         )
 

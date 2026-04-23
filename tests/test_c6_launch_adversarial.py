@@ -23,7 +23,6 @@ from smart_contracts.market_app.contract import (
     COST_BOX_MBR,
     DEFAULT_LP_ENTRY_MAX_PRICE_FP,
     DEFAULT_RESIDUAL_LINEAR_LAMBDA_FP,
-    FEE_BOX_MBR,
     QuestionMarket,
     SHARE_BOX_MBR,
     SHARE_UNIT,

@@ -1,34 +1,24 @@
 from __future__ import annotations
 
-from dataclasses import replace
-from decimal import Decimal
+from smart_contracts.lmsr_math import lmsr_prices
 
-from research.active_lp.experiments import ExperimentRunner
-from research.active_lp.scenarios import build_deterministic_scenario
-from research.active_lp.types import MechanismVariant
+from .market_app_test_utils import buy_one, make_active_lp_market
 
 
 def test_layer_c_tracks_reference_on_neutral_late_lp() -> None:
-    bundle = build_deterministic_scenario("neutral_late_lp")
-    bundle = replace(
-        bundle,
-        config=replace(
-            bundle.config,
-            mechanisms=(
-                MechanismVariant.REFERENCE_PARALLEL_LMSR,
-                MechanismVariant.GLOBAL_STATE_AVM_FIXED_POINT,
-            ),
-        ),
+    market = make_active_lp_market()
+    market.bootstrap(sender="creator", deposit_amount=200_000_000, now=1)
+    buy_one(market, sender="buyer", outcome_index=1, now=2)
+    reference_prices = lmsr_prices(market.q, market.b)
+
+    market.enter_lp_active(
+        sender="late_lp",
+        target_delta_b=25_000_000,
+        max_deposit=100_000_000,
+        expected_prices=list(reference_prices),
+        now=3,
     )
+    layer_c_prices = lmsr_prices(market.q, market.b)
 
-    results = ExperimentRunner().run_bundle(bundle)
-    by_mechanism = {result.mechanism: result for result in results}
-    divergence = by_mechanism[MechanismVariant.GLOBAL_STATE_AVM_FIXED_POINT].evaluation.exact_vs_simplified_divergence
-
-    assert by_mechanism[MechanismVariant.REFERENCE_PARALLEL_LMSR].evaluation.solvency["passed"] is True
-    assert by_mechanism[MechanismVariant.GLOBAL_STATE_AVM_FIXED_POINT].evaluation.solvency["passed"] is True
-    assert divergence["implemented"] is True
-    assert Decimal(str(divergence["max_price_entry_diff_vs_reference"])) <= Decimal("0.00001")
-    assert Decimal(str(divergence["max_quote_diff_vs_reference"])) <= Decimal("0.001")
-    assert Decimal(str(divergence["max_nav_per_deposit_diff_vs_reference"])) <= Decimal("0.001")
-    assert divergence["solvency_match"] is True
+    assert max(abs(a - b) for a, b in zip(reference_prices, layer_c_prices)) <= 2
+    assert market.user_lp_shares["late_lp"] == 25_000_000

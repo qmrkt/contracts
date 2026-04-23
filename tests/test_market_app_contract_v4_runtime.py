@@ -7,7 +7,6 @@ from smart_contracts.market_app.contract import (
     COST_BOX_MBR,
     DEFAULT_LP_ENTRY_MAX_PRICE_FP,
     DEFAULT_RESIDUAL_LINEAR_LAMBDA_FP,
-    FEE_BOX_MBR,
     PRICE_TOLERANCE_BASE,
     QuestionMarket,
     SHARE_BOX_MBR,
@@ -385,8 +384,7 @@ def test_contract_lp_fees_are_strictly_prospective_and_withdrawable(disable_arc4
             latest_timestamp=6_001,
         )
         call_as(context, creator, contract.claim_lp_fees, latest_timestamp=6_002)
-        # lp2's earlier claim_lp_fees (line 377) failed before settle ran, so
-        # the uf: box still doesn't exist on this call — must pay FEE_BOX_MBR.
+        # lp2's earlier claim_lp_fees failed before settle ran, so no fees were claimed.
         call_as(context, lp2, contract.claim_lp_fees, latest_timestamp=6_002)
 
         creator_total_surplus = _withdrawable_fee_surplus(contract, creator)
@@ -400,7 +398,6 @@ def test_contract_lp_fees_are_strictly_prospective_and_withdrawable(disable_arc4
         pool_before = int(contract.pool_balance.value)
         lp_fee_balance_before = int(contract.lp_fee_balance.value)
         withdraw_amount = lp2_surplus // 2
-        # lp2's uf: box was created in the claim_lp_fees at 6_002 above.
         call_as(context, lp2, contract.withdraw_lp_fees, arc4.UInt64(withdraw_amount), latest_timestamp=6_003)
         transfers = last_inner_asset_transfers(context)
 
@@ -410,6 +407,75 @@ def test_contract_lp_fees_are_strictly_prospective_and_withdrawable(disable_arc4
         assert _withdrawable_fee_surplus(contract, lp2) == lp2_surplus - withdraw_amount
         assert int(contract.pool_balance.value) == pool_before
         assert int(contract.lp_fee_balance.value) == lp_fee_balance_before - withdraw_amount
+
+
+def test_contract_many_low_delta_lps_do_not_create_fee_boxes(disable_arc4_emit) -> None:
+    creator = make_address()
+    resolver = make_address()
+    buyer = make_address()
+    open_proposer = make_address()
+
+    with algopy_testing_context() as context:
+        contract = QuestionMarket()
+        create_contract(
+            context,
+            contract,
+            creator=creator,
+            resolver=resolver,
+            num_outcomes=2,
+            initial_b=50_000_000,
+        )
+        ensure_blueprint_cid(contract)
+        payment = make_usdc_payment(context, contract, creator, 50_000_000)
+        call_as(context, creator, contract.bootstrap, arc4.UInt64(50_000_000), payment, latest_timestamp=1)
+        opt_in_market(context, contract, creator, latest_timestamp=2)
+
+        lps = [make_address() for _ in range(30)]
+        for idx, lp in enumerate(lps):
+            opt_in_market(context, contract, lp, latest_timestamp=3 + idx)
+            prices = lmsr_prices(contract_q(contract), int(contract.b.value))
+            call_as(
+                context,
+                lp,
+                contract.enter_lp_active,
+                arc4.UInt64(5_000),
+                arc4.UInt64(10_000),
+                _price_array(prices),
+                arc4.UInt64(PRICE_TOLERANCE_BASE),
+                make_usdc_payment(context, contract, lp, 10_000),
+                latest_timestamp=100 + idx,
+            )
+
+        call_as(
+            context,
+            buyer,
+            contract.buy,
+            arc4.UInt64(0),
+            arc4.UInt64(SHARE_UNIT),
+            arc4.UInt64(10_000_000),
+            make_usdc_payment(context, contract, buyer, 10_000_000),
+            make_mbr_payment(context, contract, buyer, SHARE_BOX_MBR + COST_BOX_MBR),
+            latest_timestamp=1_000,
+        )
+
+        for idx, lp in enumerate(lps):
+            call_as(context, lp, contract.claim_lp_fees, latest_timestamp=1_100 + idx)
+            assert _withdrawable_fee_surplus(contract, lp) > 0
+        assert not hasattr(contract, "user_claimable_fees_box")
+
+        call_as(context, creator, contract.trigger_resolution, latest_timestamp=10_000)
+        propose_payment = make_usdc_payment(context, contract, open_proposer, 10_000_000)
+        call_as(
+            context,
+            open_proposer,
+            contract.propose_resolution,
+            arc4.UInt64(0),
+            arc4.DynamicBytes(b"e" * 32),
+            propose_payment,
+            latest_timestamp=13_601,
+        )
+        call_as(context, creator, contract.finalize_resolution, latest_timestamp=100_002)
+        assert int(contract.pending_payouts_box.get(Account(open_proposer).bytes, default=UInt64(0))) == 10_000_000
 
 
 def test_contract_residual_claim_respects_winner_reserve_and_tracks_settlement(disable_arc4_emit) -> None:

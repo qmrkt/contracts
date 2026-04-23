@@ -11,6 +11,7 @@ from algopy import (
     Box,
     Bytes,
     Global,
+    GlobalState,
     Txn,
     UInt64,
     arc4,
@@ -26,29 +27,25 @@ MAX_ACTIVE_LP_OUTCOMES = 8
 BPS_DENOMINATOR = 10_000
 SECONDS_PER_DAY = 86_400
 FACTORY_RESERVE = 100_000
+UINT64_MAX = 18_446_744_073_709_551_615
 
 # MBR the factory transfers to the new market app account. Must cover:
 #   1. App-account base                            100_000  (0.1 ALGO)
 #   2. USDC ASA opt-in                             100_000  (0.1 ALGO)
 #   3. Dispute-resolution pp: box buffer           200_000  (~10 pp: boxes × 19_700 μA)
-#   4. LP uf: box buffer                           400_000  (~20 LPs × 19_700 μA)
 #
 # Trader-facing boxes (us:, uc:) are NOT prefunded here — traders pay
-# per-action MBR top-ups in buy and are refunded on delete-on-zero at
-# sell/claim/refund. The trader path is the high-volume attack vector.
+# per-buy MBR top-ups that stay in the market app account until app deletion.
+# The trader path is the high-volume attack vector.
 #
-# LP uf: and dispute pp: boxes are prefunded. LP attacks require real USDC
-# commitment (enter_lp_active deposits ≥ lmsr_collateral_required_from_prices),
-# so the marginal attacker cost is far higher than the buffer — not viable.
-# Dispute-resolution callers aren't the payout recipient, so per-action
-# charging isn't natural.
+# LP fee accrual uses local state, not boxes. Dispute-resolution callers are
+# not necessarily the payout recipient, so pp: boxes remain prefunded.
 APP_ACCOUNT_BASE_MBR = 100_000
 USDC_OPTIN_MBR = 100_000
 DISPUTE_PP_BUFFER = 200_000
-LP_UF_BUFFER = 400_000
 MARKET_APP_MIN_FUNDING = (
-    APP_ACCOUNT_BASE_MBR + USDC_OPTIN_MBR + DISPUTE_PP_BUFFER + LP_UF_BUFFER
-)  # 800_000 μA = 0.8 ALGO
+    APP_ACCOUNT_BASE_MBR + USDC_OPTIN_MBR + DISPUTE_PP_BUFFER
+)  # 400_000 μA = 0.4 ALGO
 
 APP_CREATE_BASE_MIN_BALANCE = 100_000
 APP_PAGE_MIN_BALANCE = 100_000
@@ -81,6 +78,7 @@ class MarketFactory(ARC4Contract):
     def __init__(self) -> None:
         self.approval_program_box = Box(Bytes, key=b"ap")
         self.clear_program_box = Box(Bytes, key=b"cp")
+        self.protocol_config_id = GlobalState(UInt64, key="pci")
 
     @subroutine
     def _config_uint64(self, app: Application, key: Bytes) -> UInt64:
@@ -119,9 +117,10 @@ class MarketFactory(ARC4Contract):
             return window_fee
         return floor_fee
 
-    @arc4.baremethod(create="require")
-    def create(self) -> None:
-        pass
+    @arc4.abimethod(create="require")
+    def create(self, protocol_config_id: arc4.UInt64) -> None:
+        assert protocol_config_id.as_uint64() > UInt64(0)
+        self.protocol_config_id.value = protocol_config_id.as_uint64()
 
     @arc4.abimethod()
     def noop(self) -> None:
@@ -177,7 +176,7 @@ class MarketFactory(ARC4Contract):
         # Validate ALGO funding
         assert algo_funding.sender == Txn.sender
         assert algo_funding.receiver == Global.current_application_address
-        assert algo_funding.amount >= CREATE_MARKET_MIN_FUNDING
+        assert algo_funding.amount == CREATE_MARKET_MIN_FUNDING
         assert algo_funding.rekey_to == Global.zero_address
         assert algo_funding.close_remainder_to == Global.zero_address
 
@@ -186,14 +185,24 @@ class MarketFactory(ARC4Contract):
         assert usdc_funding.asset_receiver == Global.current_application_address
         assert usdc_funding.xfer_asset.id == currency_asa.as_uint64()
         assert usdc_funding.asset_amount >= deposit_amount.as_uint64()
+        assert usdc_funding.asset_sender == Global.zero_address
         assert usdc_funding.rekey_to == Global.zero_address
         assert usdc_funding.asset_close_to == Global.zero_address
 
         assert num_outcomes.as_uint64() <= MAX_ACTIVE_LP_OUTCOMES
         protocol_config_id = Txn.applications(1).id
+        assert protocol_config_id == self.protocol_config_id.value
         protocol_config_app = Application(protocol_config_id)
         linked_factory_id = self._config_uint64(protocol_config_app, Bytes(b"mfi"))
         assert linked_factory_id == Global.current_application_id.id
+        assert num_outcomes.as_uint64() <= self._config_uint64(protocol_config_app, Bytes(b"max_outcomes"))
+        assert lp_fee_bps.as_uint64() <= self._config_uint64(protocol_config_app, Bytes(b"max_lp_fee_bps"))
+        assert (
+            lp_fee_bps.as_uint64() + self._config_uint64(protocol_config_app, Bytes(b"pfb"))
+            <= UInt64(BPS_DENOMINATOR)
+        )
+        assert grace_period_secs.as_uint64() >= self._config_uint64(protocol_config_app, Bytes(b"min_grace_period_secs"))
+        assert deadline.as_uint64() <= UInt64(UINT64_MAX) - grace_period_secs.as_uint64()
         budget_required = self._max_proposer_fee(
             self._config_uint64(protocol_config_app, Bytes(b"pb")),
             self._config_uint64(protocol_config_app, Bytes(b"pbc")),
@@ -201,7 +210,7 @@ class MarketFactory(ARC4Contract):
             self._config_uint64(protocol_config_app, Bytes(b"pff")),
             challenge_window_secs.as_uint64(),
         )
-        assert usdc_funding.asset_amount >= deposit_amount.as_uint64() + budget_required
+        assert usdc_funding.asset_amount == deposit_amount.as_uint64() + budget_required
 
         # Read stored bytecode from boxes in chunks (AVM stack limit: 4096 bytes per value)
         ap_len, _ap_exists = op.Box.length(Bytes(b"ap"))

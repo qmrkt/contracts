@@ -116,12 +116,22 @@ def make_factory_funding_payment(context, contract: MarketFactory, sender: str, 
     )
 
 
-def make_factory_asset_funding(context, contract: MarketFactory, sender: str, amount: int, asset_id: int = CURRENCY_ASA):
+def make_factory_asset_funding(
+    context,
+    contract: MarketFactory,
+    sender: str,
+    amount: int,
+    asset_id: int = CURRENCY_ASA,
+    *,
+    asset_sender: str | None = None,
+):
+    zero = Account(ZERO_ADDRESS)
     return context.any.txn.asset_transfer(
         sender=Account(sender),
         asset_receiver=Account(get_app_address(contract)),
         xfer_asset=Asset(asset_id),
         asset_amount=UInt64(amount),
+        asset_sender=Account(asset_sender) if asset_sender is not None else zero,
     )
 
 
@@ -132,6 +142,8 @@ def call_create_market(
     *args,
     funding_amount: int = factory_module.CREATE_MARKET_MIN_FUNDING,
     usdc_funding_amount: int | None = None,
+    usdc_asset_sender: str | None = None,
+    protocol_config_id: int = PROTOCOL_CONFIG_APP_ID,
     latest_timestamp: int | None = None,
 ):
     if latest_timestamp is not None:
@@ -141,9 +153,9 @@ def call_create_market(
         args = (*args[:-1], arc4.UInt64(DEFAULT_LP_ENTRY_MAX_PRICE_FP), args[-1])
     algo_funding = make_factory_funding_payment(context, contract, sender, funding_amount)
     usdc_amount = int(args[-1].as_uint64()) if usdc_funding_amount is None else usdc_funding_amount
-    usdc_funding = make_factory_asset_funding(context, contract, sender, usdc_amount)
+    usdc_funding = make_factory_asset_funding(context, contract, sender, usdc_amount, asset_sender=usdc_asset_sender)
     deferred = context.txn.defer_app_call(contract.create_market, *args, algo_funding, usdc_funding)
-    deferred._txns[-1].fields["apps"] = (Application(contract.__app_id__), Application(PROTOCOL_CONFIG_APP_ID))
+    deferred._txns[-1].fields["apps"] = (Application(contract.__app_id__), Application(protocol_config_id))
     with context.txn.create_group([algo_funding, usdc_funding, deferred]):
         return contract.create_market(*args, algo_funding, usdc_funding)
 
@@ -155,6 +167,8 @@ def call_create_market_canonical(
     *args,
     funding_amount: int = factory_module.CREATE_MARKET_MIN_FUNDING,
     usdc_funding_amount: int | None = None,
+    usdc_asset_sender: str | None = None,
+    protocol_config_id: int = PROTOCOL_CONFIG_APP_ID,
     latest_timestamp: int | None = None,
 ):
     if latest_timestamp is not None:
@@ -164,9 +178,9 @@ def call_create_market_canonical(
         args = (*args[:-1], arc4.UInt64(DEFAULT_LP_ENTRY_MAX_PRICE_FP), args[-1])
     algo_funding = make_factory_funding_payment(context, contract, sender, funding_amount)
     usdc_amount = int(args[-1].as_uint64()) if usdc_funding_amount is None else usdc_funding_amount
-    usdc_funding = make_factory_asset_funding(context, contract, sender, usdc_amount)
+    usdc_funding = make_factory_asset_funding(context, contract, sender, usdc_amount, asset_sender=usdc_asset_sender)
     deferred = context.txn.defer_app_call(contract.create_market, *args, algo_funding, usdc_funding)
-    deferred._txns[-1].fields["apps"] = (Application(contract.__app_id__), Application(PROTOCOL_CONFIG_APP_ID))
+    deferred._txns[-1].fields["apps"] = (Application(contract.__app_id__), Application(protocol_config_id))
     with context.txn.create_group([algo_funding, usdc_funding, deferred]):
         return contract.create_market(*args, algo_funding, usdc_funding)
 
@@ -214,10 +228,12 @@ def create_market_factory(
 ) -> None:
     treasury = protocol_treasury or admin
     app_data = context.ledger._app_data[contract.__app_id__]
+    context._default_sender = Account(resolution_authority)
+    contract.create(arc4.UInt64(protocol_config_id))
     app_data.fields["creator"] = Account(resolution_authority)
     app_data.is_creating = False
-    context.ledger.set_global_state(Application(PROTOCOL_CONFIG_APP_ID), KEY_MARKET_FACTORY_ID, contract.__app_id__)
-    context.ledger.set_global_state(Application(PROTOCOL_CONFIG_APP_ID), KEY_PROTOCOL_TREASURY, Account(treasury).bytes.value)
+    context.ledger.set_global_state(Application(protocol_config_id), KEY_MARKET_FACTORY_ID, contract.__app_id__)
+    context.ledger.set_global_state(Application(protocol_config_id), KEY_PROTOCOL_TREASURY, Account(treasury).bytes.value)
     context.ledger.set_box(contract, b"ap", b"a" * 5_000)
     context.ledger.set_box(contract, b"cp", b"c")
 
@@ -280,6 +296,31 @@ def max_proposer_fee(
     daily_fee = (proposal_bond_cap * proposer_fee_bps + 9_999) // 10_000
     window_fee = (daily_fee * challenge_window_secs + 86_399) // 86_400
     return max(floor_fee, window_fee)
+
+
+def default_factory_market_args(
+    admin: str,
+    *,
+    lp_fee_bps: int = 200,
+    num_outcomes: int = 3,
+    deadline: int = 10_000,
+    grace_period_secs: int = 3_600,
+    deposit_amount: int = 50_000_000,
+):
+    return (
+        arc4.UInt64(CURRENCY_ASA),
+        arc4.DynamicBytes(b"q" * 32),
+        arc4.UInt64(num_outcomes),
+        arc4.UInt64(25_000_000),
+        arc4.UInt64(lp_fee_bps),
+        arc4.DynamicBytes(BLUEPRINT_CID),
+        arc4.UInt64(deadline),
+        arc4.UInt64(86_400),
+        arc4.Address(admin),
+        arc4.UInt64(grace_period_secs),
+        arc4.Bool(True),
+        arc4.UInt64(deposit_amount),
+    )
 
 @pytest.fixture()
 def disable_arc4_emit(monkeypatch):
@@ -496,6 +537,196 @@ def test_factory_rejects_v4_market_above_active_lp_outcome_guard(disable_arc4_em
                 arc4.UInt64(3_600),
                 arc4.Bool(True),
                 arc4.UInt64(50_000_000),
+            )
+
+
+def test_factory_rejects_noncanonical_protocol_config(disable_arc4_emit, monkeypatch) -> None:
+    admin = make_address()
+    creator = make_address()
+    resolver = make_address()
+    fake_config_id = PROTOCOL_CONFIG_APP_ID + 101
+
+    patch_factory_inner_create(monkeypatch, 9_003_1)
+
+    with algopy_testing_context() as context:
+        seed_protocol_config_state(context, app_id=PROTOCOL_CONFIG_APP_ID)
+        fake_config = seed_protocol_config_state(context, app_id=fake_config_id)
+        factory = MarketFactory()
+        create_market_factory(context, factory, admin=admin, resolution_authority=resolver)
+        context.ledger.set_global_state(fake_config, KEY_MARKET_FACTORY_ID, factory.__app_id__)
+
+        with pytest.raises(AssertionError):
+            call_create_market(
+                context,
+                creator,
+                factory,
+                *default_factory_market_args(admin),
+                protocol_config_id=fake_config_id,
+            )
+
+
+def test_factory_rejects_lp_fee_above_protocol_max(disable_arc4_emit, monkeypatch) -> None:
+    admin = make_address()
+    creator = make_address()
+    resolver = make_address()
+
+    patch_factory_inner_create(monkeypatch, 9_003_2)
+
+    with algopy_testing_context() as context:
+        seed_protocol_config_state(context, app_id=PROTOCOL_CONFIG_APP_ID)
+        factory = MarketFactory()
+        create_market_factory(context, factory, admin=admin, resolution_authority=resolver)
+
+        with pytest.raises(AssertionError):
+            call_create_market(
+                context,
+                creator,
+                factory,
+                *default_factory_market_args(admin, lp_fee_bps=1_001),
+            )
+
+
+def test_factory_rejects_outcome_count_above_protocol_max(disable_arc4_emit, monkeypatch) -> None:
+    admin = make_address()
+    creator = make_address()
+    resolver = make_address()
+
+    patch_factory_inner_create(monkeypatch, 9_003_8)
+
+    with algopy_testing_context() as context:
+        seed_protocol_config_state(context, app_id=PROTOCOL_CONFIG_APP_ID)
+        context.ledger.set_global_state(Application(PROTOCOL_CONFIG_APP_ID), KEY_MAX_OUTCOMES, 2)
+        factory = MarketFactory()
+        create_market_factory(context, factory, admin=admin, resolution_authority=resolver)
+
+        with pytest.raises(AssertionError):
+            call_create_market(
+                context,
+                creator,
+                factory,
+                *default_factory_market_args(admin, num_outcomes=3),
+            )
+
+
+def test_factory_rejects_fee_sum_above_bps_denominator(disable_arc4_emit, monkeypatch) -> None:
+    admin = make_address()
+    creator = make_address()
+    resolver = make_address()
+
+    patch_factory_inner_create(monkeypatch, 9_003_3)
+
+    with algopy_testing_context() as context:
+        seed_protocol_config_state(context, app_id=PROTOCOL_CONFIG_APP_ID)
+        context.ledger.set_global_state(Application(PROTOCOL_CONFIG_APP_ID), KEY_MAX_LP_FEE_BPS, 10_000)
+        factory = MarketFactory()
+        create_market_factory(context, factory, admin=admin, resolution_authority=resolver)
+
+        with pytest.raises(AssertionError):
+            call_create_market(
+                context,
+                creator,
+                factory,
+                *default_factory_market_args(admin, lp_fee_bps=9_951),
+            )
+
+
+def test_factory_rejects_grace_period_below_protocol_minimum(disable_arc4_emit, monkeypatch) -> None:
+    admin = make_address()
+    creator = make_address()
+    resolver = make_address()
+
+    patch_factory_inner_create(monkeypatch, 9_003_4)
+
+    with algopy_testing_context() as context:
+        seed_protocol_config_state(context, app_id=PROTOCOL_CONFIG_APP_ID)
+        factory = MarketFactory()
+        create_market_factory(context, factory, admin=admin, resolution_authority=resolver)
+
+        with pytest.raises(AssertionError):
+            call_create_market(
+                context,
+                creator,
+                factory,
+                *default_factory_market_args(admin, grace_period_secs=3_599),
+            )
+
+
+def test_factory_rejects_grace_period_that_can_overflow_deadline(disable_arc4_emit, monkeypatch) -> None:
+    admin = make_address()
+    creator = make_address()
+    resolver = make_address()
+
+    patch_factory_inner_create(monkeypatch, 9_003_5)
+
+    with algopy_testing_context() as context:
+        seed_protocol_config_state(context, app_id=PROTOCOL_CONFIG_APP_ID)
+        factory = MarketFactory()
+        create_market_factory(context, factory, admin=admin, resolution_authority=resolver)
+
+        with pytest.raises(AssertionError):
+            call_create_market(
+                context,
+                creator,
+                factory,
+                *default_factory_market_args(
+                    admin,
+                    deadline=10_000,
+                    grace_period_secs=(1 << 64) - 1,
+                ),
+            )
+
+
+def test_factory_rejects_overfunded_creation_payments(disable_arc4_emit, monkeypatch) -> None:
+    admin = make_address()
+    creator = make_address()
+    resolver = make_address()
+
+    patch_factory_inner_create(monkeypatch, 9_003_6)
+
+    with algopy_testing_context() as context:
+        seed_protocol_config_state(context, app_id=PROTOCOL_CONFIG_APP_ID)
+        factory = MarketFactory()
+        create_market_factory(context, factory, admin=admin, resolution_authority=resolver)
+
+        with pytest.raises(AssertionError):
+            call_create_market(
+                context,
+                creator,
+                factory,
+                *default_factory_market_args(admin),
+                funding_amount=factory_module.CREATE_MARKET_MIN_FUNDING + 1,
+            )
+
+        with pytest.raises(AssertionError):
+            call_create_market(
+                context,
+                creator,
+                factory,
+                *default_factory_market_args(admin),
+                usdc_funding_amount=50_000_001,
+            )
+
+
+def test_factory_rejects_clawback_asset_funding(disable_arc4_emit, monkeypatch) -> None:
+    admin = make_address()
+    creator = make_address()
+    resolver = make_address()
+    clawed_from = make_address()
+
+    patch_factory_inner_create(monkeypatch, 9_003_7)
+
+    with algopy_testing_context() as context:
+        seed_protocol_config_state(context, app_id=PROTOCOL_CONFIG_APP_ID)
+        factory = MarketFactory()
+        create_market_factory(context, factory, admin=admin, resolution_authority=resolver)
+
+        with pytest.raises(AssertionError):
+            call_create_market(
+                context,
+                creator,
+                factory,
+                *default_factory_market_args(admin),
+                usdc_asset_sender=clawed_from,
             )
 
 

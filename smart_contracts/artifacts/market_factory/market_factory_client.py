@@ -14,6 +14,12 @@ class MarketFactory(algopy.arc4.ARC4Client, typing.Protocol):
         Creates markets via arc4_create with compiled bytecode from boxes.
     
     """
+    @algopy.arc4.abimethod(create='require')
+    def create(
+        self,
+        protocol_config_id: algopy.arc4.UIntN[typing.Literal[64]],
+    ) -> None: ...
+
     @algopy.arc4.abimethod
     def noop(
         self,

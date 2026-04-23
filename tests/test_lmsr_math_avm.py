@@ -5,7 +5,6 @@ from smart_contracts.lmsr_math_avm import (
     _mul_div_floor,
     lmsr_collateral_required_from_prices,
     lmsr_gauge_alpha_from_prices,
-    lmsr_normalized_q_from_prices,
     lmsr_prices,
     lmsr_q_from_prices_with_floor,
 )
@@ -44,8 +43,9 @@ def test_collateral_required_from_prices_matches_binary_uniform_case() -> None:
 
 def test_normalized_q_from_prices_round_trips_prices() -> None:
     prices = Array[UInt64]((UInt64(200_000), UInt64(300_000), UInt64(500_000)))
+    floor_q = Array[UInt64]((UInt64(0), UInt64(0), UInt64(0)))
 
-    q = lmsr_normalized_q_from_prices(prices, UInt64(100_000_000))
+    q = lmsr_q_from_prices_with_floor(prices, UInt64(100_000_000), floor_q)
     reconstructed = lmsr_prices(q, UInt64(100_000_000))
 
     assert reconstructed.length == prices.length

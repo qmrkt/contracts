@@ -100,8 +100,8 @@ OPERATIONS = {
     "cancel": lambda m: m.cancel(sender="creator"),
     "refund": lambda m: m.refund(sender="trader", outcome_index=0),
     "register_dispute": lambda m: m.register_dispute(sender="resolver", dispute_ref_hash=b"r" * 32, backend_kind=1, deadline=200_000),
-    "creator_resolve_dispute": lambda m: m.creator_resolve_dispute(sender="creator", outcome_index=0, ruling_hash=b"r" * 32),
-    "admin_resolve_dispute": lambda m: m.admin_resolve_dispute(sender="admin", outcome_index=0, ruling_hash=b"r" * 32),
+    "creator_resolve_dispute": lambda m: m.creator_resolve_dispute(sender="resolver", outcome_index=0, ruling_hash=b"r" * 32),
+    "admin_resolve_dispute": lambda m: m.admin_resolve_dispute(sender="resolver", outcome_index=0, ruling_hash=b"r" * 32),
     "finalize_dispute": lambda m: m.finalize_dispute(sender="resolver", outcome_index=0, ruling_hash=b"r" * 32),
     "cancel_dispute_and_market": lambda m: m.cancel_dispute_and_market(sender="resolver", ruling_hash=b"r" * 32),
 }

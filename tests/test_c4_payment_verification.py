@@ -18,7 +18,6 @@ from smart_contracts.market_app.contract import (
     COST_BOX_MBR,
     DEFAULT_LP_ENTRY_MAX_PRICE_FP,
     DEFAULT_RESIDUAL_LINEAR_LAMBDA_FP,
-    FEE_BOX_MBR,
     PRICE_TOLERANCE_BASE,
     QuestionMarket,
     SHARE_BOX_MBR,
@@ -84,12 +83,7 @@ def make_payment(
 
 
 def make_mbr_payment(context, contract, sender, amount):
-    """Create an ALGO Payment txn funding MBR top-up for a box-creating call.
-
-    Use SHARE_BOX_MBR + COST_BOX_MBR for a first-time buy, FEE_BOX_MBR for a
-    first-time LP-settling call (enter_lp_active / claim_lp_fees / withdraw_lp_fees).
-    Use 0 for repeat calls that don't create boxes.
-    """
+    """Create an ALGO Payment txn funding MBR top-up for a box-creating call."""
     zero = Global.zero_address
     return context.any.txn.payment(
         sender=Account(sender),
@@ -337,8 +331,7 @@ class TestP11PaymentVerification:
             if method_name == "buy":
                 extra = (make_mbr_payment(context, contract, sender, SHARE_BOX_MBR + COST_BOX_MBR),)
             else:
-                # enter_lp_active no longer takes an mbr_payment (size-cap
-                # compromise — LP uf: box MBR is prefunded by the factory).
+                # enter_lp_active does not create boxes; LP fees accrue in local state.
                 extra = ()
             with pytest.raises(AssertionError):
                 call_as(context, sender, method, *method_args, payment, *extra, latest_timestamp=5000 if method_name != "bootstrap" else 1)

@@ -2,13 +2,13 @@
 
 Covers the new contract behavior:
 
-1. MBR top-up enforcement on box-creating methods: buy / enter_lp_active /
-   claim_lp_fees / withdraw_lp_fees. Strict-equality, sender/receiver
-   validation, rekey/close-remainder-to rejection.
+1. MBR top-up enforcement on buy. Strict-equality, sender, and receiver
+   validation; rekey/close-remainder-to are intentionally tolerated because
+   they only affect the trader's own payment account.
 
-2. Delete-on-zero refund path: sell / claim_winnings / refund_shares delete
-   us:/uc: boxes when the position hits zero and refund SHARE_BOX_MBR +
-   COST_BOX_MBR via an inner Payment back to the caller.
+2. No-delete-on-zero behavior: sell / claim / refund leave zero-valued
+   us:/uc: boxes in place because the approval program is at the AVM page
+   limit. Trader-funded MBR stays in the app account until app deletion.
 
 3. Attack resistance: many fresh wallets each first-buying a fresh outcome
    never drains the market app's prefund, because each trader funds their
@@ -33,7 +33,6 @@ from smart_contracts.market_app.contract import (
     BOX_KEY_USER_SHARES,
     COST_BOX_MBR,
     DEFAULT_LP_ENTRY_MAX_PRICE_FP,
-    FEE_BOX_MBR,
     PRICE_TOLERANCE_BASE,
     QuestionMarket,
     SHARE_BOX_MBR,
@@ -171,7 +170,7 @@ def disable_emit(monkeypatch):
 
 
 class TestMBRTopupEnforcement:
-    """Strict-equality MBR validation on the four box-creating methods."""
+    """Strict-equality MBR validation on buy."""
 
     def test_buy_first_time_requires_share_plus_cost_exact(self, disable_emit):
         creator, buyer = _addr(), _addr()
@@ -274,26 +273,33 @@ class TestMBRTopupEnforcement:
                     pmt, mbr, latest_timestamp=5_000,
                 )
 
-    # Receiver / rekey / close_remainder_to checks are omitted from the
-    # contract-side validation to keep the approval program under the 4-page
-    # AVM cap. Removing them is safe because:
-    #   - receiver != app: subsequent box creation reverts naturally from
-    #     insufficient MBR (funds never reach the app account).
-    #   - rekey_to != zero: the trader rekeys their OWN payment account to a
-    #     third party; they only harm themselves.
-    #   - close_remainder_to != zero: same self-harm pattern.
-    # The tests that previously asserted those reverts are replaced by the
-    # positive-case regression below: buy still succeeds when these fields
-    # are set on the mbr_payment txn.
-    def test_buy_tolerates_redirect_fields_on_mbr_payment(self, disable_emit):
-        """Regression: removed defense-in-depth checks don't cause surprise
-        reverts. A buy with rekey_to set on the mbr_payment still goes
-        through (trader self-harm only)."""
+    def test_buy_mbr_receiver_must_be_app_account(self, disable_emit):
+        creator, buyer, wrong_receiver = _addr(), _addr(), _addr()
+        with algopy_testing_context() as ctx:
+            c = _ready(ctx, creator)
+            pmt = _usdc_payment(ctx, c, buyer, 50_000_000)
+            mbr = _mbr_payment(
+                ctx,
+                c,
+                buyer,
+                SHARE_BOX_MBR + COST_BOX_MBR,
+                receiver=wrong_receiver,
+            )
+            with pytest.raises(AssertionError):
+                _call_as(
+                    ctx, buyer, c.buy,
+                    arc4.UInt64(0), arc4.UInt64(SHARE_UNIT), arc4.UInt64(50_000_000),
+                    pmt, mbr, latest_timestamp=5_000,
+                )
+
+    # Rekey / close_remainder_to checks are omitted from the contract-side
+    # validation to keep the approval program under the 4-page AVM cap. Setting
+    # either field only affects the trader's own payment account.
+    def test_buy_tolerates_rekey_on_mbr_payment(self, disable_emit):
         creator, buyer, anywhere = _addr(), _addr(), _addr()
         with algopy_testing_context() as ctx:
             c = _ready(ctx, creator)
             pmt = _usdc_payment(ctx, c, buyer, 50_000_000)
-            # rekey_to is set — contract no longer checks this; call still succeeds.
             mbr = _mbr_payment(
                 ctx, c, buyer, SHARE_BOX_MBR + COST_BOX_MBR, rekey_to=anywhere
             )

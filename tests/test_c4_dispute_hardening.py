@@ -191,16 +191,16 @@ class TestRound1_AuthBypass:
             m.register_dispute(sender="attacker", dispute_ref_hash=b"x" * 32,
                                backend_kind=1, deadline=99999)
 
-    def test_creator_resolve_by_non_creator(self):
+    def test_creator_resolve_by_non_authority(self):
         m = make_disputed_market()
-        with pytest.raises(MarketAppError, match="creator"):
-            m.creator_resolve_dispute(sender="attacker", outcome_index=0,
+        with pytest.raises(MarketAppError, match="authority"):
+            m.creator_resolve_dispute(sender="creator", outcome_index=0,
                                        ruling_hash=b"r" * 32)
 
-    def test_admin_resolve_by_non_admin(self):
+    def test_admin_resolve_by_non_authority(self):
         m = make_disputed_market()
-        with pytest.raises(MarketAppError, match="admin"):
-            m.admin_resolve_dispute(sender="attacker", outcome_index=0,
+        with pytest.raises(MarketAppError, match="authority"):
+            m.admin_resolve_dispute(sender="admin", outcome_index=0,
                                      ruling_hash=b"r" * 32)
 
     def test_finalize_dispute_by_non_authority(self):
@@ -546,11 +546,11 @@ class TestRound3_ReplayAndDuplicate:
     def test_creator_resolve_then_admin_resolve_rejected(self):
         """After creator resolves dispute, admin cannot re-resolve."""
         m = make_disputed_market()
-        m.creator_resolve_dispute(sender="creator", outcome_index=0, ruling_hash=b"cr" * 16)
+        m.creator_resolve_dispute(sender="resolver", outcome_index=0, ruling_hash=b"cr" * 16)
         # After creator resolve, pending_responder_role should change
         # Trying admin resolve should fail (status is now RESOLVED or already resolved)
         with pytest.raises(MarketAppError):
-            m.admin_resolve_dispute(sender="admin", outcome_index=1, ruling_hash=b"ar" * 16)
+            m.admin_resolve_dispute(sender="resolver", outcome_index=1, ruling_hash=b"ar" * 16)
 
 
 class TestRound3_ZeroAddressAndEmptyState:
@@ -867,32 +867,32 @@ class TestRound3_CreatorAndAdminResolveDispute:
 
     def test_creator_resolve_dispute_sets_pending_role(self):
         m = make_disputed_market()
-        m.creator_resolve_dispute(sender="creator", outcome_index=0, ruling_hash=b"cr" * 16)
+        m.creator_resolve_dispute(sender="resolver", outcome_index=0, ruling_hash=b"cr" * 16)
         # After creator resolves, status should be RESOLVED
         assert m.status == STATUS_RESOLVED
         assert m.resolution_path_used == 1  # dispute path
 
     def test_admin_resolve_dispute_sets_path(self):
         m = make_disputed_market()
-        m.admin_resolve_dispute(sender="admin", outcome_index=1, ruling_hash=b"ar" * 16)
+        m.admin_resolve_dispute(sender="resolver", outcome_index=1, ruling_hash=b"ar" * 16)
         assert m.status == STATUS_RESOLVED
         assert m.resolution_path_used == 2  # admin fallback
 
     def test_creator_cannot_resolve_with_invalid_outcome(self):
         m = make_disputed_market()
         with pytest.raises(MarketAppError, match="outcome"):
-            m.creator_resolve_dispute(sender="creator", outcome_index=99, ruling_hash=b"cr" * 16)
+            m.creator_resolve_dispute(sender="resolver", outcome_index=99, ruling_hash=b"cr" * 16)
 
     def test_admin_cannot_resolve_with_invalid_outcome(self):
         m = make_disputed_market()
         with pytest.raises(MarketAppError, match="outcome"):
-            m.admin_resolve_dispute(sender="admin", outcome_index=99, ruling_hash=b"ar" * 16)
+            m.admin_resolve_dispute(sender="resolver", outcome_index=99, ruling_hash=b"ar" * 16)
 
     def test_creator_resolve_bond_settlement(self):
         """Creator resolve should settle bonds correctly."""
         m = make_disputed_market()
         pre = snapshot_balances(m)
-        m.creator_resolve_dispute(sender="creator", outcome_index=0, ruling_hash=b"cr" * 16)
+        m.creator_resolve_dispute(sender="resolver", outcome_index=0, ruling_hash=b"cr" * 16)
         post = snapshot_balances(m)
         assert post["proposer_bond"] == 0
         assert post["challenger_bond"] == 0
@@ -900,7 +900,7 @@ class TestRound3_CreatorAndAdminResolveDispute:
     def test_admin_resolve_bond_settlement(self):
         m = make_disputed_market()
         pre = snapshot_balances(m)
-        m.admin_resolve_dispute(sender="admin", outcome_index=1, ruling_hash=b"ar" * 16)
+        m.admin_resolve_dispute(sender="resolver", outcome_index=1, ruling_hash=b"ar" * 16)
         post = snapshot_balances(m)
         assert post["proposer_bond"] == 0
         assert post["challenger_bond"] == 0

@@ -57,7 +57,6 @@ DEFAULT_LP_ENTRY_MAX_PRICE_FP = 800_000
 SECONDS_PER_DAY = 86_400
 
 BOX_KEY_USER_SHARES = b"us:"
-BOX_KEY_USER_FEES = b"uf:"
 BOX_KEY_USER_COST_BASIS = b"uc:"
 BOX_KEY_PENDING_PAYOUTS = b"pp:"
 
@@ -68,21 +67,18 @@ BOX_KEY_PENDING_PAYOUTS = b"pp:"
 #
 #   us: key = "us:"(3) + sender(32) + outcome index u64(8) = 43 bytes
 #   uc: key = "uc:"(3) + sender(32) + outcome index u64(8) = 43 bytes
-#   uf: key = "uf:"(3) + sender(32)                        = 35 bytes
 #   pp: key = "pp:"(3) + account(32)                       = 35 bytes
 #
-# Trader-facing actions (buy / sell / claim / refund / LP methods) pay
-# these at call time via an ALGO payment grouped with the call, and are
-# refunded the same amount when the corresponding box is deleted on full
-# exit (delete-on-zero). Net cost of a round-trip is zero, modulo inner-txn
-# fees covered by Algorand's fee pooling on the outer txn.
+# Trader-facing buy actions pay these at call time via an ALGO payment
+# grouped with the call. The current 4-page approval cap prevents
+# delete-on-zero, so the paid MBR stays in the market app account until app
+# deletion.
 #
 # Dispute-resolution methods still create pp: boxes, but they are paid out
 # of the market app account's MARKET_APP_MIN_FUNDING prefund — see the
 # buffer decomposition in smart_contracts/market_factory/contract.py.
 SHARE_BOX_MBR = 2_500 + 400 * (3 + 32 + 8 + 8)   # 22_900
 COST_BOX_MBR = 2_500 + 400 * (3 + 32 + 8 + 8)    # 22_900
-FEE_BOX_MBR = 2_500 + 400 * (3 + 32 + 8)         # 19_700
 PENDING_PAYOUT_BOX_MBR = 2_500 + 400 * (3 + 32 + 8)  # 19_700
 
 # State and event schema consumed by the acceptance harness and ARC-56 tooling.
@@ -250,7 +246,6 @@ class QuestionMarket(ARC4Contract):
         self.bootstrapper_lp_entry = GlobalState(UInt64, key="ble")
 
         self.user_outcome_shares_box = BoxMap(Bytes, UInt64, key_prefix=BOX_KEY_USER_SHARES)
-        self.user_claimable_fees_box = BoxMap(Bytes, UInt64, key_prefix=BOX_KEY_USER_FEES)
         self.user_cost_basis_box = BoxMap(Bytes, UInt64, key_prefix=BOX_KEY_USER_COST_BASIS)
         self.pending_payouts_box = BoxMap(Bytes, UInt64, key_prefix=BOX_KEY_PENDING_PAYOUTS)
 
@@ -296,12 +291,6 @@ class QuestionMarket(ARC4Contract):
 
     def _set_residual_claimed(self, value: UInt64) -> None:
         self.residual_claimed[Txn.sender] = value
-
-    def _get_claimable_fees(self) -> UInt64:
-        return self.user_claimable_fees_box.get(self._sender_fee_key(), default=UInt64(0))
-
-    def _set_claimable_fees(self, value: UInt64) -> None:
-        self.user_claimable_fees_box[self._sender_fee_key()] = value
 
     def _get_user_outcome_shares(self, outcome_index: UInt64) -> UInt64:
         return self.user_outcome_shares_box.get(self._sender_outcome_key(outcome_index), default=UInt64(0))
@@ -527,7 +516,7 @@ class QuestionMarket(ARC4Contract):
         if cumulative > snapshot:
             delta = cumulative - snapshot
             accrued = lmsr_mul_div_floor(delta, shares, UInt64(SCALE))
-            self._set_claimable_fees(self._get_claimable_fees() + accrued)
+            self._set_withdrawable_fee_surplus(self._get_withdrawable_fee_surplus() + accrued)
         self._set_fee_snapshot(cumulative)
 
     @subroutine
@@ -695,21 +684,14 @@ class QuestionMarket(ARC4Contract):
 
     @arc4.abimethod()
     def claim_lp_fees(self) -> None:
-        # LP uf: box MBR is absorbed by MARKET_APP_MIN_FUNDING's LP buffer
-        # rather than charged per-call: LP attacks require real USDC
-        # commitment (enter_lp_active deposits), so the marginal cost to an
-        # attacker is far higher than the cost of draining the buffer. This
-        # shrinks the approval program to fit the 4-page AVM cap.
+        before = self._get_withdrawable_fee_surplus()
         self._settle_lp_fees()
-        claimable = self._get_claimable_fees()
-        self._require(claimable > UInt64(0))
-        self._set_claimable_fees(UInt64(0))
-        self._set_withdrawable_fee_surplus(self._get_withdrawable_fee_surplus() + claimable)
-        arc4.emit("ClaimLpFees(uint64)", arc4.UInt64(claimable))
+        claimed = self._get_withdrawable_fee_surplus() - before
+        self._require(claimed > UInt64(0))
+        arc4.emit("ClaimLpFees(uint64)", arc4.UInt64(claimed))
 
     @arc4.abimethod()
     def withdraw_lp_fees(self, amount: arc4.UInt64) -> None:
-        self._settle_lp_fees()
         withdraw_amount = amount.as_uint64()
         self._require(withdraw_amount > UInt64(0))
         self._require(self._get_withdrawable_fee_surplus() >= withdraw_amount)
@@ -988,10 +970,11 @@ class QuestionMarket(ARC4Contract):
         # SHARE+COST. Excess accumulates as app-account slack rather than
         # being refunded — one-time ~0.05 ALGO fee per (trader, outcome,
         # buy-call) instead of per (trader, outcome) first-touch.
-        # Receiver/rekey/close checks are defense-in-depth and omitted for
-        # the same cap reason; pay to a different receiver simply causes
-        # subsequent box creation to revert on insufficient MBR.
+        # The payment must actually fund the app account before box creation.
+        # Rekey/close checks are omitted as a size-cap compromise; nonzero
+        # values only affect the trader's own payment account.
         assert mbr_payment.sender.bytes == Txn.sender.bytes
+        assert mbr_payment.receiver == Global.current_application_address
         assert mbr_payment.amount == UInt64(SHARE_BOX_MBR + COST_BOX_MBR)
 
         q = self._get_q()
@@ -1084,8 +1067,7 @@ class QuestionMarket(ARC4Contract):
         self._require(delta_b > UInt64(0))
         self._require(max_deposit_val > UInt64(0))
         self._require(expected_prices.length == self.num_outcomes.value)
-        # LP uf: box MBR is funded by MARKET_APP_MIN_FUNDING's LP buffer.
-        # See comment on claim_lp_fees for rationale.
+        # LP fee accrual uses local state, so this path does not create boxes.
 
         current_prices = lmsr_prices(self._get_q(), self.b.value)
         max_price = UInt64(0)
@@ -1145,11 +1127,9 @@ class QuestionMarket(ARC4Contract):
         self._assert_valid_outcome(outcome)
 
         is_authority = Txn.sender.bytes == self.resolution_authority.value
-        grace_expired = self._now() >= self.deadline.value + self.grace_period_secs.value
-
         if not is_authority:
             # Open proposing: only after grace period.
-            self._require(grace_expired)
+            self._require(self._now() >= self.deadline.value + self.grace_period_secs.value)
 
         required_bond = UInt64(0)
         if not is_authority:
@@ -1245,7 +1225,7 @@ class QuestionMarket(ARC4Contract):
         ruling_hash: arc4.DynamicBytes,
     ) -> None:
         self._require_status(UInt64(STATUS_DISPUTED))
-        self._require_authorized(self.creator.value)
+        self._require_authorized(self.resolution_authority.value)
         outcome = outcome_index.as_uint64()
         self._assert_valid_outcome(outcome)
         self._resolve_dispute_core(outcome, ruling_hash.bytes, UInt64(1))
@@ -1258,7 +1238,7 @@ class QuestionMarket(ARC4Contract):
         ruling_hash: arc4.DynamicBytes,
     ) -> None:
         self._require_status(UInt64(STATUS_DISPUTED))
-        self._require_authorized(self.market_admin.value)
+        self._require_authorized(self.resolution_authority.value)
         outcome = outcome_index.as_uint64()
         self._assert_valid_outcome(outcome)
         self._resolve_dispute_core(outcome, ruling_hash.bytes, UInt64(2))
@@ -1440,11 +1420,11 @@ class QuestionMarket(ARC4Contract):
 __all__ = [
     "BOX_KEY_PENDING_PAYOUTS",
     "BOX_KEY_USER_COST_BASIS",
-    "BOX_KEY_USER_FEES",
     "BOX_KEY_USER_SHARES",
     "DEFAULT_LP_ENTRY_MAX_PRICE_FP",
     "MAX_OUTCOMES",
     "MIN_OUTCOMES",
+    "PENDING_PAYOUT_BOX_MBR",
     "PRICE_TOLERANCE_BASE",
     "QuestionMarket",
     "SHARE_UNIT",

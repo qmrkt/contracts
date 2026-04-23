@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 from pathlib import Path
 
@@ -8,11 +9,17 @@ import smart_contracts.market_factory.contract as factory_module
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 ARTIFACTS_DIR = ROOT_DIR / "smart_contracts" / "artifacts"
+AVM_PAGE_BYTES = 2048
 
 
 def _arc56_methods(path: Path) -> list[str]:
     data = json.loads(path.read_text(encoding="utf-8"))
     return [method["name"] for method in data.get("methods", [])]
+
+
+def _arc56_program_bytes(path: Path, program: str) -> int:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return len(base64.b64decode(data["byteCode"][program]))
 
 
 def test_market_app_arc56_includes_active_lp_surface() -> None:
@@ -60,3 +67,26 @@ def test_market_factory_schema_constants_track_market_artifact() -> None:
     assert schema["global"]["bytes"] == factory_module.QUESTION_MARKET_GLOBAL_BYTES
     assert schema["local"]["ints"] == factory_module.QUESTION_MARKET_LOCAL_UINTS
     assert schema["local"]["bytes"] == factory_module.QUESTION_MARKET_LOCAL_BYTES
+
+
+def test_generated_programs_fit_avm_page_limits() -> None:
+    expected_page_counts = {
+        "market_app/QuestionMarket.arc56.json": 1 + factory_module.QUESTION_MARKET_EXTRA_PAGES,
+        "market_factory/MarketFactory.arc56.json": 1,
+        "protocol_config/ProtocolConfig.arc56.json": 1,
+    }
+
+    for relative_path, page_count in expected_page_counts.items():
+        artifact = ARTIFACTS_DIR / relative_path
+        approval_size = _arc56_program_bytes(artifact, "approval")
+        clear_size = _arc56_program_bytes(artifact, "clear")
+        approval_limit = page_count * AVM_PAGE_BYTES
+
+        assert approval_size <= approval_limit, (
+            f"{relative_path} approval program is {approval_size} bytes, "
+            f"exceeding {approval_limit} bytes ({page_count} AVM pages)"
+        )
+        assert clear_size <= AVM_PAGE_BYTES, (
+            f"{relative_path} clear-state program is {clear_size} bytes, "
+            f"exceeding {AVM_PAGE_BYTES} bytes"
+        )

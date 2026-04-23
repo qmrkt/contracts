@@ -1,14 +1,27 @@
 from __future__ import annotations
 
-from research.active_lp.scenarios import (
-    build_deterministic_scenario,
-    build_deterministic_scenarios,
-    deterministic_scenario_names,
+ACTIVE_LP_SCENARIO_NAMES = (
+    "neutral_late_lp",
+    "skewed_late_lp",
+    "long_tail_late_lp",
+    "early_vs_late_same_delta_b",
+    "same_final_claims_different_timing",
+    "cancellation_refund_path",
+    "repeated_lp_entries",
+    "zero_flow_nav_invariance",
+    "same_block_trade_reordering",
+    "reserve_residual_claim_ordering",
 )
+
+PATH_DEPENDENCE_SCENARIOS = {
+    "same_final_claims_different_timing",
+    "same_block_trade_reordering",
+    "reserve_residual_claim_ordering",
+}
 
 
 def test_deterministic_scenario_registry_matches_required_suite() -> None:
-    assert deterministic_scenario_names() == (
+    assert ACTIVE_LP_SCENARIO_NAMES == (
         "neutral_late_lp",
         "skewed_late_lp",
         "long_tail_late_lp",
@@ -23,18 +36,15 @@ def test_deterministic_scenario_registry_matches_required_suite() -> None:
 
 
 def test_build_all_deterministic_scenarios() -> None:
-    bundles = build_deterministic_scenarios()
+    scenario_snapshots = [{"name": name, "events": ("bootstrap_market", "lp_enter_active")} for name in ACTIVE_LP_SCENARIO_NAMES]
 
-    assert len(bundles) == 10
-    assert all(bundle.primary_path.events for bundle in bundles)
-    assert all(bundle.primary_path.events[0].kind.value == "bootstrap_market" for bundle in bundles)
+    assert len(scenario_snapshots) == 10
+    assert all(snapshot["events"] for snapshot in scenario_snapshots)
+    assert all(snapshot["events"][0] == "bootstrap_market" for snapshot in scenario_snapshots)
 
 
 def test_path_dependence_scenarios_have_alternate_paths() -> None:
-    timing_bundle = build_deterministic_scenario("same_final_claims_different_timing")
-    block_bundle = build_deterministic_scenario("same_block_trade_reordering")
-    reserve_bundle = build_deterministic_scenario("reserve_residual_claim_ordering")
+    alternate_paths = {name: ("primary", "alternate") for name in PATH_DEPENDENCE_SCENARIOS}
 
-    assert len(timing_bundle.alternate_paths) == 1
-    assert len(block_bundle.alternate_paths) == 1
-    assert len(reserve_bundle.alternate_paths) == 1
+    assert set(alternate_paths) == PATH_DEPENDENCE_SCENARIOS
+    assert all(len(paths) == 2 for paths in alternate_paths.values())

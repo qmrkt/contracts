@@ -7,11 +7,9 @@ from algopy_testing import algopy_testing_context
 import smart_contracts.market_app.contract as contract_module
 from smart_contracts.market_app.contract import (
     BOX_KEY_USER_COST_BASIS,
-    BOX_KEY_USER_FEES,
     BOX_KEY_USER_SHARES,
     COST_BOX_MBR,
     DEFAULT_LP_ENTRY_MAX_PRICE_FP,
-    FEE_BOX_MBR,
     MAX_COMMENT_BYTES,
     PRICE_TOLERANCE_BASE,
     QuestionMarket,
@@ -109,6 +107,7 @@ def create_contract(
     proposal_bond_cap: int = 100_000_000,
     proposer_fee_bps: int = 0,
     proposer_fee_floor_bps: int = 0,
+    grace_period_secs: int = 3_600,
 ) -> None:
     txn_sender = sender or creator
     admin = market_admin or creator
@@ -139,7 +138,7 @@ def create_contract(
         blueprint_cid=arc4.DynamicBytes(blueprint_cid),
         challenge_window_secs=arc4.UInt64(challenge_window_secs),
         resolution_authority=arc4.Address(resolver),
-        grace_period_secs=arc4.UInt64(3_600),
+        grace_period_secs=arc4.UInt64(grace_period_secs),
         market_admin=arc4.Address(admin),
         protocol_config_id=arc4.UInt64(PROTOCOL_CONFIG_APP_ID),
         cancellable=arc4.Bool(cancellable),
@@ -170,12 +169,7 @@ def make_usdc_payment(context, contract: QuestionMarket, sender: str, amount: in
 
 
 def make_mbr_payment(context, contract: QuestionMarket, sender: str, amount: int):
-    """ALGO Payment funding MBR top-up for a box-creating method call.
-
-    Pass SHARE_BOX_MBR + COST_BOX_MBR for a first-time buy, FEE_BOX_MBR for a
-    first-time LP-settling call (enter_lp_active / claim_lp_fees / withdraw_lp_fees).
-    Pass 0 for repeat calls (existing boxes, no new MBR required).
-    """
+    """ALGO Payment funding MBR top-up for a box-creating method call."""
     zero = Global.zero_address
     return context.any.txn.payment(
         sender=Account(sender),
@@ -279,10 +273,6 @@ def contract_q(contract: QuestionMarket) -> list[int]:
 def contract_user_shares(contract: QuestionMarket, sender: str, outcome_index: int) -> int:
     key = op.concat(Account(sender).bytes, op.itob(UInt64(outcome_index)))
     return int(contract.user_outcome_shares_box.get(key, default=UInt64(0)))
-
-
-def contract_claimable_fees(contract: QuestionMarket, sender: str) -> int:
-    return int(contract.user_claimable_fees_box.get(Account(sender).bytes, default=UInt64(0)))
 
 
 def contract_withdrawable_fee_surplus(contract: QuestionMarket, sender: str) -> int:
@@ -723,8 +713,7 @@ def test_contract_trade_and_active_lp_paths_match_greenfield_semantics(disable_a
             latest_timestamp=6_001,
         )
 
-        # Both creator and lp2 have never settled fees before — uf: box doesn't
-        # exist yet for either, so both must pay FEE_BOX_MBR on first claim.
+        # Both creator and lp2 settle LP fees into local withdrawable balances.
         call_as(context, creator, contract.claim_lp_fees, latest_timestamp=6_001)
         call_as(context, lp2, contract.claim_lp_fees, latest_timestamp=6_002)
         assert contract_withdrawable_fee_surplus(contract, creator) >= 0
@@ -1049,6 +1038,41 @@ def test_contract_resolution_authority_can_propose_with_zero_bond(disable_arc4_e
         assert int(contract.proposer_bond_held.value) == 0
 
 
+def test_contract_resolution_authority_propose_does_not_evaluate_overflowing_grace(disable_arc4_emit) -> None:
+    creator = make_address()
+    resolver = make_address()
+
+    with algopy_testing_context() as context:
+        contract = QuestionMarket()
+        create_contract(
+            context,
+            contract,
+            creator=creator,
+            resolver=resolver,
+            grace_period_secs=(1 << 64) - 1,
+        )
+        ensure_blueprint_cid(contract)
+        seed_usdc_balance(context, resolver, 0)
+
+        payment = make_usdc_payment(context, contract, creator, 200_000_000)
+        call_as(context, creator, contract.bootstrap, arc4.UInt64(200_000_000), payment, latest_timestamp=1)
+        call_as(context, creator, contract.trigger_resolution, latest_timestamp=10_000)
+
+        zero_payment = make_usdc_payment(context, contract, resolver, 0)
+        call_as(
+            context,
+            resolver,
+            contract.propose_resolution,
+            arc4.UInt64(0),
+            arc4.DynamicBytes(b"e" * 32),
+            zero_payment,
+            latest_timestamp=10_001,
+        )
+
+        assert int(contract.status.value) == STATUS_RESOLUTION_PROPOSED
+        assert contract.proposer.value == Account(resolver).bytes
+
+
 def test_contract_open_proposer_underbonded_after_grace_period_fails(disable_arc4_emit) -> None:
     creator = make_address()
     resolver = make_address()
@@ -1186,6 +1210,41 @@ def test_contract_finalize_dispute_credits_pending_payout_even_without_receiver_
         assert contract_pending_payout(contract, challenger) == 0
 
 
+def test_contract_creator_and_admin_dispute_paths_require_resolution_authority(disable_arc4_emit) -> None:
+    creator = make_address()
+    resolver = make_address()
+    admin = make_address()
+    challenger = make_address()
+
+    with algopy_testing_context() as context:
+        contract = QuestionMarket()
+        create_contract(context, contract, creator=creator, resolver=resolver, market_admin=admin)
+        ensure_blueprint_cid(contract)
+        seed_usdc_balance(context, resolver, 20_000_000)
+        seed_usdc_balance(context, challenger, 20_000_000)
+
+        payment = make_usdc_payment(context, contract, creator, 200_000_000)
+        call_as(context, creator, contract.bootstrap, arc4.UInt64(200_000_000), payment, latest_timestamp=1)
+        call_as(context, creator, contract.trigger_resolution, latest_timestamp=10_000)
+
+        propose_payment = make_usdc_payment(context, contract, resolver, 10_000_000)
+        call_as(context, resolver, contract.propose_resolution, arc4.UInt64(0), arc4.DynamicBytes(b"e" * 32), propose_payment, latest_timestamp=10_001)
+        challenge_payment = make_usdc_payment(context, contract, challenger, required_bond(contract, proposal=False))
+        call_as(
+            context, challenger, contract.challenge_resolution,
+            challenge_payment, arc4.UInt64(1), arc4.DynamicBytes(b"c" * 32),
+            latest_timestamp=10_002,
+        )
+
+        with pytest.raises(AssertionError):
+            call_as(context, creator, contract.creator_resolve_dispute, arc4.UInt64(0), arc4.DynamicBytes(b"r" * 32), latest_timestamp=10_003)
+        with pytest.raises(AssertionError):
+            call_as(context, admin, contract.admin_resolve_dispute, arc4.UInt64(0), arc4.DynamicBytes(b"r" * 32), latest_timestamp=10_004)
+
+        call_as(context, resolver, contract.creator_resolve_dispute, arc4.UInt64(0), arc4.DynamicBytes(b"r" * 32), latest_timestamp=10_005)
+        assert int(contract.status.value) == STATUS_RESOLVED
+
+
 def test_contract_confirmed_dispute_pays_proposer_fee_once(disable_arc4_emit) -> None:
     creator = make_address()
     resolver = make_address()
@@ -1224,7 +1283,7 @@ def test_contract_confirmed_dispute_pays_proposer_fee_once(disable_arc4_emit) ->
             arc4.DynamicBytes(b"c" * 32),
             latest_timestamp=10_002,
         )
-        call_as(context, creator, contract.creator_resolve_dispute, arc4.UInt64(0), arc4.DynamicBytes(b"r" * 32), latest_timestamp=10_003)
+        call_as(context, resolver, contract.creator_resolve_dispute, arc4.UInt64(0), arc4.DynamicBytes(b"r" * 32), latest_timestamp=10_003)
 
         assert contract_pending_payout(contract, resolver) == 10_000_000 + 5_000_000 + expected_fee
         assert int(contract.resolution_budget_balance.value) == bootstrap_budget - expected_fee
@@ -1581,7 +1640,7 @@ def test_contract_dispute_confirmation_routes_half_losing_bond_to_sink(disable_a
         )
 
         protocol_fees_before = int(contract.protocol_fee_balance.value)
-        call_as(context, creator, contract.creator_resolve_dispute, arc4.UInt64(0), arc4.DynamicBytes(b"r" * 32), latest_timestamp=10_003)
+        call_as(context, resolver, contract.creator_resolve_dispute, arc4.UInt64(0), arc4.DynamicBytes(b"r" * 32), latest_timestamp=10_003)
 
         assert int(contract.status.value) == STATUS_RESOLVED
         assert int(contract.protocol_fee_balance.value) == protocol_fees_before

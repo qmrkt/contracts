@@ -710,7 +710,7 @@ class MarketAppModel:
 
     def creator_resolve_dispute(self, *, sender: str, outcome_index: int, ruling_hash: bytes) -> None:
         self._require_status(STATUS_DISPUTED)
-        self._require_authorized(sender, self.creator, "only creator may resolve dispute")
+        self._require_authorized(sender, self.resolution_authority, "only resolution authority may resolve dispute")
         self._assert_valid_outcome(outcome_index)
         original_proposal = self.proposed_outcome
         bond_settlement = self._settle_dispute_and_credit(outcome_index, original_proposal)
@@ -732,7 +732,7 @@ class MarketAppModel:
 
     def admin_resolve_dispute(self, *, sender: str, outcome_index: int, ruling_hash: bytes) -> None:
         self._require_status(STATUS_DISPUTED)
-        self._require_authorized(sender, self.market_admin, "only market admin may resolve dispute")
+        self._require_authorized(sender, self.resolution_authority, "only resolution authority may resolve dispute")
         self._assert_valid_outcome(outcome_index)
         original_proposal = self.proposed_outcome
         bond_settlement = self._settle_dispute_and_credit(outcome_index, original_proposal)

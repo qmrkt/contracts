@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from smart_contracts.market_app.active_lp_model import ActiveLpMarketAppModel
 from smart_contracts.market_app.model import MarketAppModel
 
 CONTRACT_SOURCE = Path(__file__).resolve().parents[1] / "smart_contracts" / "market_app" / "contract.py"
@@ -31,6 +32,31 @@ def make_market(*, num_outcomes: int = 3, deadline: int = 10_000, cancellable: b
         grace_period_secs=3_600,
         market_admin="admin",
         cancellable=cancellable,
+    )
+
+
+def make_active_lp_market(*, num_outcomes: int = 3, deadline: int = 10_000) -> ActiveLpMarketAppModel:
+    return ActiveLpMarketAppModel(
+        creator="creator",
+        currency_asa=31566704,
+        outcome_asa_ids=[1000 + i for i in range(num_outcomes)],
+        b=100_000_000,
+        lp_fee_bps=200,
+        protocol_fee_bps=50,
+        deadline=deadline,
+        question_hash=b"q" * 32,
+        main_blueprint_hash=b"b" * 32,
+        dispute_blueprint_hash=b"d" * 32,
+        challenge_window_secs=86_400,
+        protocol_config_id=77,
+        factory_id=88,
+        resolution_authority="resolver",
+        challenge_bond=10_000_000,
+        proposal_bond=10_000_000,
+        proposer_fee_bps=0,
+        proposer_fee_floor_bps=0,
+        grace_period_secs=3_600,
+        market_admin="admin",
     )
 
 
