@@ -1,7 +1,7 @@
 import algosdk.account
 import algosdk.logic
 import pytest
-from algopy import Account, Application, Asset, Bytes, OnCompleteAction, UInt64, arc4, op
+from algopy import Account, Application, Asset, Bytes, Global, OnCompleteAction, UInt64, arc4, op
 from algopy_testing import algopy_testing_context
 
 import smart_contracts.market_app.contract as contract_module
@@ -9,10 +9,13 @@ from smart_contracts.market_app.contract import (
     BOX_KEY_USER_COST_BASIS,
     BOX_KEY_USER_FEES,
     BOX_KEY_USER_SHARES,
+    COST_BOX_MBR,
     DEFAULT_LP_ENTRY_MAX_PRICE_FP,
+    FEE_BOX_MBR,
     MAX_COMMENT_BYTES,
     PRICE_TOLERANCE_BASE,
     QuestionMarket,
+    SHARE_BOX_MBR,
     SHARE_UNIT,
     STATUS_ACTIVE,
     STATUS_CANCELLED,
@@ -163,6 +166,23 @@ def make_usdc_payment(context, contract: QuestionMarket, sender: str, amount: in
         asset_receiver=Account(get_app_address(contract)),
         xfer_asset=Asset(CURRENCY_ASA),
         asset_amount=UInt64(amount),
+    )
+
+
+def make_mbr_payment(context, contract: QuestionMarket, sender: str, amount: int):
+    """ALGO Payment funding MBR top-up for a box-creating method call.
+
+    Pass SHARE_BOX_MBR + COST_BOX_MBR for a first-time buy, FEE_BOX_MBR for a
+    first-time LP-settling call (enter_lp_active / claim_lp_fees / withdraw_lp_fees).
+    Pass 0 for repeat calls (existing boxes, no new MBR required).
+    """
+    zero = Global.zero_address
+    return context.any.txn.payment(
+        sender=Account(sender),
+        receiver=Account(get_app_address(contract)),
+        amount=UInt64(amount),
+        rekey_to=zero,
+        close_remainder_to=zero,
     )
 
 
@@ -469,6 +489,7 @@ def test_contract_post_comment_emits_for_lp_and_holder(monkeypatch) -> None:
             arc4.UInt64(SHARE_UNIT),
             arc4.UInt64(10_000_000),
             buy_payment,
+            make_mbr_payment(context, contract, holder, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_000,
         )
         call_as(context, holder, contract.post_comment, arc4.String("holder comment"), latest_timestamp=5_001)
@@ -526,6 +547,7 @@ def test_contract_post_comment_holder_path_skips_lp_local_state(disable_arc4_emi
             arc4.UInt64(SHARE_UNIT),
             arc4.UInt64(10_000_000),
             buy_payment,
+            make_mbr_payment(context, contract, holder, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_000,
         )
 
@@ -640,6 +662,7 @@ def test_contract_trade_and_active_lp_paths_match_greenfield_semantics(disable_a
             arc4.UInt64(SHARE_UNIT),
             arc4.UInt64(10_000_000),
             buy_payment,
+            make_mbr_payment(context, contract, buyer, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_000,
         )
         post_buy_pool = int(contract.pool_balance.value)
@@ -696,9 +719,12 @@ def test_contract_trade_and_active_lp_paths_match_greenfield_semantics(disable_a
             arc4.UInt64(SHARE_UNIT),
             arc4.UInt64(10_000_000),
             followup_payment,
+            make_mbr_payment(context, contract, followup_buyer, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=6_001,
         )
 
+        # Both creator and lp2 have never settled fees before — uf: box doesn't
+        # exist yet for either, so both must pay FEE_BOX_MBR on first claim.
         call_as(context, creator, contract.claim_lp_fees, latest_timestamp=6_001)
         call_as(context, lp2, contract.claim_lp_fees, latest_timestamp=6_002)
         assert contract_withdrawable_fee_surplus(contract, creator) >= 0
@@ -732,6 +758,7 @@ def test_contract_buy_refunds_surplus_payment(disable_arc4_emit) -> None:
             arc4.UInt64(SHARE_UNIT),
             arc4.UInt64(10_000_000),
             buy_payment,
+            make_mbr_payment(context, contract, buyer, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_000,
         )
 
@@ -771,6 +798,7 @@ def test_contract_resolved_claim_is_one_to_one_and_lp_can_claim_residual(disable
             arc4.UInt64(SHARE_UNIT),
             arc4.UInt64(10_000_000),
             winning_buy,
+            make_mbr_payment(context, contract, winner, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_000,
         )
         call_as(
@@ -781,6 +809,7 @@ def test_contract_resolved_claim_is_one_to_one_and_lp_can_claim_residual(disable
             arc4.UInt64(SHARE_UNIT),
             arc4.UInt64(10_000_000),
             losing_buy,
+            make_mbr_payment(context, contract, loser, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_001,
         )
 
@@ -847,6 +876,7 @@ def test_contract_multi_share_buy_and_sell_single_call_paths(disable_arc4_emit) 
             arc4.UInt64(buy_shares),
             arc4.UInt64(50_000_000),
             buy_payment,
+            make_mbr_payment(context, contract, buyer, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_000,
         )
 
@@ -894,6 +924,7 @@ def test_contract_sell_rejects_oversell_amount(disable_arc4_emit) -> None:
             arc4.UInt64(held_shares),
             arc4.UInt64(50_000_000),
             buy_payment,
+            make_mbr_payment(context, contract, seller, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_000,
         )
 
@@ -1321,6 +1352,7 @@ def test_contract_resolution_claim_and_refund_paths_match_model(disable_arc4_emi
             arc4.UInt64(SHARE_UNIT),
             arc4.UInt64(10_000_000),
             buy_payment,
+            make_mbr_payment(context, contract, winner, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_000,
         )
         pre_claim_pool = int(contract.pool_balance.value)
@@ -1367,6 +1399,7 @@ def test_contract_resolution_claim_and_refund_paths_match_model(disable_arc4_emi
             arc4.UInt64(SHARE_UNIT),
             arc4.UInt64(10_000_000),
             buy_payment,
+            make_mbr_payment(context, contract, winner, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_000,
         )
         cost_basis_before = contract_user_cost_basis(contract, winner, 1)
@@ -1433,6 +1466,7 @@ def test_contract_multi_share_claim_and_refund_single_call_paths(disable_arc4_em
             arc4.UInt64(winning_shares),
             arc4.UInt64(50_000_000),
             winner_buy_payment,
+            make_mbr_payment(context, contract, winner, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_000,
         )
 
@@ -1445,6 +1479,7 @@ def test_contract_multi_share_claim_and_refund_single_call_paths(disable_arc4_em
             arc4.UInt64(SHARE_UNIT),
             arc4.UInt64(10_000_000),
             losing_buy_payment,
+            make_mbr_payment(context, contract, buyer, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_001,
         )
 
@@ -1498,6 +1533,7 @@ def test_contract_multi_share_claim_and_refund_single_call_paths(disable_arc4_em
             arc4.UInt64(held_shares),
             arc4.UInt64(50_000_000),
             buy_payment,
+            make_mbr_payment(context, contract, buyer, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_000,
         )
         basis_before = contract_user_cost_basis(contract, buyer, 2)
@@ -1646,6 +1682,7 @@ def test_contract_abort_early_resolution_reopens_active_before_deadline(disable_
             arc4.UInt64(SHARE_UNIT),
             arc4.UInt64(10_000_000),
             buy_payment,
+            make_mbr_payment(context, contract, trader, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_000,
         )
 
@@ -1699,6 +1736,7 @@ def test_contract_abort_early_resolution_reopens_active_before_deadline(disable_
             arc4.UInt64(SHARE_UNIT),
             arc4.UInt64(10_000_000),
             reopened_buy,
+            make_mbr_payment(context, contract, trader, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=9_993,
         )
         assert contract_user_shares(contract, trader, 1) == SHARE_UNIT
@@ -1790,6 +1828,7 @@ def test_contract_cancelled_lp_residual_claim_preserves_refund_reserve(disable_a
             arc4.UInt64(SHARE_UNIT),
             arc4.UInt64(10_000_000),
             buy_payment,
+            make_mbr_payment(context, contract, trader, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_000,
         )
         trader_basis = contract_user_cost_basis(contract, trader, 0)
@@ -1842,6 +1881,7 @@ def test_contract_enter_lp_active_handles_large_amounts_without_overflow(disable
             arc4.UInt64(SHARE_UNIT),
             arc4.UInt64(10_000_000),
             buy_payment,
+            make_mbr_payment(context, contract, trader, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_000,
         )
 
@@ -1890,6 +1930,7 @@ def test_contract_claim_lp_residual_handles_large_resolved_pool_without_overflow
             arc4.UInt64(SHARE_UNIT),
             arc4.UInt64(10_000_000),
             buy_payment,
+            make_mbr_payment(context, contract, winner, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_000,
         )
         call_as(context, creator, contract.trigger_resolution, latest_timestamp=10_000)
@@ -1938,6 +1979,7 @@ def test_contract_claim_lp_residual_handles_large_cancelled_pool_without_overflo
             arc4.UInt64(SHARE_UNIT),
             arc4.UInt64(10_000_000),
             buy_payment,
+            make_mbr_payment(context, contract, trader, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_000,
         )
         trader_basis = contract_user_cost_basis(contract, trader, 0)
@@ -1974,6 +2016,7 @@ def test_contract_claim_handles_large_pool_without_overflow(disable_arc4_emit) -
             arc4.UInt64(SHARE_UNIT),
             arc4.UInt64(10_000_000),
             buy_payment,
+            make_mbr_payment(context, contract, winner, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_000,
         )
 
@@ -2032,6 +2075,7 @@ def test_withdraw_protocol_fees_sends_to_stored_treasury(disable_arc4_emit) -> N
             arc4.UInt64(SHARE_UNIT),
             arc4.UInt64(10_000_000),
             buy_payment,
+            make_mbr_payment(context, contract, trader, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_000,
         )
 

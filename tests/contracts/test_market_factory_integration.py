@@ -2,17 +2,20 @@ from __future__ import annotations
 
 import algosdk.logic
 
-from algopy import Account, Application, Asset, UInt64, arc4
+from algopy import Account, Application, Asset, Global, UInt64, arc4
 from algopy_testing import algopy_testing_context
 
 import smart_contracts.market_factory.contract as factory_module
 import smart_contracts.market_app.contract as market_app_module
 from smart_contracts.lmsr_math import lmsr_prices as reference_lmsr_prices
 from smart_contracts.market_app.contract import (
+    COST_BOX_MBR,
     DEFAULT_LP_ENTRY_MAX_PRICE_FP,
     DEFAULT_RESIDUAL_LINEAR_LAMBDA_FP,
+    FEE_BOX_MBR,
     PRICE_TOLERANCE_BASE,
     QuestionMarket,
+    SHARE_BOX_MBR,
     STATUS_ACTIVE,
     STATUS_RESOLVED,
 )
@@ -45,6 +48,18 @@ def make_usdc_payment(context, contract: QuestionMarket, sender: str, amount: in
         asset_receiver=Account(get_app_address(contract)),
         xfer_asset=Asset(CURRENCY_ASA),
         asset_amount=UInt64(amount),
+    )
+
+
+def make_mbr_payment(context, contract: QuestionMarket, sender: str, amount: int):
+    """ALGO Payment funding MBR top-up for a box-creating method call."""
+    zero = Global.zero_address
+    return context.any.txn.payment(
+        sender=Account(sender),
+        receiver=Account(get_app_address(contract)),
+        amount=UInt64(amount),
+        rekey_to=zero,
+        close_remainder_to=zero,
     )
 
 
@@ -124,6 +139,7 @@ def test_factory_created_market_passes_c2_lifecycle(disable_arc4_emit, monkeypat
             arc4.UInt64(market_app_module.SHARE_UNIT),
             arc4.UInt64(10_000_000),
             buy_payment,
+            make_mbr_payment(context, market, buyer, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_000,
         )
 
@@ -224,6 +240,7 @@ def test_factory_created_market_bootstraps_and_enters_active_lp(disable_arc4_emi
             arc4.UInt64(market_app_module.SHARE_UNIT),
             arc4.UInt64(10_000_000),
             buy_payment,
+            make_mbr_payment(context, market, buyer, SHARE_BOX_MBR + COST_BOX_MBR),
             latest_timestamp=5_000,
         )
 

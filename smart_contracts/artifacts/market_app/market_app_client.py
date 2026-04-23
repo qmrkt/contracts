@@ -71,6 +71,7 @@ class QuestionMarket(algopy.arc4.ARC4Client, typing.Protocol):
         shares: algopy.arc4.UIntN[typing.Literal[64]],
         max_cost: algopy.arc4.UIntN[typing.Literal[64]],
         payment: algopy.gtxn.AssetTransferTransaction,
+        mbr_payment: algopy.gtxn.PaymentTransaction,
     ) -> None: ...
 
     @algopy.arc4.abimethod

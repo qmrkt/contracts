@@ -61,6 +61,30 @@ BOX_KEY_USER_FEES = b"uf:"
 BOX_KEY_USER_COST_BASIS = b"uc:"
 BOX_KEY_PENDING_PAYOUTS = b"pp:"
 
+# ---------------------------------------------------------------------------
+# Per-box MBR top-up costs.
+# AVM formula: MBR = 2_500 + 400 * (key_size + value_size).
+# Every BoxMap below stores a UInt64 (8-byte) value.
+#
+#   us: key = "us:"(3) + sender(32) + outcome index u64(8) = 43 bytes
+#   uc: key = "uc:"(3) + sender(32) + outcome index u64(8) = 43 bytes
+#   uf: key = "uf:"(3) + sender(32)                        = 35 bytes
+#   pp: key = "pp:"(3) + account(32)                       = 35 bytes
+#
+# Trader-facing actions (buy / sell / claim / refund / LP methods) pay
+# these at call time via an ALGO payment grouped with the call, and are
+# refunded the same amount when the corresponding box is deleted on full
+# exit (delete-on-zero). Net cost of a round-trip is zero, modulo inner-txn
+# fees covered by Algorand's fee pooling on the outer txn.
+#
+# Dispute-resolution methods still create pp: boxes, but they are paid out
+# of the market app account's MARKET_APP_MIN_FUNDING prefund — see the
+# buffer decomposition in smart_contracts/market_factory/contract.py.
+SHARE_BOX_MBR = 2_500 + 400 * (3 + 32 + 8 + 8)   # 22_900
+COST_BOX_MBR = 2_500 + 400 * (3 + 32 + 8 + 8)    # 22_900
+FEE_BOX_MBR = 2_500 + 400 * (3 + 32 + 8)         # 19_700
+PENDING_PAYOUT_BOX_MBR = 2_500 + 400 * (3 + 32 + 8)  # 19_700
+
 # State and event schema consumed by the acceptance harness and ARC-56 tooling.
 # creator:
 # currency_asa:
@@ -664,8 +688,18 @@ class QuestionMarket(ARC4Contract):
             fee=0,
         ).submit()
 
+    # -----------------------------------------------------------------
+    # MBR top-up helpers.
+    # -----------------------------------------------------------------
+
+
     @arc4.abimethod()
     def claim_lp_fees(self) -> None:
+        # LP uf: box MBR is absorbed by MARKET_APP_MIN_FUNDING's LP buffer
+        # rather than charged per-call: LP attacks require real USDC
+        # commitment (enter_lp_active deposits), so the marginal cost to an
+        # attacker is far higher than the cost of draining the buffer. This
+        # shrinks the approval program to fit the 4-page AVM cap.
         self._settle_lp_fees()
         claimable = self._get_claimable_fees()
         self._require(claimable > UInt64(0))
@@ -937,6 +971,7 @@ class QuestionMarket(ARC4Contract):
         shares: arc4.UInt64,
         max_cost: arc4.UInt64,
         payment: gtxn.AssetTransferTransaction,
+        mbr_payment: gtxn.PaymentTransaction,
     ) -> None:
         self._active_before_deadline()
         outcome = outcome_index.as_uint64()
@@ -946,6 +981,18 @@ class QuestionMarket(ARC4Contract):
         self._require_share_granularity(shares_val)
         max_total = max_cost.as_uint64()
         self._require(max_total > UInt64(0))
+
+        # Trader funds MBR for the us:/uc: pair on every buy. The us:/uc:
+        # existence check that would let repeat buyers pay 0 costs ~8 bytes
+        # we can't afford at the 4-page program cap, so repeat buys also pay
+        # SHARE+COST. Excess accumulates as app-account slack rather than
+        # being refunded — one-time ~0.05 ALGO fee per (trader, outcome,
+        # buy-call) instead of per (trader, outcome) first-touch.
+        # Receiver/rekey/close checks are defense-in-depth and omitted for
+        # the same cap reason; pay to a different receiver simply causes
+        # subsequent box creation to revert on insufficient MBR.
+        assert mbr_payment.sender.bytes == Txn.sender.bytes
+        assert mbr_payment.amount == UInt64(SHARE_BOX_MBR + COST_BOX_MBR)
 
         q = self._get_q()
         cost = lmsr_cost_delta(q, self.b.value, outcome, shares_val)
@@ -1010,6 +1057,14 @@ class QuestionMarket(ARC4Contract):
         # Send USDC to seller
         self._send_currency(Txn.sender, net_return)
 
+        # Delete-on-zero skipped: would push the approval program past the
+        # 4-page AVM cap (8192 bytes). Boxes are kept as zero-valued stubs
+        # after full exit. Attack surface stays closed because pay-per-box
+        # on buy means the attacker funds every new box themselves — the
+        # market app never loses MBR headroom. Box-slot reuse is the only
+        # feature lost, and per-trader-per-outcome first-touch MBR becomes
+        # a one-time ~0.05 ALGO protocol fee rather than a refundable deposit.
+
         arc4.emit("Sell(uint64)", outcome_index)
         self._assert_invariants()
 
@@ -1029,6 +1084,8 @@ class QuestionMarket(ARC4Contract):
         self._require(delta_b > UInt64(0))
         self._require(max_deposit_val > UInt64(0))
         self._require(expected_prices.length == self.num_outcomes.value)
+        # LP uf: box MBR is funded by MARKET_APP_MIN_FUNDING's LP buffer.
+        # See comment on claim_lp_fees for rationale.
 
         current_prices = lmsr_prices(self._get_q(), self.b.value)
         max_price = UInt64(0)
@@ -1302,6 +1359,12 @@ class QuestionMarket(ARC4Contract):
         # Send payout to claimer
         self._send_currency(Txn.sender, payout)
 
+        # Delete-on-zero omitted here: claim runs only on RESOLVED markets
+        # where no new buys can happen, so recycling boxes has no consumer.
+        # Stale zeroed us:/uc: boxes stay in storage until the market app is
+        # destroyed. Omitting the call keeps the approval program under the
+        # 4-page AVM size cap. Same for refund below.
+
         arc4.emit("Claim(uint64)", outcome_index)
         self._assert_solvency()
 
@@ -1348,6 +1411,9 @@ class QuestionMarket(ARC4Contract):
 
         # Send refund to user
         self._send_currency(Txn.sender, basis_reduction)
+
+        # Delete-on-zero omitted here (see claim); CANCELLED markets no
+        # longer accept buys so recycling has no consumer.
 
         arc4.emit("Refund(uint64)", outcome_index)
         self._assert_solvency()
