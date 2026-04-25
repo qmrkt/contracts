@@ -1,0 +1,57 @@
+bounty_submission:
+  target_repository: "Tusharkhadde/contracts"
+  platform: "devloot"
+  reward_total_eligible: 500
+  currency: "USDC"
+  findings:
+    - id: "BUG-001"
+      title: "Permanent Lock of Bootstrapper LP Shares"
+      severity: "High"
+      impact: "Permanent lock of creator funds (LP shares and residuals)"
+      category: "Logic Error / Access Control"
+      repro_script: "audit/bug2_bootstrap_lp_shares_stuck.py"
+      acceptance_criteria_met: true
+
+    - id: "BUG-002"
+      title: "Critical Double-Spend / Transaction Index Reuse"
+      severity: "Critical"
+      impact: "Complete theft of pool funds via asset transfer reuse"
+      category: "Input Validation / Transaction Grouping"
+      repro_script: "audit/bug2_gtxn_double_spend.py"
+      acceptance_criteria_met: true
+
+    - id: "BUG-003"
+      title: "Risk-Free Value Extraction (LP Sniping)"
+      severity: "High"
+      impact: "Theft of safety slack/fees from existing LPs"
+      category: "Economic Logic / Mathematical Flaw"
+      repro_script: "audit/bug3_lp_sniping.py"
+      acceptance_criteria_met: true
+
+    - id: "BUG-004"
+      title: "LP Fee Dust Rounding / Permanent Lock"
+      severity: "Medium-High"
+      impact: "Permanent lock of LP fee revenue due to integer precision loss"
+      category: "Mathematical Flaw / Precision Loss"
+      repro_script: "audit/bug4_dust_fee_lock.py"
+      acceptance_criteria_met: true
+
+    - id: "BUG-005"
+      title: "Terminal Stuck State in Post-Deadline Abort"
+      severity: "High"
+      impact: "Permanent lock of 100% of market funds (Zombification)"
+      category: "State Machine / Logic Error"
+      repro_script: "audit/bug5_stuck_dispute.py"
+      acceptance_criteria_met: true
+
+tech_stack:
+  - Algorand
+  - AlgoPy
+  - AVM
+  - Python (Audit Scripts)
+tags:
+  - smart-contracts
+  - security
+  - blockchain
+  - bounty
+  - algorithmic-market-maker
