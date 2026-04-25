@@ -147,6 +147,7 @@ PENDING_PAYOUT_BOX_MBR = 2_500 + 400 * (3 + 32 + 8)  # 19_700
 # arc4.emit("Cancel()")
 # arc4.emit("Refund(uint64)")
 # arc4.emit("WithdrawPendingPayouts(uint64)")
+# arc4.emit("WithdrawDisputeSink(uint64)")
 # arc4.emit("CommentPosted(string)")
 
 
@@ -1366,6 +1367,15 @@ class QuestionMarket(ARC4Contract):
         self.protocol_fee_balance.value = UInt64(0)
         self._send_currency(Account(self.protocol_treasury.value), amount)
         arc4.emit("WithdrawFees(uint64)", arc4.UInt64(amount))
+
+    @arc4.abimethod()
+    def withdraw_dispute_sink(self) -> None:
+        """Withdraw accumulated dispute-sink balance to the configured protocol treasury."""
+        amount = self.dispute_sink_balance.value
+        self._require(amount > UInt64(0))
+        self.dispute_sink_balance.value = UInt64(0)
+        self._send_currency(Account(self.protocol_treasury.value), amount)
+        arc4.emit("WithdrawDisputeSink(uint64)", arc4.UInt64(amount))
 
     @arc4.abimethod()
     def refund(self, outcome_index: arc4.UInt64, shares: arc4.UInt64) -> None:
