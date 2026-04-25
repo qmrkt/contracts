@@ -9,7 +9,7 @@ bounty_submission:
       severity: "High"
       impact: "Permanent lock of creator funds (LP shares and residuals)"
       category: "Logic Error / Access Control"
-      repro_script: "audit/bug2_bootstrap_lp_shares_stuck.py"
+      repro_script: "audit/bug1_creator_shares_lock.py"
       acceptance_criteria_met: true
 
     - id: "BUG-002"
