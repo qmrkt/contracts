@@ -1360,10 +1360,11 @@ class QuestionMarket(ARC4Contract):
 
     @arc4.abimethod()
     def withdraw_protocol_fees(self) -> None:
-        """Withdraw accumulated protocol fees to the configured protocol treasury."""
-        amount = self.protocol_fee_balance.value
+        """Withdraw accumulated protocol fees and dispute-sink balance to the configured protocol treasury."""
+        amount = self.protocol_fee_balance.value + self.dispute_sink_balance.value
         self._require(amount > UInt64(0))
         self.protocol_fee_balance.value = UInt64(0)
+        self.dispute_sink_balance.value = UInt64(0)
         self._send_currency(Account(self.protocol_treasury.value), amount)
         arc4.emit("WithdrawFees(uint64)", arc4.UInt64(amount))
 

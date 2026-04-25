@@ -2154,3 +2154,45 @@ def test_withdraw_protocol_fees_sends_to_stored_treasury(disable_arc4_emit) -> N
         assert transfers[0].asset_receiver == Account(treasury)
         assert int(transfers[0].asset_amount) == accrued_protocol_fees
         assert usdc_balance(context, attacker) == attacker_before
+
+
+def test_withdraw_protocol_fees_drains_dispute_sink_to_treasury(disable_arc4_emit) -> None:
+    creator = make_address()
+    resolver = make_address()
+    challenger = make_address()
+    treasury = make_address()
+    attacker = make_address()
+
+    with algopy_testing_context() as context:
+        contract = QuestionMarket()
+        create_contract(context, contract, creator=creator, resolver=resolver, protocol_treasury=treasury)
+        register_outcome_asas(context, contract, creator)
+        ensure_blueprint_cid(contract)
+        seed_usdc_balance(context, treasury, 0)
+
+        payment = make_usdc_payment(context, contract, creator, 200_000_000)
+        call_as(context, creator, contract.bootstrap, arc4.UInt64(200_000_000), payment, latest_timestamp=1)
+        call_as(context, creator, contract.trigger_resolution, latest_timestamp=10_000)
+
+        propose_payment = make_usdc_payment(context, contract, resolver, 10_000_000)
+        call_as(context, resolver, contract.propose_resolution, arc4.UInt64(0), arc4.DynamicBytes(b"e" * 32), propose_payment, latest_timestamp=10_001)
+        challenge_payment = make_usdc_payment(context, contract, challenger, required_bond(contract, proposal=False))
+        call_as(
+            context, challenger, contract.challenge_resolution,
+            challenge_payment, arc4.UInt64(1), arc4.DynamicBytes(b"c" * 32),
+            latest_timestamp=10_002,
+        )
+        call_as(context, resolver, contract.creator_resolve_dispute, arc4.UInt64(0), arc4.DynamicBytes(b"r" * 32), latest_timestamp=10_003)
+
+        sink_accrued = int(contract.dispute_sink_balance.value)
+        protocol_fees_before = int(contract.protocol_fee_balance.value)
+        assert sink_accrued > 0
+
+        call_as(context, attacker, contract.withdraw_protocol_fees, latest_timestamp=10_004)
+
+        transfers = last_inner_asset_transfers(context)
+        assert int(contract.dispute_sink_balance.value) == 0
+        assert int(contract.protocol_fee_balance.value) == 0
+        assert len(transfers) == 1
+        assert transfers[0].asset_receiver == Account(treasury)
+        assert int(transfers[0].asset_amount) == sink_accrued + protocol_fees_before
