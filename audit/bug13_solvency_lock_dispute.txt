@@ -1,0 +1,274 @@
+﻿================================================================================
+     BUG BOUNTY REPORT ΓÇö question.market / QuestionMarket Contract
+================================================================================
+
+Title       : Permanent Dispute Lock via Pool Depletion (Invariant Panic in
+              challenge_resolution)
+Severity    : CRITICAL
+Category    : Contract-level logic bug ΓÇö affects core resolution functionality
+              and enables theft of user funds
+Contract    : QuestionMarket (smart_contracts/market_app/contract.py)
+Network     : Algorand (testnet deployment)
+Submitted   : 2026-04-26
+Repro       : tests/repro_solvency_lock.py (run: python -m pytest tests/repro_solvency_lock.py -s)
+
+
+================================================================================
+EXECUTIVE SUMMARY
+================================================================================
+
+A critical invariant check in the QuestionMarket contract incorrectly gates
+the STATUS_DISPUTED state transition behind a cost-basis solvency requirement
+(pool_balance >= total_outstanding_cost_basis).
+
+Because an LMSR AMM legitimately loses money to profitable traders ΓÇö this is a
+designed and expected property ΓÇö active trading in a prediction market WILL
+eventually drive pool_balance below total_outstanding_cost_basis. Once this
+threshold is crossed, the invariant check panics (asserts false) at the end of
+challenge_resolution(), permanently preventing ANY user from challenging a
+resolution proposal.
+
+This means a malicious resolver can propose an incorrect outcome, and if the
+market has seen sufficient trading activity, the challenge mechanism is
+completely bricked. The wrong outcome finalises after the challenge window,
+and all losing-side users lose their funds to the incorrect winner.
+
+
+================================================================================
+VULNERABILITY DETAILS
+================================================================================
+
+--- Vulnerable Code Location ---
+
+File : smart_contracts/market_app/contract.py
+Lines: 644ΓÇô653
+
+    @subroutine
+    def _assert_invariants(self) -> None:
+        st = self.status.value
+        if st >= UInt64(STATUS_ACTIVE) and st <= UInt64(STATUS_DISPUTED):
+            self._require(self.winner_share_bps.value + self.dispute_sink_share_bps.value <= UInt64(BPS_DENOMINATOR))
+            self._assert_solvency()
+            if st == UInt64(STATUS_CANCELLED) or st == UInt64(STATUS_DISPUTED):
+                self._require(self.pool_balance.value >= self.total_outstanding_cost_basis.value)  # <-- BUG HERE
+            if st != UInt64(STATUS_RESOLVED):
+                self._assert_price_sum()
+
+The check on line 651 is applied to BOTH STATUS_CANCELLED AND STATUS_DISPUTED.
+
+--- Trigger Path ---
+
+The call to _assert_invariants() happens at line 1191, inside
+challenge_resolution(), AFTER the status has already been set to
+STATUS_DISPUTED (line 1188):
+
+    def challenge_resolution(self, payment, reason_code, evidence_hash):
+        self._require_status(UInt64(STATUS_RESOLUTION_PROPOSED))
+        ...
+        self.status.value = UInt64(STATUS_DISPUTED)       # <-- status set
+        ...
+        arc4.emit(...)
+        self._assert_invariants()                          # <-- panics here
+
+
+================================================================================
+ROOT CAUSE ANALYSIS
+================================================================================
+
+The LMSR AMM has a fundamental property: its pool is designed to potentially
+end up paying out more to winners than it collected from losers. The "bootstrap
+deposit" is the initial cushion that absorbs this expected loss. However, the
+LMSR loss is bounded and normal ΓÇö traders who correctly predict the outcome
+extract value from the pool, shrinking the pool_balance relative to the total
+cost basis.
+
+The state variable total_outstanding_cost_basis tracks the total amount all
+current share-holders paid for their shares (their "cost basis"). As profitable
+traders sell at a profit, the pool shrinks but cost_basis for remaining holders
+does not change. After sufficient trading, the following is entirely possible
+and expected:
+
+    pool_balance < total_outstanding_cost_basis
+
+This is NOT a solvency problem for resolution ΓÇö because only ONE outcome's
+shares will ultimately be redeemable. The resolved solvency check correctly
+handles this (_assert_solvency checks pool >= winning_payout, not >= total
+cost_basis).
+
+The invariant check for STATUS_DISPUTED is therefore INCORRECT. It applies a
+solvency test that is only meaningful for STATUS_CANCELLED (where ALL users
+need a refund) to STATUS_DISPUTED, where the market is simply mid-dispute and
+will eventually transition to STATUS_RESOLVED or STATUS_CANCELLED.
+
+
+================================================================================
+ATTACK SCENARIO (FUND THEFT)
+================================================================================
+
+The following sequence allows a malicious resolver to steal funds:
+
+Step 1: A QuestionMarket is created with normal parameters and bootstrapped
+        with the minimum required deposit (e.g. $100 for b=$50 market).
+
+Step 2: Normal trading activity occurs. The market becomes active with many
+        users buying and selling shares. The LMSR pool's "cushion" is drained
+        by profitable traders. At some point:
+            pool_balance < total_outstanding_cost_basis
+
+        This can happen naturally in any market with volume, or be hastened by
+        a coordinated trading attack.
+
+Step 3: The market deadline passes. Anyone calls trigger_resolution().
+
+Step 4: The malicious resolution authority proposes an INCORRECT outcome
+        (e.g. Outcome 2 is "YES wins" when the correct answer is "NO wins").
+
+        The resolution authority (per protocol whitepaper) is a trusted role,
+        but the dispute mechanism exists precisely to catch and punish malicious
+        resolvers. This vulnerability neutralises that mechanism.
+
+Step 5: Any user who notices the incorrect proposal tries to call
+        challenge_resolution() with their bond payment. The call PANICS at
+        _assert_invariants() because pool_balance < total_outstanding_cost_basis.
+        The challenge is permanently blocked. No user can dispute.
+
+Step 6: The challenge window (86,400 seconds = 24 hours) expires with no
+        successful challenge. finalize_resolution() can now be called by anyone,
+        permanently setting the wrong outcome.
+
+Step 7: The malicious resolver's proposed outcome is finalised. Correct-outcome
+        shareholders cannot claim. The wrong-outcome shareholders (potentially
+        controlled by the malicious resolver or accomplices) can claim all the
+        funds.
+
+        RESULT: All user funds in the market are effectively transferred to
+        the malicious resolver and their accomplices.
+
+
+================================================================================
+PROOF OF CONCEPT ΓÇö REPRODUCTION
+================================================================================
+
+File: tests/repro_solvency_lock.py
+
+To run:
+    python -m pytest tests/repro_solvency_lock.py -s
+
+Expected output:
+    Pool Balance: 10045109050
+    Total Basis: 10500007600
+    Attempting to challenge...
+    Challenge failed as expected:        <-- confirms the bug
+    1 passed in 0.51s
+
+The test:
+1. Creates a market with b=50_000_000 and bootstraps with $100 (min deposit).
+2. Runs two traders (trader1 and trader2) through repeated buy/sell cycles.
+   - trader2 inflates the price of an outcome by buying large positions.
+   - trader1 buys before trader2's large purchase and sells after, capturing
+     the price movement as profit extracted from the pool.
+3. After 10+ cycles, pool_balance (10,045,109,050 uUSDC) is less than
+   total_outstanding_cost_basis (10,500,007,600 uUSDC).
+4. The market deadline is passed, resolution is triggered, and a WRONG
+   outcome is proposed by the resolver.
+5. A challenge attempt panics with AssertionError ΓÇö the dispute is locked.
+
+Note: The test passes (1 passed) because it correctly EXPECTS the challenge to
+fail. This CONFIRMS the vulnerability is real and reproducible.
+
+The pool and basis figures above are in micro-USDC (6 decimal places):
+    Pool:  10,045.109050 USDC
+    Basis: 10,500.007600 USDC
+    Deficit: ~454 USDC ΓÇö enough to trigger the bug
+
+
+================================================================================
+IMPACT ASSESSMENT
+================================================================================
+
+Impact Level   : CRITICAL
+Affected users : ALL users who hold shares in the affected market at the time
+                 of resolution
+Funds at risk  : The entire pool_balance of the market at the time of the
+                 attack (~10,000+ USDC in the reproduction; unlimited in
+                 real markets with more trading volume)
+Scope          : Qualifies under "affect user funds ΓÇö loss, theft, or
+                 permanent lock" AND "make a contract unusable for its core
+                 functionality: resolution"
+Exploitability : Moderate-to-High. Requires pool to be drained below basis,
+                 which happens naturally in active markets OR can be forced by
+                 a colluding attacker with capital. No special privileges
+                 required for the trading steps. Only requires a malicious
+                 resolver for Step 4.
+No External    : This is a pure smart contract logic bug, no external
+Trust Required   dependencies, oracle manipulation, or frontend issues.
+
+
+================================================================================
+FULL CALL STACK AT PANIC (from algopy_testing simulation)
+================================================================================
+
+    challenge_resolution(payment, reason_code, evidence_hash)
+      -> self.status.value = UInt64(STATUS_DISPUTED)
+      -> self._assert_invariants()
+           -> st == STATUS_DISPUTED  [True]
+           -> self._require(pool_balance >= total_outstanding_cost_basis)
+                pool_balance  = 10,045,109,050
+                cost_basis    = 10,500,007,600
+                10045109050 >= 10500007600  ΓåÆ FALSE
+                ΓåÆ _require panics (AssertionError in testing / logic error on AVM)
+
+
+================================================================================
+AFFECTED METHODS (SECONDARY IMPACT)
+================================================================================
+
+The same invariant check at line 650ΓÇô651 also applies to STATUS_CANCELLED.
+However, the cancellation flow typically occurs BEFORE substantial trading has
+depleted the pool (markets can only be cancelled in certain states). The
+DISPUTED path is the critical attack vector because it can be hit after any
+amount of trading.
+
+Other functions that call _assert_invariants() after entering DISPUTED state:
+- register_dispute()      (line 1207) ΓÇö similarly blocked
+- finalize_dispute()      (line ~1240) ΓÇö blocked
+- cancel_dispute_and_market() (line ~1268) ΓÇö blocked
+
+This means once the pool deficit condition is triggered, the ENTIRE dispute
+resolution flow is bricked ΓÇö not just the initial challenge.
+
+
+================================================================================
+RECOMMENDED FIX
+================================================================================
+
+See: PROPOSED_FIX.txt
+
+Short version: Remove STATUS_DISPUTED from the cost-basis solvency check.
+The check at line 650ΓÇô651 should only apply to STATUS_CANCELLED, since a
+cancelled market requires full refunds. A disputed market will eventually
+resolve with a winner and only needs the winner-payout solvency check
+(_assert_solvency, which already handles this correctly).
+
+
+================================================================================
+ADDITIONAL NOTES
+================================================================================
+
+1. This vulnerability exists independently of the trust assumptions documented
+   in the whitepaper (resolver authority). The dispute mechanism is the
+   MITIGATION for resolver misbehaviour ΓÇö disabling it removes the safety net.
+
+2. No oracle manipulation, flash loans, or front-running is required. The
+   trading pattern that triggers the condition is normal market behaviour.
+
+3. The reproduction uses the algopy_testing framework (the official Algorand
+   Python testing library) against the actual contract source code ΓÇö no
+   simulated or approximate logic.
+
+4. The existing test suite does NOT catch this because no existing test
+   attempts to challenge a resolution after a pool-draining trading sequence.
+
+================================================================================
+END OF REPORT
+================================================================================
