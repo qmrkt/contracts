@@ -1,0 +1,204 @@
+================================================================================
+     PROPOSED FIX — question.market / QuestionMarket Contract
+================================================================================
+
+Bug Reference : BUG_BOUNTY_REPORT.txt
+Title         : Permanent Dispute Lock via Pool Depletion (Invariant Panic)
+File          : smart_contracts/market_app/contract.py
+Author        : Security Research (Bug Bounty Submission)
+Date          : 2026-04-26
+
+
+================================================================================
+SECTION 1: THE BUG IN ONE LINE
+================================================================================
+
+Line 650 in contract.py incorrectly applies a "pool covers all cost basis"
+solvency check to STATUS_DISPUTED markets. This check fails after normal
+profitable trading, blocking the entire dispute mechanism.
+
+
+================================================================================
+SECTION 2: CURRENT CODE (VULNERABLE)
+================================================================================
+
+File: smart_contracts/market_app/contract.py, Lines 644–653
+
+    @subroutine
+    def _assert_invariants(self) -> None:
+        st = self.status.value
+        if st >= UInt64(STATUS_ACTIVE) and st <= UInt64(STATUS_DISPUTED):
+            self._require(self.winner_share_bps.value + self.dispute_sink_share_bps.value <= UInt64(BPS_DENOMINATOR))
+            self._assert_solvency()
+            if st == UInt64(STATUS_CANCELLED) or st == UInt64(STATUS_DISPUTED):  # <-- BUG: DISPUTED included
+                self._require(self.pool_balance.value >= self.total_outstanding_cost_basis.value)
+            if st != UInt64(STATUS_RESOLVED):
+                self._assert_price_sum()
+
+
+================================================================================
+SECTION 3: PROPOSED FIX
+================================================================================
+
+Remove STATUS_DISPUTED from the cost-basis check condition on line 650.
+Only STATUS_CANCELLED genuinely requires this constraint.
+
+    @subroutine
+    def _assert_invariants(self) -> None:
+        st = self.status.value
+        if st >= UInt64(STATUS_ACTIVE) and st <= UInt64(STATUS_DISPUTED):
+            self._require(self.winner_share_bps.value + self.dispute_sink_share_bps.value <= UInt64(BPS_DENOMINATOR))
+            self._assert_solvency()
+            if st == UInt64(STATUS_CANCELLED):                                   # <-- FIXED: only CANCELLED
+                self._require(self.pool_balance.value >= self.total_outstanding_cost_basis.value)
+            if st != UInt64(STATUS_RESOLVED):
+                self._assert_price_sum()
+
+
+DIFF:
+------
+-            if st == UInt64(STATUS_CANCELLED) or st == UInt64(STATUS_DISPUTED):
++            if st == UInt64(STATUS_CANCELLED):
+                 self._require(self.pool_balance.value >= self.total_outstanding_cost_basis.value)
+
+
+================================================================================
+SECTION 4: RATIONALE FOR THE FIX
+================================================================================
+
+--- Why the check is WRONG for STATUS_DISPUTED ---
+
+A DISPUTED market is in a transient state. It will always ultimately resolve
+to either:
+  (a) STATUS_RESOLVED  — one outcome wins, _assert_solvency() verifies
+                          pool >= winning_payout (correct, already exists)
+  (b) STATUS_CANCELLED — all users get refunds, then the cost-basis check
+                          is relevant and should apply
+
+Requiring pool >= total_cost_basis in DISPUTED status is wrong because:
+  1. LMSR AMM markets are mathematically expected to have pool < cost_basis
+     after profitable traders take money out. This is NOT a bug, it's LMSR.
+  2. The dispute outcome (finalize_dispute or cancel_dispute_and_market) will
+     set the correct terminal status (RESOLVED or CANCELLED), where the
+     relevant invariants will be enforced correctly.
+  3. There is no reason to enforce a "can refund all users" guarantee during
+     a dispute that will ultimately resolve to paying only the winning side.
+
+--- Why the check is CORRECT for STATUS_CANCELLED ---
+
+A cancelled market requires every user to be able to get a full refund
+(pro-rata by cost basis). Therefore, the pool must be >= total_cost_basis.
+This check is correct and should remain for STATUS_CANCELLED.
+
+However, note that even STATUS_CANCELLED can theoretically be locked by pool
+depletion (if the market is cancelled after heavy profitable trading). This
+would require a separate mitigation (e.g., pro-rata refunds rather than
+full-cost-basis refunds). For the scope of this report, the primary critical
+fix is removing DISPUTED from the check.
+
+--- Why _assert_solvency() already covers the RESOLVED case ---
+
+The existing _assert_solvency() at lines 635–642 correctly verifies:
+  pool_balance >= winning_payout (total shares for winning outcome)
+This is the only solvency requirement that matters after resolution.
+It is already called unconditionally before the STATUS_CANCELLED / DISPUTED
+branch, and it only activates for STATUS_RESOLVED. This is correct.
+
+
+================================================================================
+SECTION 5: EXACT FILE EDIT LOCATION
+================================================================================
+
+File    : smart_contracts/market_app/contract.py
+Line    : 650
+
+CURRENT (line 650):
+    if st == UInt64(STATUS_CANCELLED) or st == UInt64(STATUS_DISPUTED):
+
+REPLACE WITH:
+    if st == UInt64(STATUS_CANCELLED):
+
+
+================================================================================
+SECTION 6: TEST PLAN
+================================================================================
+
+--- Step 1: Verify the Reproduction Script Confirms the Bug ---
+
+    python -m pytest tests/repro_solvency_lock.py -s
+
+Expected output (BEFORE fix):
+    Pool Balance: 10045109050
+    Total Basis: 10500007600
+    Attempting to challenge...
+    Challenge failed as expected:
+    1 passed in 0.51s
+
+The test PASSES because it EXPECTS the challenge to fail.
+This confirms the bug is present.
+
+--- Step 2: Apply the Fix ---
+
+Edit line 650 in smart_contracts/market_app/contract.py as shown above.
+
+--- Step 3: Update the Reproduction Script to Verify the Fix ---
+
+After applying the fix, the test expectation should be inverted. The challenge
+should SUCCEED. The test at tests/repro_solvency_lock.py should be updated
+(or a new assertion added) to confirm that after the fix:
+  - challenge_resolution() completes without panicking
+  - contract.status.value == STATUS_DISPUTED
+
+--- Step 4: Run the Full Test Suite for Regressions ---
+
+    python -m pytest tests/ -v
+
+All existing tests must pass. Pay special attention to:
+  - tests/test_c4_dispute_hardening.py  — dispute state machine tests
+  - tests/test_market_app_contract_runtime.py — runtime integration tests
+  - tests/test_c4_property_invariants.py — invariant property tests
+  - tests/test_c6_adversarial.py — adversarial tests
+
+--- Step 5: Rebuild and Re-deploy Contract Artifacts ---
+
+After fixing and verifying:
+    algokit project run build
+    algokit project deploy localnet  (for localnet validation)
+
+
+================================================================================
+SECTION 7: SECONDARY CONSIDERATION — STATUS_CANCELLED LOCKABILITY
+================================================================================
+
+The same pool-depletion condition that causes the DISPUTED lock can, in theory,
+also prevent STATUS_CANCELLED from being entered (e.g., if admin tries to
+cancel a market where profitable traders have depleted the pool).
+
+This is a lower-severity concern because:
+  - Markets are typically cancelled EARLY (before heavy trading)
+  - Cancellation paths are admin-controlled
+  - The most critical exploit path (dispute-blocking by malicious resolver)
+    is fully addressed by the above fix
+
+A longer-term hardening measure would be to remove the cost-basis check from
+STATUS_CANCELLED as well, and replace it with pro-rata refunds based on
+available pool balance. This is a more complex change requiring careful
+consideration of the refund accounting.
+
+
+================================================================================
+SECTION 8: NON-IMPACTED AREAS (CONFIRMED SAFE)
+================================================================================
+
+The following are NOT affected by this bug:
+  - The _assert_solvency() check (pool >= winning_payout) — correct as-is
+  - The buy/sell trade logic — mathematically sound LMSR implementation
+  - The withdraw_protocol_fees() method — correctly includes dispute_sink_balance
+  - The finalize_resolution() path — unaffected (uses STATUS_RESOLVED checks)
+  - Bond calculation logic (_required_challenge_bond) — correctly scales with
+    max(pool_balance, bootstrap_deposit), not exploitable
+
+
+================================================================================
+END OF PROPOSED FIX
+================================================================================

@@ -633,7 +633,7 @@ class QuestionMarket(ARC4Contract):
         if st >= UInt64(STATUS_ACTIVE) and st <= UInt64(STATUS_DISPUTED):
             self._require(self.winner_share_bps.value + self.dispute_sink_share_bps.value <= UInt64(BPS_DENOMINATOR))
             self._assert_solvency()
-            if st == UInt64(STATUS_CANCELLED) or st == UInt64(STATUS_DISPUTED):
+            if st == UInt64(STATUS_CANCELLED):
                 self._require(self.pool_balance.value >= self.total_outstanding_cost_basis.value)
             if st != UInt64(STATUS_RESOLVED):
                 self._assert_price_sum()
