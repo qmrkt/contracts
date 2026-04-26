@@ -544,45 +544,31 @@ class QuestionMarket(ARC4Contract):
         return self.settlement_timestamp.value - self.activation_timestamp.value - UInt64(1)
 
     @subroutine
-    def _residual_weight(self) -> UInt64:
-        shares = self._get_lp_shares()
+    def _calculate_weight(self, shares: UInt64, entry_sum: UInt64) -> UInt64:
         if shares == UInt64(0):
             return UInt64(0)
         window = self._normalized_residual_window()
         if window == UInt64(0):
             return shares
         elapsed_scaled = self._entry_weighted_sum_checked(shares, self.settlement_timestamp.value - UInt64(1))
-        weighted_sum = self._get_lp_weighted_entry_sum()
-        if elapsed_scaled <= weighted_sum:
+        if elapsed_scaled <= entry_sum:
             return shares
         window_high, window_scaled = op.mulw(window, UInt64(SCALE))
         self._require(window_high == UInt64(0))
         premium = lmsr_mul_div_floor(
             self.residual_linear_lambda_fp.value,
-            elapsed_scaled - weighted_sum,
+            elapsed_scaled - entry_sum,
             window_scaled,
         )
         return shares + premium
 
     @subroutine
+    def _residual_weight(self) -> UInt64:
+        return self._calculate_weight(self._get_lp_shares(), self._get_lp_weighted_entry_sum())
+
+    @subroutine
     def _total_residual_weight(self) -> UInt64:
-        total_shares = self.lp_shares_total.value
-        if total_shares == UInt64(0):
-            return UInt64(0)
-        window = self._normalized_residual_window()
-        if window == UInt64(0):
-            return total_shares
-        elapsed_scaled = self._entry_weighted_sum_checked(total_shares, self.settlement_timestamp.value - UInt64(1))
-        if elapsed_scaled <= self.total_lp_weighted_entry_sum.value:
-            return total_shares
-        window_high, window_scaled = op.mulw(window, UInt64(SCALE))
-        self._require(window_high == UInt64(0))
-        premium = lmsr_mul_div_floor(
-            self.residual_linear_lambda_fp.value,
-            elapsed_scaled - self.total_lp_weighted_entry_sum.value,
-            window_scaled,
-        )
-        return total_shares + premium
+        return self._calculate_weight(self.lp_shares_total.value, self.total_lp_weighted_entry_sum.value)
 
     @subroutine
     def _claimable_residual(self) -> UInt64:
@@ -660,7 +646,8 @@ class QuestionMarket(ARC4Contract):
         # The identity op ensures UInt64 type for both AVM and testing framework
         return Global.latest_timestamp + UInt64(0)
 
-    def _verify_payment(self, payment: gtxn.AssetTransferTransaction, min_amount: UInt64) -> None:
+    def _verify_payment(self, payment: gtxn.AssetTransferTransaction, min_amount: UInt64, expected_index: UInt64) -> None:
+        self._require(payment.group_index == expected_index)
         self._require(payment.sender.bytes == Txn.sender.bytes)
         self._require(payment.asset_receiver == Global.current_application_address)
         self._require(payment.xfer_asset.id == self.currency_asa.value)
@@ -921,7 +908,7 @@ class QuestionMarket(ARC4Contract):
         funding_required = deposit + budget_required
         self._require(deposit > UInt64(0))
         self._require_lmsr_bootstrap_floor(deposit)
-        self._verify_payment(payment, funding_required)
+        self._verify_payment(payment, funding_required, Txn.group_index - UInt64(1))
 
         self._require(self.blueprint_cid.value.length > UInt64(0))
 
@@ -973,6 +960,7 @@ class QuestionMarket(ARC4Contract):
         # The payment must actually fund the app account before box creation.
         # Rekey/close checks are omitted as a size-cap compromise; nonzero
         # values only affect the trader's own payment account.
+        self._require(mbr_payment.group_index == Txn.group_index - UInt64(1))
         assert mbr_payment.sender.bytes == Txn.sender.bytes
         assert mbr_payment.receiver == Global.current_application_address
         assert mbr_payment.amount == UInt64(SHARE_BOX_MBR + COST_BOX_MBR)
@@ -983,7 +971,7 @@ class QuestionMarket(ARC4Contract):
         protocol_fee = self._calc_fee_up(cost, self.protocol_fee_bps.value)
         total_cost = cost + lp_fee + protocol_fee
         self._require(total_cost <= max_total)
-        self._verify_payment(payment, total_cost)
+        self._verify_payment(payment, total_cost, Txn.group_index - UInt64(2))
 
         # State updates first (P9)
         q[outcome] = q[outcome] + shares_val
@@ -1080,7 +1068,7 @@ class QuestionMarket(ARC4Contract):
 
         deposit_required = lmsr_collateral_required_from_prices(delta_b, current_prices)
         self._require(deposit_required <= max_deposit_val)
-        self._verify_payment(payment, deposit_required)
+        self._verify_payment(payment, deposit_required, Txn.group_index - UInt64(1))
 
         self._settle_lp_fees()
 
@@ -1134,7 +1122,7 @@ class QuestionMarket(ARC4Contract):
         required_bond = UInt64(0)
         if not is_authority:
             required_bond = self._required_proposal_bond()
-        self._verify_payment(payment, required_bond)
+        self._verify_payment(payment, required_bond, Txn.group_index - UInt64(1))
 
         # State updates (P9)
         self.proposer.value = Txn.sender.bytes
@@ -1157,7 +1145,7 @@ class QuestionMarket(ARC4Contract):
         self._require_authorized(self.resolution_authority.value)
         outcome = outcome_index.as_uint64()
         self._assert_valid_outcome(outcome)
-        self._verify_payment(payment, UInt64(0))
+        self._verify_payment(payment, UInt64(0), Txn.group_index - UInt64(1))
 
         self.proposer.value = Txn.sender.bytes
         self.proposer_bond_held.value = payment.asset_amount
@@ -1177,7 +1165,7 @@ class QuestionMarket(ARC4Contract):
     ) -> None:
         self._require_status(UInt64(STATUS_RESOLUTION_PROPOSED))
         self._require(self._now() < self.proposal_timestamp.value + self.challenge_window_secs.value)
-        self._verify_payment(payment, self._required_challenge_bond())
+        self._verify_payment(payment, self._required_challenge_bond(), Txn.group_index - UInt64(1))
 
         # State updates first (P9). Bond retained by contract until dispute resolves.
         self.challenger.value = Txn.sender.bytes
