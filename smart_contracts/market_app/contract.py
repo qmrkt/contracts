@@ -634,6 +634,33 @@ class QuestionMarket(ARC4Contract):
             self._require(self.winner_share_bps.value + self.dispute_sink_share_bps.value <= UInt64(BPS_DENOMINATOR))
             self._assert_solvency()
             if st == UInt64(STATUS_CANCELLED) or st == UInt64(STATUS_DISPUTED):
+                # DESIGN NOTE — why STATUS_DISPUTED is included here:
+                #
+                # Every exit path out of STATUS_DISPUTED (finalize_dispute,
+                # cancel_dispute_and_market) ultimately either resolves to a
+                # winner (STATUS_RESOLVED) or falls back to a full refund
+                # (STATUS_CANCELLED).  The CANCELLED path calls refund(), which
+                # pays each holder at cost-basis.  If pool < total_cost_basis,
+                # early refund callers drain the pool and later callers get
+                # nothing — an underflow / unfair distribution.
+                #
+                # To prevent a market from ever reaching STATUS_DISPUTED when
+                # it cannot honour the refund-at-basis guarantee, we gate entry
+                # to STATUS_DISPUTED behind the same pool >= tcb check that
+                # guards STATUS_CANCELLED.  This means:
+                #
+                #   • It is IMPOSSIBLE to enter STATUS_DISPUTED when
+                #     pool < total_outstanding_cost_basis.
+                #   • The market can still be finalised via propose_resolution /
+                #     finalize_resolution — resolution is never blocked.
+                #   • The "stuck-in-dispute" liveness failure described in
+                #     security report #13 cannot occur because entry is gated.
+                #
+                # Known limitation: if heavy profitable trading drives
+                # pool < total_cost_basis, the challenge mechanism becomes
+                # unavailable.  The correct long-term fix is a pro-rata fallback
+                # refund mechanism (see issue #16).  Until that is implemented,
+                # this invariant is the safest conservative choice.
                 self._require(self.pool_balance.value >= self.total_outstanding_cost_basis.value)
             if st != UInt64(STATUS_RESOLVED):
                 self._assert_price_sum()
