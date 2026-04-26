@@ -647,7 +647,7 @@ class QuestionMarket(ARC4Contract):
         return Global.latest_timestamp + UInt64(0)
 
     def _verify_payment(self, payment: gtxn.AssetTransferTransaction, min_amount: UInt64, expected_index: UInt64) -> None:
-        self._require(payment.index == expected_index)
+        self._require(payment.group_index == expected_index)
         self._require(payment.sender.bytes == Txn.sender.bytes)
         self._require(payment.asset_receiver == Global.current_application_address)
         self._require(payment.xfer_asset.id == self.currency_asa.value)
@@ -960,7 +960,7 @@ class QuestionMarket(ARC4Contract):
         # The payment must actually fund the app account before box creation.
         # Rekey/close checks are omitted as a size-cap compromise; nonzero
         # values only affect the trader's own payment account.
-        self._require(mbr_payment.index == Txn.group_index - UInt64(1))
+        self._require(mbr_payment.group_index == Txn.group_index - UInt64(1))
         assert mbr_payment.sender.bytes == Txn.sender.bytes
         assert mbr_payment.receiver == Global.current_application_address
         assert mbr_payment.amount == UInt64(SHARE_BOX_MBR + COST_BOX_MBR)
@@ -1350,28 +1350,6 @@ class QuestionMarket(ARC4Contract):
     def withdraw_protocol_fees(self) -> None:
         """Withdraw accumulated protocol fees and dispute-sink balance to the configured protocol treasury."""
         amount = self.protocol_fee_balance.value + self.dispute_sink_balance.value
-        
-        bs = self.bootstrapper_lp_shares.value
-        if bs > UInt64(0) and (self.status.value == UInt64(STATUS_RESOLVED) or self.status.value == UInt64(STATUS_CANCELLED)):
-            fee_accrued = lmsr_mul_div_floor(self.cumulative_fee_per_share.value, bs, UInt64(SCALE))
-            weight = self._calculate_weight(bs, self.bootstrapper_lp_entry.value)
-            total_weight = self._total_residual_weight()
-            
-            entitled = UInt64(0)
-            if total_weight > UInt64(0):
-                entitled = lmsr_mul_div_floor(self._releasable_residual_pool(), weight, total_weight)
-                
-            self.bootstrapper_lp_shares.value = UInt64(0)
-            
-            if fee_accrued > UInt64(0):
-                self.lp_fee_balance.value = self.lp_fee_balance.value - fee_accrued
-                amount = amount + fee_accrued
-                
-            if entitled > UInt64(0):
-                self.pool_balance.value = self.pool_balance.value - entitled
-                self.total_residual_claimed.value = self.total_residual_claimed.value + entitled
-                amount = amount + entitled
-
         self._require(amount > UInt64(0))
         self.protocol_fee_balance.value = UInt64(0)
         self.dispute_sink_balance.value = UInt64(0)

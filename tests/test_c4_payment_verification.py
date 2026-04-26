@@ -260,6 +260,44 @@ class TestP11PaymentVerification:
                     latest_timestamp=5000,
                 )
 
+    def test_buy_rejects_reused_payment_gtxn(self, disable_arc4_emit) -> None:
+        """
+        Regression for the gtxn-index reuse double-spend (qmrkt/contracts#11).
+
+        An attacker submits one USDC payment + two buy() AppCalls in the same
+        group, both passing the SAME payment txn as their `payment` argument.
+        Without the `payment.group_index == Txn.group_index - 2` check, both
+        buys would settle against a single payment, letting the attacker mint
+        free shares. With the check in place, the second buy must reject.
+        """
+        creator = make_address()
+        attacker = make_address()
+        with algopy_testing_context() as context:
+            contract = setup_bootstrapped_contract(context, creator)
+
+            single_payment = make_payment(context, contract, attacker, 10_000_000)
+            mbr1 = make_mbr_payment(context, contract, attacker, SHARE_BOX_MBR + COST_BOX_MBR)
+            mbr2 = make_mbr_payment(context, contract, attacker, SHARE_BOX_MBR + COST_BOX_MBR)
+
+            context.ledger.patch_global_fields(latest_timestamp=5_000)
+            context._default_sender = Account(attacker)
+
+            d1 = context.txn.defer_app_call(
+                contract.buy,
+                arc4.UInt64(0), arc4.UInt64(SHARE_UNIT), arc4.UInt64(10_000_000),
+                single_payment, mbr1,
+            )
+            d2 = context.txn.defer_app_call(
+                contract.buy,
+                arc4.UInt64(0), arc4.UInt64(SHARE_UNIT), arc4.UInt64(10_000_000),
+                single_payment, mbr2,  # SAME single_payment reused
+            )
+
+            with pytest.raises(AssertionError):
+                with context.txn.create_group([d1, d2]):
+                    contract.buy(arc4.UInt64(0), arc4.UInt64(SHARE_UNIT), arc4.UInt64(10_000_000), single_payment, mbr1)
+                    contract.buy(arc4.UInt64(0), arc4.UInt64(SHARE_UNIT), arc4.UInt64(10_000_000), single_payment, mbr2)
+
     @pytest.mark.parametrize(
         ("payment_kwargs", "method_name", "method_args", "sender_role"),
         [
