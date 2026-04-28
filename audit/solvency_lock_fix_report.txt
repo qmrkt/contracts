@@ -1,0 +1,106 @@
+### VULNERABILITY TITLE:
+**Permanent Fund Lock via Invariant-Induced Liveness Failure (Solvency Lock)**
+
+---
+
+### SEVERITY:
+**Critical**  
+This bug permanently freezes all user funds and contract assets when a market becomes insolvent.
+
+---
+
+### AFFECTED FUNCTION(S):
+- `_assert_invariants()` (Lines 646-681)
+- `challenge_resolution()` (Line 1219)
+- `finalize_resolution()` (Line 1338)
+- `cancel()` (Line 1386)
+
+---
+
+### ROOT CAUSE:
+The `_assert_invariants()` method incorrectly gates entry into `STATUS_DISPUTED` and `STATUS_CANCELLED` on a strict solvency check:  
+`pool_balance >= total_outstanding_cost_basis`.
+
+In this contract, "insolvency" (i.e., `pool_balance < total_outstanding_cost_basis`) is an unavoidable state due to the following reasons:
+
+1. **LMSR Logic**:
+   - Traders can legitimately extract more profit than the initial LP cushion if the market moves significantly.
+
+2. **Fee Siphoning**:
+   - Every `sell()` operation decrements `pool_balance` by the **gross return** (Line 1063) while diverting fees to separate balances.
+   - The initial `bootstrap_deposit` does not account for this drain. High trading volume will inevitably deplete the pool cushion until it falls below the cost basis.
+
+Once this threshold is crossed:
+- The contract blocks the **Challenge** and **Cancel** paths.
+- If the proposed outcome is also insolvent (`pool_balance < winning_shares`), the **Finalize** path is blocked by `_assert_solvency()`.
+
+This creates a **terminal deadlock** with no exit transition, locking 100% of the funds.
+
+---
+
+### ATTACK PATH:
+1. **Create a Market**:
+   - Bootstrap the market with an initial deposit.
+2. **Drain the Pool Cushion**:
+   - Execute high-volume trading (Buy/Sell cycles) until `pool_balance < total_outstanding_cost_basis` (due to fee siphoning and trader profit).
+3. **Reach Market Deadline**:
+   - A proposer submits an outcome where `total_user_shares[outcome] > pool_balance`.
+4. **Trigger Deadlock**:
+   - Attempt to **Challenge** → REVERT (`Invariant pool >= tcb fails`).
+   - Attempt to **Finalize** → REVERT (`Solvency check pool >= shares fails`).
+   - Attempt to **Cancel** → REVERT (`Invariant pool >= tcb fails`).
+
+**Result**: Market is permanently stuck; funds are locked.
+
+---
+
+### IMPACT:
+- **All users and LPs are affected**.
+- **100% of the market's liquidity is permanently locked** in the contract with no recovery path.
+
+---
+
+### REPRODUCTION:
+A localnet-compatible reproduction script using `algokit-utils` and the actual contract artifacts is available at:  
+`scripts/repro_solvency_lock_localnet.py`
+
+#### Steps to Run:
+1. Start LocalNet:  
+   ```bash
+   algokit localnet start
+   ```
+2. Run the script:  
+   ```bash
+   python scripts/repro_solvency_lock_localnet.py
+   ```
+
+---
+
+### EXPECTED BEHAVIOR:
+The contract must always allow:
+- **Challenging a proposal** or
+- **Cancelling the market**  
+to restore liveness, even if the pool is insolvent.
+
+Invariants should ensure safety (e.g., pro-rata distribution), not block terminal state transitions.
+
+---
+
+### ACTUAL BEHAVIOR:
+The contract reverts all attempts to transition the market to a terminal state, locking all funds.
+
+---
+
+### SUGGESTED FIXES:
+1. **Relax Solvency Checks**:
+   - Allow `challenge_resolution()` and `cancel()` to proceed even if `pool_balance < total_outstanding_cost_basis`.
+   - Introduce fallback mechanisms to ensure liveness.
+
+2. **Pro-Rata Distribution**:
+   - Implement a pro-rata distribution mechanism for insolvent states to ensure fair recovery of funds.
+
+3. **Fee Accounting Adjustments**:
+   - Modify the `sell()` logic to account for fee siphoning and prevent premature depletion of the pool cushion.
+
+4. **Graceful Degradation**:
+   - Introduce a "graceful degradation" mode where the contract transitions to a terminal state with partial payouts if solvency cannot be maintained.
