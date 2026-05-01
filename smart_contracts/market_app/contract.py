@@ -1384,6 +1384,21 @@ class QuestionMarket(ARC4Contract):
         arc4.emit("WithdrawFees(uint64)", arc4.UInt64(amount))
 
     @arc4.abimethod()
+    @arc4.abimethod()
+    def withdraw_dispute_sink(self, amount: arc4.UInt64) -> None:
+        """Withdraw a specified amount of USDC from the dispute sink.
+
+        The dispute sink holds slashed bond funds that would otherwise be
+        permanently locked. This method allows the protocol treasury (or an
+        authorized admin) to recover those funds.
+        """
+        withdraw_amount = amount.as_uint64()
+        self._require(withdraw_amount > UInt64(0))
+        self._require(self.dispute_sink_balance.value >= withdraw_amount)
+        self.dispute_sink_balance.value = self.dispute_sink_balance.value - withdraw_amount
+        self._send_currency(Account(self.protocol_treasury.value), withdraw_amount)
+        arc4.emit("WithdrawDisputeSink(uint64)", arc4.UInt64(withdraw_amount))
+
     def refund(self, outcome_index: arc4.UInt64, shares: arc4.UInt64) -> None:
         self._require_status(UInt64(STATUS_CANCELLED))
         outcome = outcome_index.as_uint64()
